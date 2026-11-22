@@ -1,7 +1,168 @@
 <!doctype html>
 <html lang="nl">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Maze Lab</title>
-<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#111;color:#ddd;font-family:system-ui}</style>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Maze Lab</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #151b23; --line: #263040; --text: #dbe4ee; --muted: #8b98a8;
+    --accent: #ffd166; --accent-ink: #1a1405; --field: #0f141b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; display: flex; flex-direction: column; }
+  header.top { display: flex; align-items: center; gap: 20px; padding: 0 16px; height: 50px; border-bottom: 1px solid var(--line); flex: none; }
+  .brand { font-weight: 800; letter-spacing: .04em; }
+  .brand span { color: var(--accent); }
+  .tabs { display: flex; gap: 4px; }
+  .tabs button { background: none; border: 1px solid transparent; color: var(--muted); padding: 6px 14px; border-radius: 8px; cursor: pointer; font: inherit; }
+  .tabs button:hover { color: var(--text); }
+  .tabs button.on { color: var(--text); border-color: var(--line); background: var(--panel); }
+  .wrap { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px 1fr; }
+  #panel { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 8px 14px 24px; }
+  .sec { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .sec:last-child { border-bottom: 0; }
+  .sec h3 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+  .row { display: grid; grid-template-columns: 84px 1fr 52px; gap: 8px; align-items: center; margin: 6px 0; }
+  .row > :nth-child(2):last-child { grid-column: 2 / 4; }
+  .row[hidden] { display: none; }
+  .row span { color: var(--muted); }
+  .row output { text-align: right; font-variant-numeric: tabular-nums; color: var(--text); font-size: 12px; }
+  select, input:not([type=range]) { width: 100%; background: var(--field); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; font: inherit; min-width: 0; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .hint { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+  .btn { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; font: inherit; white-space: nowrap; }
+  .btn:hover { border-color: var(--muted); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  .icon { padding: 4px 8px; font-size: 16px; line-height: 1; }
+  .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .toolbar { display: flex; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; align-items: center; }
+  .toolbar .keys { margin-left: auto; color: var(--muted); font-size: 12px; }
+  .view { flex: 1; min-height: 0; position: relative; }
+  .view[hidden] { display: none; }
+  #cv-build { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .hud { position: absolute; left: 14px; bottom: 10px; right: 14px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; pointer-events: none; text-shadow: 0 1px 2px #000a; }
+  #lab-grid { position: absolute; inset: 10px; display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+  #lab-grid[data-n="3"] { grid-template-columns: repeat(3, 1fr); }
+  #lab-grid[data-n="4"] { grid-template-rows: 1fr 1fr; }
+  .pane { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; min-height: 0; background: var(--panel); }
+  .pane.winner { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .pane-head { display: flex; gap: 8px; align-items: center; padding: 6px; }
+  .pane-head .rank { font-weight: 800; color: var(--accent); min-width: 32px; text-align: right; }
+  .pane-cv { flex: 1; min-height: 0; position: relative; }
+  .pane-cv canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .pane-stats { padding: 5px 8px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 26px; }
+  #watch { position: fixed; inset: 0; background: #07060d; z-index: 10; }
+  #watch[hidden] { display: none; }
+  #cv-watch { width: 100%; height: 100%; display: block; transition: opacity .7s ease; }
+  #watch-info { position: absolute; left: 20px; bottom: 16px; color: #ffffff70; font-size: 13px; letter-spacing: .05em; }
+  #watch-exit { position: absolute; right: 16px; top: 14px; background: #ffffff14; color: #fffc; border-color: #ffffff22; opacity: .4; transition: opacity .3s; }
+  #watch-exit:hover { opacity: 1; }
+  @media (max-width: 760px) {
+    .wrap { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    #panel { max-height: 42vh; border-right: 0; border-bottom: 1px solid var(--line); }
+    #lab-grid, #lab-grid[data-n="3"] { grid-template-columns: 1fr; }
+    .toolbar .keys { display: none; }
+  }
+</style>
 </head>
-<body><p>Maze Lab — in aanbouw</p></body>
+<body>
+<header class="top">
+  <div class="brand">MAZE <span>LAB</span></div>
+  <nav class="tabs">
+    <button data-mode="build">Bouwen</button>
+    <button data-mode="lab">Lab</button>
+    <button data-mode="watch">Kijken</button>
+  </nav>
+</header>
+
+<div class="wrap">
+  <aside id="panel">
+    <section class="sec">
+      <h3>Vorm</h3>
+      <label class="row"><span>Raster</span>
+        <select data-key="grid">
+          <option value="square">Vierkant</option><option value="hex">Zeshoek</option>
+          <option value="tri">Driehoek</option><option value="polar">Cirkel (ringen)</option>
+        </select></label>
+      <label class="row" id="row-shape"><span>Silhouet</span>
+        <select data-key="shape">
+          <option value="rect">Rechthoek</option><option value="circle">Cirkel</option><option value="ring">Ring</option>
+          <option value="heart">Hart</option><option value="star">Ster</option><option value="text">Tekst</option>
+        </select></label>
+      <label class="row" id="row-text"><span>Tekst</span><input data-key="text" maxlength="12"></label>
+      <label class="row"><span>Grootte</span><input type="range" data-key="size" min="6" max="80"><output data-out="size"></output></label>
+    </section>
+
+    <section class="sec">
+      <h3>Maken</h3>
+      <label class="row" id="row-gen"><span>Algoritme</span><select data-key="gen"></select></label>
+      <label class="row" id="row-mix"><span>Kronkel</span><input type="range" data-key="mix" min="0" max="100"><output data-out="mix"></output></label>
+      <label class="row"><span>Lussen</span><input type="range" data-key="braid" min="0" max="100"><output data-out="braid"></output></label>
+      <div class="row"><span>Zaadje</span><input data-key="seed" aria-label="Zaadje"><button id="dice" class="btn icon" title="Nieuw zaadje">⚄</button></div>
+    </section>
+
+    <section class="sec">
+      <h3>Puzzel</h3>
+      <label class="row"><span>Sleutels</span><input type="range" data-key="keys" min="0" max="6"><output data-out="keys"></output></label>
+      <label class="row"><span>Eenrichting</span><input type="range" data-key="oneways" min="0" max="30"><output data-out="oneways"></output></label>
+      <label class="row"><span>Teleporters</span><input type="range" data-key="teleports" min="0" max="6"><output data-out="teleports"></output></label>
+      <p class="hint">Sleutel opent de deur in dezelfde kleur. Pijl = eenrichting. Dubbele ringen = teleporter-paar.</p>
+    </section>
+
+    <section class="sec">
+      <h3>Oplossen</h3>
+      <label class="row" id="row-solver"><span>Oplosser</span><select data-key="solver"></select></label>
+      <label class="row"><span>Snelheid</span><input type="range" data-key="speed" min="0" max="100"><output data-out="speed"></output></label>
+    </section>
+
+    <section class="sec" id="sec-lab">
+      <h3>Lab</h3>
+      <label class="row"><span>Vergelijk</span>
+        <select data-key="compare"><option value="solvers">Oplossers (zelfde doolhof)</option><option value="makers">Makers (zelfde oplosser)</option></select></label>
+      <label class="row"><span>Panelen</span>
+        <select data-key="panes" data-num><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
+    </section>
+
+    <section class="sec">
+      <h3>Weergave</h3>
+      <label class="row"><span>Palet</span><select data-key="palette"></select></label>
+    </section>
+
+    <section class="sec">
+      <h3>Export</h3>
+      <div class="btns"><button class="btn" id="btn-json" title="Model met asset-namen, voor 3D later">JSON (3D)</button><button class="btn" id="btn-png">PNG</button></div>
+    </section>
+  </aside>
+
+  <main>
+    <div class="toolbar">
+      <button class="btn primary" id="btn-new">Nieuw doolhof</button>
+      <button class="btn" id="btn-instant">Direct klaar</button>
+      <button class="btn primary" id="btn-solve">Los op</button>
+      <button class="btn" id="btn-pause">Pauze</button>
+      <button class="btn" id="btn-clear">Wis oplossing</button>
+      <span class="keys">N nieuw · S oplossen · spatie pauze</span>
+    </div>
+    <section class="view" id="view-build"><canvas id="cv-build"></canvas><div class="hud" id="hud-build"></div></section>
+    <section class="view" id="view-lab" hidden><div id="lab-grid"></div></section>
+  </main>
+</div>
+
+<div id="watch" hidden>
+  <canvas id="cv-watch"></canvas>
+  <div id="watch-info"></div>
+  <button class="btn" id="watch-exit">Stoppen (Esc)</button>
+</div>
+
+<script src="src/rng.js"></script>
+<script src="src/model.js"></script>
+<script src="src/generators.js"></script>
+<script src="src/puzzle.js"></script>
+<script src="src/solvers.js"></script>
+<script src="src/render2d.js"></script>
+<script src="src/app.js"></script>
+</body>
 </html>
