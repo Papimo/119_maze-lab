@@ -1,0 +1,5 @@
+node_modules/
+prullenbak/
+scratch/
+*.log
+exports/
