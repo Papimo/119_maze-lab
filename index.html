@@ -43,8 +43,18 @@
   .view { flex: 1; min-height: 0; position: relative; }
   .view[hidden] { display: none; }
   #cv-build { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-  .hud { position: absolute; left: 14px; bottom: 10px; right: 14px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; pointer-events: none; text-shadow: 0 1px 2px #000a; }
-  #lab-grid { position: absolute; inset: 10px; display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+  .hud { position: absolute; left: 14px; bottom: 10px; right: auto; max-width: calc(100% - 28px); padding: 3px 9px; border-radius: 6px; background: #0d1117c0; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; pointer-events: none; text-shadow: 0 1px 2px #000a; }
+  .hud:empty { display: none; }
+  #lab-grid { position: absolute; inset: 10px 10px 200px; display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+  #lab-grid[data-n="1"] { grid-template-columns: 1fr; }
+  #lab-chart { position: absolute; left: 10px; right: 10px; bottom: 10px; height: 180px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+  #lab-chart canvas { width: 100%; height: 100%; display: block; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; box-shadow: 0 1px 2px rgba(0,0,0,.4); }
+  .pane.race .pane-head { flex-wrap: wrap; gap: 12px; }
+  .racer { display: flex; align-items: center; gap: 6px; }
+  .racer .rank { color: var(--accent); min-width: 22px; }
+  .rstat { display: inline-flex; align-items: center; gap: 5px; margin-right: 14px; }
+  .rstat.win { color: var(--accent); font-weight: 700; }
   #lab-grid[data-n="3"] { grid-template-columns: repeat(3, 1fr); }
   #lab-grid[data-n="4"] { grid-template-rows: 1fr 1fr; }
   .pane { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; min-height: 0; background: var(--panel); }
@@ -111,6 +121,8 @@
       <label class="row" id="row-text"><span>Tekst</span><input data-key="text" maxlength="12"></label>
       <label class="row"><span>Grootte</span><input type="range" data-key="size" min="6" max="80"><output data-out="size"></output></label>
       <label class="row"><span>Verdiepingen</span><input type="range" data-key="levels" min="1" max="4"><output data-out="levels"></output></label>
+      <label class="row" id="row-variant"><span>Variant</span>
+        <select data-key="variant"><option value="">Gewoon</option><option value="rooms">Kamers &amp; zalen</option><option value="wide">Brede + smalle gangen</option><option value="weave">Weave (bruggen)</option></select></label>
       <div class="row" id="row-torus"><span>Torus</span><label class="check"><input type="checkbox" data-key="torus"> randen lopen door</label></div>
     </section>
 
@@ -144,6 +156,7 @@
       <h3>Moeilijkheid</h3>
       <div class="meter"><div class="meter-bar" id="score-bar"></div></div>
       <p class="hint" id="score-text">—</p>
+      <p class="hint" id="calib-text"></p>
       <label class="row"><span>Doel</span><input type="range" data-key="target" min="0" max="100"><output data-out="target"></output></label>
       <div class="btns"><button class="btn" id="btn-target">Zoek doolhof met dit doel</button></div>
       <p class="hint" id="score-hint">Probeert tot 40 zaadjes met de huidige instellingen.</p>
@@ -157,14 +170,15 @@
     <section class="sec std" id="sec-lab">
       <h3>Lab</h3>
       <label class="row"><span>Vergelijk</span>
-        <select data-key="compare"><option value="solvers">Oplossers (zelfde doolhof)</option><option value="makers">Makers (zelfde oplosser)</option></select></label>
-      <label class="row"><span>Panelen</span>
+        <select data-key="compare"><option value="solvers">Oplossers (zelfde doolhof)</option><option value="makers">Makers (zelfde oplosser)</option><option value="race">Race (oplossers op één doolhof)</option></select></label>
+      <label class="row"><span>Aantal</span>
         <select data-key="panes" data-num><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
     </section>
 
     <section class="sec">
       <h3>Weergave</h3>
-      <label class="row"><span>Palet</span><select data-key="palette"></select></label>
+      <label class="row"><span>Stijl</span><select data-key="palette"></select></label>
+      <div class="row"><span>Leven</span><label class="check"><input type="checkbox" data-key="life"> rustig leven (maquette)</label></div>
     </section>
 
     <section class="sec">
@@ -186,7 +200,7 @@
       <span class="keys tb-daily">pijltjes of klik = lopen · T = trap/teleporter · spatie = wachten</span>
     </div>
     <section class="view" id="view-build"><canvas id="cv-build"></canvas><div class="hud" id="hud-build"></div></section>
-    <section class="view" id="view-lab" hidden><div id="lab-grid"></div></section>
+    <section class="view" id="view-lab" hidden><div id="lab-grid"></div><div id="lab-chart"><canvas id="cv-chart"></canvas></div></section>
     <section class="view" id="view-daily" hidden><canvas id="cv-daily"></canvas><div class="hud" id="hud-daily"></div></section>
   </main>
 </div>
@@ -205,6 +219,7 @@
 <script src="src/score.js"></script>
 <script src="src/fx.js"></script>
 <script src="src/render2d.js"></script>
+<script src="src/chart.js"></script>
 <script src="src/play.js"></script>
 <script src="src/app.js"></script>
 </body>

@@ -28,7 +28,7 @@
     rng.shuffle(ends);
     for (const c of ends) {
       if (openCount(m, c) !== 1 || rng() >= p) continue;
-      const closed = m.cells[c].nbrs.filter(nb => !m.walls[nb.w].open && !m.walls[nb.w].stair);
+      const closed = m.cells[c].nbrs.filter(nb => { const w = m.walls[nb.w]; return !w.open && !w.stair && !w.lock && !w.bridge; });
       if (!closed.length) continue;
       const pref = closed.filter(nb => openCount(m, nb.c) === 1);
       m.walls[rng.pick(pref.length ? pref : closed).w].open = true;
@@ -121,7 +121,7 @@
       const ss = swAt[c2] >= 0 ? sw ^ (1 << swAt[c2]) : sw;
       return enc(c2, (t + 1) % T, ss, kk);
     };
-    const g = cells[m.goal].lc, step = m.maxStep, tel = m.teleporters, minC = m.minCost, tor = m.torus;
+    const g = cells[m.goal].lc, step = m.maxStep * (m.bridges && m.bridges.length ? 2 : 1), tel = m.teleporters, minC = m.minCost, tor = m.torus;
     const dist = (a, b) => {
       let dx = Math.abs(a[0] - b[0]), dy = Math.abs(a[1] - b[1]);
       if (tor) { dx = Math.min(dx, tor.w - dx); dy = Math.min(dy, tor.h - dy); }
@@ -228,7 +228,7 @@
     m.switches = []; m.switchAt.fill(-1); m.swDoors = []; m.timed = [];
     for (const w of m.walls) { w.door = null; w.oneway = null; w.sw = null; w.swInv = false; w.timed = null; }
     const used = new Set([m.start, m.goal]);
-    const busy = w => w.b === null || w.stair || w.door !== null || w.sw !== null || w.timed || w.oneway !== null;
+    const busy = w => w.b === null || w.stair || w.bridge || w.door !== null || w.sw !== null || w.timed || w.oneway !== null;
 
     // Teleporters: bij voorkeur in doodlopende hoekjes.
     const pool = [];
@@ -250,7 +250,7 @@
     // Deuren op de route, sleutel k ligt altijd vóór deur k (eventueel achter eerdere deuren).
     const K0 = Math.min(o.keys | 0, ML.KEY_COLORS.length);
     if (K0 > 0) {
-      const cp = cellPath(m), pathSet = new Set(cp), pw = pathWalls(m, cp).filter(w => !w.stair).map(w => w.i);
+      const cp = cellPath(m), pathSet = new Set(cp), pw = pathWalls(m, cp).filter(w => !w.stair && !w.bridge).map(w => w.i);
       const K = Math.min(K0, Math.max(0, pw.length - 1));
       for (let k = 0; k < K; k++) m.walls[pw[Math.floor((k + 1) * pw.length / (K + 1))]].door = k;
       for (let k = 0; k < K; k++) {
@@ -335,8 +335,84 @@
     }
   };
 
+  // Kamers & zalen (vierkant raster): blokken van 2-4 x 2-3 cellen waarvan de binnenmuren weg zijn.
+  // Ruimte van 1 cel rond elke zaal, zodat zalen niet aan elkaar plakken. Lussen ontstaan vanzelf.
+  ML.placeRooms = function (m, rng) {
+    const C = m.cells, n = C.length, at = new Map(), room = new Int16Array(n).fill(-1), groups = [];
+    for (const c of C) if (c.grid && c.grid.r != null) at.set(c.level + ',' + c.grid.r + ',' + c.grid.c, c.i);
+    const want = Math.max(1, Math.min(12, Math.round(n / 70)));
+    for (let t = 0; t < want * 25 && groups.length < want; t++) {
+      const c0 = C[rng.int(n)], w = 2 + rng.int(3), h = 2 + rng.int(2), l = c0.level, r0 = c0.grid.r, k0 = c0.grid.c, cells = [];
+      let ok = true;
+      for (let r = r0 - 1; r <= r0 + h && ok; r++) for (let k = k0 - 1; k <= k0 + w && ok; k++) {
+        const i = at.get(l + ',' + r + ',' + k), inside = r >= r0 && r < r0 + h && k >= k0 && k < k0 + w;
+        if (i !== undefined && room[i] >= 0) ok = false;
+        else if (inside) { if (i === undefined) ok = false; else cells.push(i); }
+      }
+      if (!ok) continue;
+      for (const i of cells) room[i] = groups.length;
+      groups.push(cells);
+    }
+    for (const w of m.walls) if (!w.stair && w.b !== null && room[w.a] >= 0 && room[w.a] === room[w.b]) w.open = true;
+    m.rooms = groups; m.roomOf = room;
+  };
+
+  // Weave (vierkant raster): een rechte gang (kruiscel x, alleen N-Z of alleen O-W open) krijgt een brug
+  // dwars eroverheen tussen de twee buren. Brug = randtype 'bridge' (open, a/b = buren, via = x).
+  // Om het doolhof perfect te houden gaat er per brug één muur dicht op de oude route tussen a en b.
+  ML.placeWeave = function (m, rng) {
+    const C = m.cells, n = C.length, at = new Map(), cross = new Uint8Array(n);
+    for (const c of C) if (c.grid && c.grid.r != null) at.set(c.level + ',' + c.grid.r + ',' + c.grid.c, c.i);
+    const wallTo = (a, b) => { for (const nb of C[a].nbrs) { const w = m.walls[nb.w]; if (nb.c === b && !w.wrap && !w.stair && !w.bridge) return w; } return null; };
+    const want = Math.max(1, Math.round(n / 14));
+    const cand = rng.shuffle(C.filter(c => c.grid && c.grid.r != null).map(c => c.i));
+    const D = [[-1, 0], [0, 1], [1, 0], [0, -1]];
+    let made = 0;
+    for (const x of cand) {
+      if (made >= want) break;
+      const g = C[x].grid, l = C[x].level;
+      const nb4 = D.map(([dr, dc]) => at.get(l + ',' + (g.r + dr) + ',' + (g.c + dc)));
+      if (nb4.some(v => v === undefined || cross[v])) continue;
+      const w4 = nb4.map(v => wallTo(x, v));
+      if (w4.some(w => !w)) continue;
+      const vert = w4[0].open && w4[2].open && !w4[1].open && !w4[3].open;
+      const hor = w4[1].open && w4[3].open && !w4[0].open && !w4[2].open;
+      if (!vert && !hor) continue;
+      const a = vert ? nb4[1] : nb4[0], b = vert ? nb4[3] : nb4[2], side = vert ? [w4[1], w4[3]] : [w4[0], w4[2]];
+      // oude route a → b (BFS over open randen), daarop een muur kiezen die dicht mag
+      const prev = new Int32Array(n).fill(-1), pw = new Int32Array(n).fill(-1), q = [a];
+      prev[a] = a;
+      for (let h = 0; h < q.length && prev[b] < 0; h++) for (const e of C[q[h]].nbrs) {
+        const w = m.walls[e.w];
+        if (w.open && prev[e.c] < 0) { prev[e.c] = q[h]; pw[e.c] = e.w; q.push(e.c); }
+      }
+      if (prev[b] < 0) continue;
+      const route = [];
+      for (let c = b; c !== a; c = prev[c]) route.push(m.walls[pw[c]]);
+      const ok = route.filter(w => !w.stair && !w.bridge && !w.wrap && !w.lock && !cross[w.a] && !cross[w.b] && w.a !== x && w.b !== x);
+      if (!ok.length) continue;
+      rng.pick(ok).open = false;
+      side.forEach(w => { w.lock = true; });
+      cross[x] = 1;
+      const ca = C[a].center, cb = C[b].center;
+      const w = Object.assign({
+        i: m.walls.length, id: 'w' + m.walls.length, type: 'bridge', asset: ML.ASSETS.bridge, level: l, open: true,
+        door: null, oneway: null, sw: null, swInv: false, timed: null, stair: false, wrap: false, wm: null,
+        a, b, segs: [], mid: C[x].center, bridge: true, via: x
+      });
+      m.walls.push(w);
+      const ang = Math.atan2(cb[1] - ca[1], cb[0] - ca[0]);
+      C[a].nbrs.push({ c: b, w: w.i, ang });
+      C[b].nbrs.push({ c: a, w: w.i, ang: ang + Math.PI });
+      made++;
+    }
+    m.bridges = m.walls.filter(w => w.bridge).map(w => w.i);
+  };
+
   // Na het maken: lussen, start/doel, terrein, puzzel, goedkoopste oplossing.
   ML.finishMaze = function (m, s, genId) {
+    if (s.variant === 'rooms' && s.grid === 'square') ML.placeRooms(m, ML.makeRng(s.seed + '|zalen'));
+    if (s.variant === 'weave' && s.grid === 'square' && !m.bridges) ML.placeWeave(m, ML.makeRng(s.seed + '|weave'));
     const prng = ML.makeRng(s.seed + '|p|' + genId);
     ML.braid(m, prng, (s.braid || 0) / 100);
     ML.placeEnds(m, prng);
@@ -365,8 +441,9 @@
       if (k === 1) de++; else if (k >= 3) jn++;
     }
     for (const w of m.walls) if (w.stair && w.open) st++;
+    const br = m.bridges ? m.bridges.length : 0;
     return {
-      cells: m.cells.length, deadEnds: de, junctions: jn, stairs: st,
+      cells: m.cells.length, deadEnds: de, junctions: jn, stairs: st, bridges: br,
       route: m.solution ? m.solution.length - 1 : 0, cost: m.solutionCost, weighted: m.weighted
     };
   };

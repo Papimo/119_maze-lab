@@ -14,6 +14,7 @@
     wallWrap: 'wall.wrap',               // torus: rand die aan de overkant doorloopt
     post: 'wall.post',                   // paaltje op muurhoeken
     stair: dir => `stair.${dir}`,        // stair.up | stair.down
+    bridge: 'bridge',                    // weave: brug over een rechte gang (kruiscel eronder)
     door: color => `door.${color}`,
     key: color => `key.${color}`,
     lever: color => `switch.${color}`,
@@ -323,6 +324,18 @@
   };
 
   // Doolhof uit instellingen (vorm + silhouet + verdiepingen + torus). Nog zonder gangen.
+  // Brede + smalle gangen: ongelijke kolombreedtes/rijhoogtes (smal 0.55, gewoon 1, breed 1.7),
+  // daarna geschaald naar dezelfde totale maat. Raster blijft r/c, dus alle makers werken.
+  ML.widenSquare = function (polys, w, h, seed) {
+    const r = ML.makeRng(seed + '|breed'), sizes = [0.55, 1, 1, 1.7];
+    const edges = n => { const e = [0]; for (let i = 0; i < n; i++) e.push(e[i] + r.pick(sizes)); const k = n / e[n]; return e.map(v => v * k); };
+    const X = edges(w), Y = edges(h), mp = ([x, y]) => [X[Math.round(x)], Y[Math.round(y)]];
+    return polys.map(p => {
+      const pts = p.pts.map(mp);
+      return { ...p, pts, center: [(pts[0][0] + pts[2][0]) / 2, (pts[0][1] + pts[2][1]) / 2] };
+    });
+  };
+
   ML.makeMaze = function (s, aspect) {
     const size = s.size | 0, torus = !!s.torus && s.grid === 'square';
     const L = Math.max(1, Math.min(4, (s.levels | 0) || 1));
@@ -338,6 +351,7 @@
       else {
         const rows = Math.max(3, Math.round(size * a));
         polys = ML.TOPO.square(size, rows);
+        if (s.variant === 'wide' && !torus) polys = ML.widenSquare(polys, size, rows, s.seed);
         if (shape === 'rect') sq = { w: size, h: rows };
         if (torus) tor = { w: size, h: rows };
       }
@@ -390,6 +404,10 @@
     for (const w of m.walls) if (w.stair && w.open) {
       add({ id: 'stair' + w.i, type: 'stair', asset: A.stair('up'), from: C[w.a].id, to: C[w.b].id, pos: cpos(w.a), level: C[w.a].level, toLevel: C[w.b].level });
       assets.add(A.stair('down'));
+    }
+    for (const wi of (m.bridges || [])) {
+      const w = m.walls[wi], f = C[w.a].center, t = C[w.b].center;
+      add({ id: 'bridge' + w.i, type: 'bridge', asset: A.bridge, from: C[w.a].id, to: C[w.b].id, over: C[w.via].id, pos: cpos(w.via), angle: r3(Math.atan2(t[1] - f[1], t[0] - f[0])), level: w.level });
     }
     const posts = new Map();
     for (const w of m.walls) if (!w.open && !w.stair) for (const s of w.segs)

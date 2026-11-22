@@ -9,12 +9,13 @@
     mode: 'build', grid: 'square', shape: 'rect', text: 'MAZE', size: 24, levels: 1, torus: false,
     gen: 'backtracker', mix: 75, braid: 0, seed: ML.randomSeed(),
     keys: 0, oneways: 0, teleports: 0, switches: 0, timed: 0, terrain: 0,
-    solver: 'bfs', speed: 45, palette: 'blauwdruk', target: 50,
-    compare: 'solvers', panes: 2,
+    solver: 'bfs', speed: 45, palette: 'maquette', life: true, variant: '', styleV: 1, target: 50,
+    compare: 'solvers', panes: 2, raceSel: ['bfs', 'astar', 'dfs', 'wall'],
     paneSel: ['bfs', 'astar', 'dfs', 'wall'], paneGen: ['backtracker', 'prim', 'kruskal', 'wilson']
   };
   try { Object.assign(S, JSON.parse(localStorage.getItem(STORE) || '{}')); } catch (e) { /* geen opslag */ }
   if (S.mode === 'watch') S.mode = 'build';
+  if (S.styleV !== 1) { S.palette = 'maquette'; S.styleV = 1; } // maquette = nieuwe standaardstijl
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) { /* geen opslag */ } };
 
   const speedToSpf = v => Math.pow(10, v / 25 - 1); // 0.1 … 1000 stappen per beeld
@@ -32,12 +33,22 @@
     return Math.round(c * 10) / 10;
   }
 
+  // Verloop voor de grafiek: [stap, bezocht], max ~400 punten (dunt zichzelf uit).
+  const mkHist = () => ({ pts: [[0, 0]], stride: 1 });
+  function histPush(h, step, v, force) {
+    if (!force && step % h.stride) return;
+    const L = h.pts[h.pts.length - 1];
+    if (L[0] === step) { L[1] = v; return; }
+    h.pts.push([step, v]);
+    if (h.pts.length > 400) { h.pts = h.pts.filter((_, i) => i % 2 === 0 || i === h.pts.length - 1); h.stride *= 2; }
+  }
+
   // ---- Runner: één doolhof + animatie op één canvas ----
   class Runner {
     constructor(canvas) {
       this.cv = canvas; this.r = new ML.Render2D(canvas);
       this.m = null; this.P = null; this.phase = 'idle'; this.vs = { cur: -1 }; this.acc = 0; this.steps = 0;
-      this.fx = []; this.lastT = 0; this.clk = -1;
+      this.fx = []; this.lastT = 0; this.clk = -1; this.lifeT = 0;
       this.dirty = true; this.onChange = null;
       new ResizeObserver(() => this.resize()).observe(canvas);
       this.resize();
@@ -54,7 +65,7 @@
     generate(s, genId, animate) {
       this.s = { ...s }; this.genId = genId;
       const m = this.m = ML.makeMaze(this.s, this.aspect());
-      this.P = null; this.score = null; this.play = null; this.fx.length = 0;
+      this.P = null; this.score = null; this.play = null; this.fx.length = 0; this.racers = null; this.hist = null;
       this.genIt = byId(ML.GENERATORS, genId).fn(m, ML.makeRng(s.seed + '|' + genId), { mix: s.mix / 100 });
       this.vs = { inMaze: new Uint8Array(m.cells.length), cur: -1, wallAnim: new Map(), tail: [] };
       this.phase = 'gen'; this.steps = 0; this.result = null; this.stats = null; this.acc = 0;
@@ -81,11 +92,29 @@
         vt: new Float64Array(n), recent: [], tail: [], side: new Uint8Array(n), dead: new Uint8Array(n)
       };
       this.steps = 0; this.result = null; this.phase = 'solve'; this.acc = 0; this.dirty = true;
+      this.hist = mkHist(); this.racers = null;
+      this.emit('solve');
+    }
+    // Race: meerdere oplossers tegelijk op hetzelfde doolhof, elk dezelfde stappen per beeld.
+    race(ids) {
+      if (!this.m) return;
+      if (this.phase === 'gen') this.finishGen();
+      const m = this.m, n = m.cells.length;
+      this.play = null; this.result = null; this.steps = 0; this.acc = 0; this.hist = null;
+      this.racers = ids.map((id, k) => {
+        const sv = byId(ML.SOLVERS, id);
+        return { id: sv.id, name: sv.name, col: ML.RACECOL[k % ML.RACECOL.length], it: sv.fn(m, this.P), seen: new Uint8Array(n), list: [],
+          cur: m.start, tail: [], path: null, pathT: 0, found: false, done: false, steps: 0, rank: 0, hist: mkHist() };
+      });
+      this.finished = 0;
+      this.vs = { cur: -1, race: this.racers };
+      this.phase = 'race'; this.dirty = true;
       this.emit('solve');
     }
     clearSolve() {
       if (!this.m || this.phase === 'gen') return;
       this.vs = { cur: -1 }; this.phase = 'ready'; this.result = null; this.steps = 0; this.play = null; this.dirty = true;
+      this.racers = null; this.hist = null;
       this.emit('clear');
     }
     pushTail(c, t) {
@@ -108,11 +137,16 @@
         ML.FX.vortex(this.fx, cc[0], cc[1], col, true);
       }
     }
-    goalFx() { const g = this.m.cells[this.m.goal].center; ML.FX.confetti(this.fx, g[0], g[1]); this.dirty = true; }
+    goalFx() {
+      const g = this.m.cells[this.m.goal].center; ML.FX.confetti(this.fx, g[0], g[1]);
+      this.vs.endT = performance.now() / 1000; // eindscène (render2d klemt op >= 0: rAF-tijd kan iets achterlopen)
+      this.dirty = true;
+    }
 
     tick(spf, t) {
       const ph = this.phase, v = this.vs;
-      if (ph !== 'gen' && ph !== 'solve' && ph !== 'path') return;
+      if (ph !== 'gen' && ph !== 'solve' && ph !== 'path' && ph !== 'race') return;
+      if (ph === 'race') { this.tickRace(spf, t); return; }
       if (ph === 'path') {
         const L = v.path.length - 1, i0 = Math.floor((v.pathT || 0) * L);
         v.pathT = Math.min(1, (v.pathT || 0) + 1 / Math.max(40, Math.min(150, L * 1.5)));
@@ -146,6 +180,7 @@
           if (r.done) {
             this.result = r.value; v.path = r.value.path; v.pathT = 0; v.cur = -1;
             this.result.cost = pathCost(this.m, v.path);
+            if (this.hist) histPush(this.hist, this.steps, v.nOrder, true);
             this.phase = v.path.length > 1 ? 'path' : 'done';
             if (this.phase === 'done' && this.result.found) this.goalFx();
             this.emit('solved'); break;
@@ -159,10 +194,44 @@
           if (v.cur !== e.visit) { v.cur = e.visit; this.pushTail(e.visit, t); }
           for (const f of e.front) v.front[f] = 1;
           this.steps++;
+          if (this.hist) histPush(this.hist, this.steps, v.nOrder);
         }
         const R = v.recent;
         if (R.length > 1200) { const cut = R.length - 1200; for (let i = 0; i < cut; i++) v.vt[R[i]] = 0; R.splice(0, cut); }
       }
+      this.dirty = true;
+    }
+    tickRace(spf, t) {
+      const R = this.racers;
+      for (const r of R) if (r.done && r.path && r.pathT < 1) r.pathT = Math.min(1, r.pathT + 1 / Math.max(30, Math.min(120, r.path.length)));
+      this.acc += spf;
+      let k = Math.floor(this.acc);
+      this.acc -= k;
+      while (k-- > 0 && this.finished < R.length) {
+        this.steps++;
+        for (const r of R) {
+          if (r.done) continue;
+          const x = r.it.next();
+          if (x.done) {
+            r.done = true; r.found = !!x.value.found; r.path = x.value.path && x.value.path.length > 1 ? x.value.path : null;
+            this.finished++;
+            histPush(r.hist, r.steps, r.list.length, true);
+            if (r.found) {
+              r.rank = 1 + R.filter(q => q !== r && q.found && q.rank).length;
+              if (r.rank === 1) this.goalFx();
+            }
+            continue;
+          }
+          const e = x.value;
+          r.steps++;
+          if (e.visit !== undefined && e.dead === undefined) {
+            if (!r.seen[e.visit]) { r.seen[e.visit] = 1; r.list.push(e.visit); }
+            if (r.cur !== e.visit) { r.cur = e.visit; r.tail.push({ c: e.visit, t }); if (r.tail.length > 14) r.tail.shift(); }
+          }
+          histPush(r.hist, r.steps, r.list.length);
+        }
+      }
+      if (this.finished >= R.length && R.every(r => !r.path || r.pathT >= 1)) { this.phase = 'done'; this.emit('done'); }
       this.dirty = true;
     }
     draw(t) {
@@ -173,9 +242,11 @@
       if (v.recent && v.recent.length) { let i = 0; while (i < v.recent.length && t - v.vt[v.recent[i]] > AN.RIP) i++; if (i) v.recent.splice(0, i); }
       if (v.wallAnim && v.wallAnim.size) for (const [k, a] of v.wallAnim) if (t - a.t0 > AN.WALL) v.wallAnim.delete(k);
       if (this.m && this.m.timed.length && v.state == null) { const c = Math.floor(t / AN.CLOCK); if (c !== this.clk) { this.clk = c; this.dirty = true; } }
+      // rustig leven (maquette): ~30 beelden per seconde, alleen als het canvas zichtbaar is
+      if (S.life && this.r.pal.maq && this.m && this.m.ready && t - this.lifeT >= 0.033 && this.cv.getClientRects().length > 0) { this.lifeT = t; this.dirty = true; }
       if (!this.dirty) return;
       this.dirty = false;
-      v.fx = this.fx; v.P = this.P; v.phase = this.phase;
+      v.fx = this.fx; v.P = this.P; v.phase = this.phase; v.life = S.life;
       if (this.r.draw(this.m, v, t)) this.dirty = true;
     }
   }
@@ -189,6 +260,7 @@
       const st = r.stats;
       p.push(`${st.deadEnds} doodlopend`, `${st.junctions} kruisingen`);
       if (m.levels > 1) p.push(`${st.stairs} trappen`);
+      if (st.bridges) p.push(`${st.bridges} bruggen`);
       p.push(`kortste route ${st.route || '—'}` + (st.weighted ? ` (kosten ${Math.round(st.cost * 10) / 10})` : ''));
       if (r.score) p.push(`moeilijkheid ${r.score.score}`);
     }
@@ -206,6 +278,14 @@
     const sc = build.score;
     $('#score-bar').style.width = sc ? sc.score + '%' : '0';
     $('#score-text').textContent = sc ? `${sc.score} / 100 · ${sc.label}` : '—';
+    const ci = ML.calibInfo();
+    $('#calib-text').textContent = ci.n >= ci.min ? `Geijkt op ${ci.n} eigen dagdoolhoven (weging ${ci.w.map(v => Math.round(v * 100)).join('/')}).`
+      : `Weging is nog een gok; speel ${ci.min - ci.n} dagdoolhof${ci.min - ci.n === 1 ? '' : 'en'} meer om te ijken.`;
+  }
+  function recalibrate() {
+    ML.calibrate();
+    if (build.m && build.m.ready) build.score = ML.difficulty(build.m);
+    showScore(); hudDirty = true;
   }
   function findTarget() {
     const base = ML.randomSeed(), t0 = performance.now(), aspect = build.aspect();
@@ -224,20 +304,22 @@
 
   // ---- Lab ----
   let panes = [];
-  const paneGen = i => S.compare === 'solvers' ? S.gen : S.paneGen[i];
+  const paneGen = i => S.compare === 'makers' ? S.paneGen[i] : S.gen;
+  const raceIds = () => S.raceSel.slice(0, S.panes);
   const paneSolver = i => S.compare === 'solvers' ? S.paneSel[i] : S.solver;
 
   function makeLab() {
     const grid = $('#lab-grid');
     grid.innerHTML = '';
-    grid.dataset.n = S.panes;
     panes = [];
+    if (S.compare === 'race') { makeRace(grid); return; }
+    grid.dataset.n = S.panes;
     const list = S.compare === 'solvers' ? ML.SOLVERS : ML.GENERATORS;
     const arr = S.compare === 'solvers' ? S.paneSel : S.paneGen;
     for (let i = 0; i < S.panes; i++) {
       const el = document.createElement('div');
       el.className = 'pane';
-      el.innerHTML = `<div class="pane-head"><select aria-label="Kies voor paneel ${i + 1}"></select><span class="rank"></span></div>
+      el.innerHTML = `<div class="pane-head"><i class="dot" style="background:${ML.RACECOL[i]}"></i><select aria-label="Kies voor paneel ${i + 1}"></select><span class="rank"></span></div>
         <div class="pane-cv"><canvas></canvas></div><div class="pane-stats"></div>`;
       grid.appendChild(el);
       const sel = el.querySelector('select');
@@ -245,7 +327,7 @@
       sel.value = byId(list, arr[i]).id;
       const r = new Runner(el.querySelector('canvas'));
       r.el = el; r.setPalette(pal());
-      r.onChange = () => paneInfo();
+      r.onChange = () => paneInfo(true);
       sel.addEventListener('change', () => {
         arr[i] = sel.value; save(); refreshPanel();
         if (S.compare === 'makers') r.generate(S, sel.value, false); else r.clearSolve();
@@ -254,7 +336,76 @@
     }
     panes.forEach((r, i) => r.generate(S, paneGen(i), false));
   }
-  function paneInfo() {
+  // Race: één groot doolhof, per deelnemer een kleur-keuze in de kop.
+  function makeRace(grid) {
+    grid.dataset.n = 1;
+    const el = document.createElement('div');
+    el.className = 'pane race';
+    const heads = raceIds().map((id, i) => `<label class="racer"><i class="dot" style="background:${ML.RACECOL[i]}"></i><select aria-label="Deelnemer ${i + 1}">${ML.SOLVERS.map(x => `<option value="${x.id}">${x.name}</option>`).join('')}</select><b class="rank"></b></label>`).join('');
+    el.innerHTML = `<div class="pane-head">${heads}</div><div class="pane-cv"><canvas></canvas></div><div class="pane-stats"></div>`;
+    grid.appendChild(el);
+    el.querySelectorAll('select').forEach((sel, i) => {
+      sel.value = byId(ML.SOLVERS, S.raceSel[i]).id;
+      sel.addEventListener('change', () => { S.raceSel[i] = sel.value; save(); r.clearSolve(); });
+    });
+    const r = new Runner(el.querySelector('canvas'));
+    r.el = el; r.setPalette(pal());
+    r.onChange = () => paneInfo(true);
+    panes.push(r);
+    r.generate(S, S.gen, false);
+  }
+  function raceInfo(r) {
+    const R = r.racers, ranks = r.el.querySelectorAll('.rank');
+    ranks.forEach((b, i) => { const q = R && R[i]; b.textContent = !q || !q.done ? '' : q.found ? `${q.rank}e` : 'vast'; });
+    const st = r.el.querySelector('.pane-stats');
+    if (!R) { st.textContent = statusText(r, true); return; }
+    st.innerHTML = R.map(q => `<span class="rstat${q.rank === 1 ? ' win' : ''}"><i class="dot" style="background:${q.col}"></i>${q.name}: bezocht ${q.list.length} · stappen ${q.steps}` +
+      (q.done ? (q.found ? ` · pad ${q.path ? q.path.length - 1 : 0}` : ' · vastgelopen') : '') + '</span>').join('');
+  }
+
+  // Grafiek onder het lab (bezocht per stap + blokjes per maat). Hooguit ~8x per seconde.
+  const chart = new ML.Chart($('#cv-chart'));
+  let chartT = 0;
+  function drawChart(force) {
+    const now = performance.now();
+    if (!force && now - chartT < 120) return;
+    chartT = now;
+    if (S.mode !== 'lab' || !panes.length) return;
+    const E = [], mets = [];
+    const low = (label, vals) => mets.push({ label, vals, low: true });
+    if (S.compare === 'race') {
+      const R = panes[0].racers || [];
+      for (const q of R) E.push({ name: q.name, col: q.col, hist: q.hist.pts, done: q.done, found: q.found, win: q.rank === 1, rank: q.rank ? q.rank + 'e' : '' });
+      if (R.length) {
+        low('bezocht', R.map(q => q.list.length)); low('stappen', R.map(q => q.steps));
+        low('pad', R.map(q => q.found && q.path ? q.path.length - 1 : null));
+      }
+      chart.draw(pal(), E, mets, 'Race · bezocht per stap');
+      return;
+    }
+    const list = S.compare === 'solvers' ? ML.SOLVERS : ML.GENERATORS;
+    const done = panes.filter(r => r.result).sort((a, b) => (b.result.found - a.result.found) || (a.steps - b.steps));
+    panes.forEach((r, i) => {
+      const id = S.compare === 'solvers' ? paneSolver(i) : paneGen(i), rk = done.indexOf(r);
+      E.push({ name: byId(list, id).name, col: ML.RACECOL[i], hist: r.hist ? r.hist.pts : [], done: !!r.result, found: r.result && r.result.found,
+        win: rk === 0 && r.result && r.result.found && done.length === panes.length, rank: rk >= 0 && r.result.found ? rk + 1 + 'e' : '' });
+    });
+    const solved = panes.some(r => r.vs.order);
+    if (S.compare === 'makers') {
+      mets.push({ label: 'doodlopend', vals: panes.map(r => r.stats ? r.stats.deadEnds : null) });
+      mets.push({ label: 'kruisingen', vals: panes.map(r => r.stats ? r.stats.junctions : null) });
+      mets.push({ label: 'route', vals: panes.map(r => r.stats ? r.stats.route : null) });
+      mets.push({ label: 'moeilijk', vals: panes.map(r => r.score ? r.score.score : null) });
+      if (solved) low('bezocht', panes.map(r => r.vs.order ? r.vs.nOrder : null));
+    } else if (solved) {
+      low('bezocht', panes.map(r => r.vs.order ? r.vs.nOrder : null)); low('stappen', panes.map(r => r.vs.order ? r.steps : null));
+      low('pad', panes.map(r => r.result && r.result.found ? r.result.path.length - 1 : null));
+    }
+    chart.draw(pal(), solved || S.compare === 'makers' ? E : [], mets, S.compare === 'makers' ? 'Zelfde oplosser · bezocht per stap' : 'Bezocht per stap');
+  }
+
+  function paneInfo(force) {
+    if (S.compare === 'race') { if (panes[0]) raceInfo(panes[0]); drawChart(force); return; }
     const done = panes.filter(r => r.result).sort((a, b) => (b.result.found - a.result.found) || (a.steps - b.steps));
     panes.forEach(r => {
       const rank = done.indexOf(r);
@@ -262,6 +413,7 @@
       r.el.classList.toggle('winner', rank === 0 && r.result.found && done.length === panes.length && panes.length > 1);
       r.el.querySelector('.pane-stats').textContent = statusText(r, S.compare === 'makers');
     });
+    drawChart(force);
   }
 
   // ---- Vandaag: dagelijks doolhof, zelf spelen ----
@@ -289,6 +441,7 @@
     if (p.gaveUp) return;
     const time = p.tEnd - p.t0, best = daily.stats.route;
     const res = ML.Daily.record(D.ymd, { time, moves: p.moves, best });
+    setTimeout(recalibrate, 50);
     D.msg = `Gehaald in ${ML.Daily.fmt(time)} met ${p.moves} stappen (kortste ${best}).` + (res.newTime ? ' Nieuw tijdrecord!' : res.newMoves ? ' Minste stappen ooit!' : '');
     dailyPanel();
   }
@@ -381,7 +534,7 @@
   }
 
   // ---- Paneel ----
-  const REBUILD = new Set(['grid', 'shape', 'text', 'size', 'levels', 'torus', 'gen', 'mix', 'braid', 'seed', 'keys', 'oneways', 'teleports', 'switches', 'timed', 'terrain']);
+  const REBUILD = new Set(['variant', 'grid', 'shape', 'text', 'size', 'levels', 'torus', 'gen', 'mix', 'braid', 'seed', 'keys', 'oneways', 'teleports', 'switches', 'timed', 'terrain']);
   function fillSelect(el, list) { el.innerHTML = list.map(x => `<option value="${x.id}">${x.name} — ${x.desc}</option>`).join(''); }
   fillSelect($('[data-key="gen"]'), ML.GENERATORS);
   fillSelect($('[data-key="solver"]'), ML.SOLVERS);
@@ -400,15 +553,16 @@
   function refreshPanel() {
     const lab = S.mode === 'lab', torus = S.grid === 'square' && S.torus;
     document.body.dataset.mode = S.mode;
-    show('#row-gen', !lab || S.compare === 'solvers');
+    show('#row-gen', !lab || S.compare !== 'makers');
     show('#row-solver', !lab || S.compare === 'makers');
-    const gensUsed = (!lab || S.compare === 'solvers') ? [S.gen] : S.paneGen.slice(0, S.panes);
+    const gensUsed = (!lab || S.compare !== 'makers') ? [S.gen] : S.paneGen.slice(0, S.panes);
     show('#row-mix', gensUsed.includes('growing'));
     const plainSquare = S.grid === 'square' && (S.shape === 'rect' || torus);
     show('#gen-hint', !plainSquare && gensUsed.some(id => byId(ML.GENERATORS, id).grid));
     show('#row-shape', S.grid !== 'polar' && !torus);
     show('#row-text', S.grid !== 'polar' && !torus && S.shape === 'text');
     show('#row-torus', S.grid === 'square');
+    show('#row-variant', S.grid === 'square');
     show('#sec-lab', lab);
     document.querySelectorAll('.tabs [data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === S.mode));
     show('#view-build', S.mode === 'build'); show('#view-lab', lab); show('#view-daily', S.mode === 'daily');
@@ -423,7 +577,8 @@
   }
   function solveAll() {
     if (S.mode === 'daily') return;
-    if (S.mode === 'lab') panes.forEach((r, i) => r.solve(paneSolver(i)));
+    if (S.mode === 'lab' && S.compare === 'race') { if (panes[0]) panes[0].race(raceIds()); }
+    else if (S.mode === 'lab') panes.forEach((r, i) => r.solve(paneSolver(i)));
     else build.solve(S.solver);
     paused = false; refreshPanel();
   }
@@ -435,7 +590,7 @@
     el.addEventListener('input', () => {
       S[k] = check ? el.checked : num ? Number(el.value) : el.value;
       save(); outputs(); refreshPanel();
-      if (k === 'palette') setPalette();
+      if (k === 'palette') { setPalette(); drawChart(true); }
     });
     el.addEventListener('change', () => {
       if (check) { S[k] = el.checked; save(); refreshPanel(); }
@@ -448,6 +603,7 @@
   function setMode(md) {
     S.mode = md; save(); refreshPanel();
     if (md === 'lab' && !panes.length) makeLab();
+    if (md === 'lab') requestAnimationFrame(() => drawChart(true));
     if (md === 'build' && !build.m) build.generate(S, S.gen, false);
     if (md === 'daily') requestAnimationFrame(dailyEnsure); // eerst zichtbaar, dan heeft het canvas een maat
   }
@@ -475,8 +631,8 @@
   $('#btn-json').addEventListener('click', () => {
     const r = current();
     if (!r || !r.m || !r.m.ready) return;
-    const { grid, shape, text, size, levels, torus, mix, braid, keys, oneways, teleports, switches, timed, terrain } = r.s;
-    const data = ML.toJSON(r.m, { seed: r.s.seed, generator: r.genId, difficulty: r.score ? r.score.score : null, settings: { grid, shape, text, size, levels, torus, mix, braid, keys, oneways, teleports, switches, timed, terrain } });
+    const { grid, shape, text, size, levels, torus, variant, mix, braid, keys, oneways, teleports, switches, timed, terrain } = r.s;
+    const data = ML.toJSON(r.m, { seed: r.s.seed, generator: r.genId, difficulty: r.score ? r.score.score : null, settings: { grid, shape, text, size, levels, torus, variant, mix, braid, keys, oneways, teleports, switches, timed, terrain } });
     download(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }), `maze-${r.s.seed}.json`);
   });
   $('#btn-png').addEventListener('click', () => { const r = current(); if (r) r.cv.toBlob(b => download(b, `maze-${r.s ? r.s.seed : 'leeg'}.png`)); });
@@ -502,7 +658,7 @@
   function frame(now) {
     const t = now / 1000, spf = paused ? 0 : speedToSpf(S.speed);
     if (W.on) watchFrame(t);
-    else if (S.mode === 'lab') { panes.forEach(r => { r.tick(spf, t); r.draw(t); }); if (panes.some(r => r.phase === 'solve' || r.phase === 'gen')) paneInfo(); }
+    else if (S.mode === 'lab') { panes.forEach(r => { r.tick(spf, t); r.draw(t); }); if (panes.some(r => r.phase === 'solve' || r.phase === 'gen' || r.phase === 'race')) paneInfo(); }
     else if (S.mode === 'daily') { if (daily) { daily.tick(speedToSpf(70), t); daily.draw(t); dailyHud(); } }
     else {
       build.tick(spf, t); build.draw(t);
@@ -516,5 +672,6 @@
   else if (S.mode === 'daily') { build.generate(S, S.gen, false); requestAnimationFrame(dailyEnsure); }
   else build.generate(S, S.gen, false);
   showScore();
+  setTimeout(recalibrate, 800); // na het eerste beeld: eigen records meewegen
   requestAnimationFrame(frame);
 })(window.ML = window.ML || {});
