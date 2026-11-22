@@ -60,6 +60,21 @@
   #watch-info { position: absolute; left: 20px; bottom: 16px; color: #ffffff70; font-size: 13px; letter-spacing: .05em; }
   #watch-exit { position: absolute; right: 16px; top: 14px; background: #ffffff14; color: #fffc; border-color: #ffffff22; opacity: .4; transition: opacity .3s; }
   #watch-exit:hover { opacity: 1; }
+  .check { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+  .check input { width: auto; accent-color: var(--accent); }
+  .meter { height: 8px; border-radius: 4px; background: var(--field); border: 1px solid var(--line); overflow: hidden; margin: 4px 0 6px; }
+  .meter-bar { height: 100%; width: 0; background: linear-gradient(90deg, #06d6a0, #ffd166 50%, #ef476f); transition: width .5s ease; }
+  #view-daily canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: pointer; touch-action: manipulation; }
+  #daily-info p { margin: 4px 0; }
+  .daily-date { font-weight: 700; text-transform: capitalize; }
+  .daily-msg { color: var(--accent); font-weight: 600; }
+  #daily-info h3 { margin: 12px 0 4px; }
+  .daily-hist { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .daily-hist li { display: flex; justify-content: space-between; padding: 2px 0; }
+  body[data-mode="daily"] .sec.std { display: none; }
+  body:not([data-mode="daily"]) #sec-daily, body:not([data-mode="daily"]) .tb-daily { display: none; }
+  body[data-mode="daily"] .tb-std { display: none; }
+  body:not([data-mode="build"]) #sec-score { display: none; }
   @media (max-width: 760px) {
     .wrap { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
     #panel { max-height: 42vh; border-right: 0; border-bottom: 1px solid var(--line); }
@@ -74,13 +89,14 @@
   <nav class="tabs">
     <button data-mode="build">Bouwen</button>
     <button data-mode="lab">Lab</button>
+    <button data-mode="daily">Vandaag</button>
     <button data-mode="watch">Kijken</button>
   </nav>
 </header>
 
 <div class="wrap">
   <aside id="panel">
-    <section class="sec">
+    <section class="sec std">
       <h3>Vorm</h3>
       <label class="row"><span>Raster</span>
         <select data-key="grid">
@@ -94,31 +110,51 @@
         </select></label>
       <label class="row" id="row-text"><span>Tekst</span><input data-key="text" maxlength="12"></label>
       <label class="row"><span>Grootte</span><input type="range" data-key="size" min="6" max="80"><output data-out="size"></output></label>
+      <label class="row"><span>Verdiepingen</span><input type="range" data-key="levels" min="1" max="4"><output data-out="levels"></output></label>
+      <div class="row" id="row-torus"><span>Torus</span><label class="check"><input type="checkbox" data-key="torus"> randen lopen door</label></div>
     </section>
 
-    <section class="sec">
+    <section class="sec std">
       <h3>Maken</h3>
       <label class="row" id="row-gen"><span>Algoritme</span><select data-key="gen"></select></label>
+      <p class="hint" id="gen-hint">Deze maker werkt alleen op een rechthoekig vierkant raster; nu valt hij terug op diepte-eerst.</p>
       <label class="row" id="row-mix"><span>Kronkel</span><input type="range" data-key="mix" min="0" max="100"><output data-out="mix"></output></label>
       <label class="row"><span>Lussen</span><input type="range" data-key="braid" min="0" max="100"><output data-out="braid"></output></label>
       <div class="row"><span>Zaadje</span><input data-key="seed" aria-label="Zaadje"><button id="dice" class="btn icon" title="Nieuw zaadje">⚄</button></div>
     </section>
 
-    <section class="sec">
+    <section class="sec std">
       <h3>Puzzel</h3>
       <label class="row"><span>Sleutels</span><input type="range" data-key="keys" min="0" max="6"><output data-out="keys"></output></label>
       <label class="row"><span>Eenrichting</span><input type="range" data-key="oneways" min="0" max="30"><output data-out="oneways"></output></label>
       <label class="row"><span>Teleporters</span><input type="range" data-key="teleports" min="0" max="6"><output data-out="teleports"></output></label>
-      <p class="hint">Sleutel opent de deur in dezelfde kleur. Pijl = eenrichting. Dubbele ringen = teleporter-paar.</p>
+      <label class="row"><span>Hendels</span><input type="range" data-key="switches" min="0" max="3"><output data-out="switches"></output></label>
+      <label class="row"><span>Tijddeuren</span><input type="range" data-key="timed" min="0" max="8"><output data-out="timed"></output></label>
+      <label class="row"><span>Terrein</span><input type="range" data-key="terrain" min="0" max="100"><output data-out="terrain"></output></label>
+      <p class="hint">Sleutel opent de deur in dezelfde kleur. Hendel opent gestreepte deuren in zijn kleur (en sluit andere). Oranje gestreept = tijddeur (3 tikken open, 3 dicht; wachten mag). Pijl = eenrichting. Dubbele ringen = teleporter. Modder kost 3, water 6, ijs ½.</p>
     </section>
 
-    <section class="sec">
+    <section class="sec std">
       <h3>Oplossen</h3>
       <label class="row" id="row-solver"><span>Oplosser</span><select data-key="solver"></select></label>
       <label class="row"><span>Snelheid</span><input type="range" data-key="speed" min="0" max="100"><output data-out="speed"></output></label>
     </section>
 
-    <section class="sec" id="sec-lab">
+    <section class="sec std" id="sec-score">
+      <h3>Moeilijkheid</h3>
+      <div class="meter"><div class="meter-bar" id="score-bar"></div></div>
+      <p class="hint" id="score-text">—</p>
+      <label class="row"><span>Doel</span><input type="range" data-key="target" min="0" max="100"><output data-out="target"></output></label>
+      <div class="btns"><button class="btn" id="btn-target">Zoek doolhof met dit doel</button></div>
+      <p class="hint" id="score-hint">Probeert tot 40 zaadjes met de huidige instellingen.</p>
+    </section>
+
+    <section class="sec" id="sec-daily">
+      <h3>Doolhof van vandaag</h3>
+      <div id="daily-info"></div>
+    </section>
+
+    <section class="sec std" id="sec-lab">
       <h3>Lab</h3>
       <label class="row"><span>Vergelijk</span>
         <select data-key="compare"><option value="solvers">Oplossers (zelfde doolhof)</option><option value="makers">Makers (zelfde oplosser)</option></select></label>
@@ -139,15 +175,19 @@
 
   <main>
     <div class="toolbar">
-      <button class="btn primary" id="btn-new">Nieuw doolhof</button>
-      <button class="btn" id="btn-instant">Direct klaar</button>
-      <button class="btn primary" id="btn-solve">Los op</button>
-      <button class="btn" id="btn-pause">Pauze</button>
-      <button class="btn" id="btn-clear">Wis oplossing</button>
-      <span class="keys">N nieuw · S oplossen · spatie pauze</span>
+      <button class="btn primary tb-std" id="btn-new">Nieuw doolhof</button>
+      <button class="btn tb-std" id="btn-instant">Direct klaar</button>
+      <button class="btn primary tb-std" id="btn-solve">Los op</button>
+      <button class="btn tb-std" id="btn-pause">Pauze</button>
+      <button class="btn tb-std" id="btn-clear">Wis oplossing</button>
+      <span class="keys tb-std">N nieuw · S oplossen · spatie pauze</span>
+      <button class="btn primary tb-daily" id="btn-restart">Opnieuw (R)</button>
+      <button class="btn tb-daily" id="btn-giveup">Geef op, toon oplossing</button>
+      <span class="keys tb-daily">pijltjes of klik = lopen · T = trap/teleporter · spatie = wachten</span>
     </div>
     <section class="view" id="view-build"><canvas id="cv-build"></canvas><div class="hud" id="hud-build"></div></section>
     <section class="view" id="view-lab" hidden><div id="lab-grid"></div></section>
+    <section class="view" id="view-daily" hidden><canvas id="cv-daily"></canvas><div class="hud" id="hud-daily"></div></section>
   </main>
 </div>
 
@@ -162,7 +202,10 @@
 <script src="src/generators.js"></script>
 <script src="src/puzzle.js"></script>
 <script src="src/solvers.js"></script>
+<script src="src/score.js"></script>
+<script src="src/fx.js"></script>
 <script src="src/render2d.js"></script>
+<script src="src/play.js"></script>
 <script src="src/app.js"></script>
 </body>
 </html>

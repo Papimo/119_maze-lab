@@ -1,5 +1,5 @@
-// Lussen, start/doel, puzzel-elementen (sleutels+deuren, eenrichting, teleporters)
-// en het zoekprobleem dat alle oplossers gebruiken.
+// Lussen, start/doel, terrein, puzzel-elementen (sleutels+deuren, schakelaars, getimede deuren,
+// eenrichting, teleporters) en het zoekprobleem dat alle oplossers gebruiken.
 (function (ML) {
   'use strict';
 
@@ -20,7 +20,7 @@
   }
   const argmax = d => { let b = 0; for (let i = 1; i < d.length; i++) if (d[i] > d[b]) b = i; return b; };
 
-  // Lussen: doodlopende stukken openbreken → meerdere routes.
+  // Lussen: doodlopende stukken openbreken → meerdere routes. (Geen extra trappen.)
   ML.braid = function (m, rng, p) {
     if (p <= 0) return;
     const ends = [];
@@ -28,7 +28,7 @@
     rng.shuffle(ends);
     for (const c of ends) {
       if (openCount(m, c) !== 1 || rng() >= p) continue;
-      const closed = m.cells[c].nbrs.filter(nb => !m.walls[nb.w].open);
+      const closed = m.cells[c].nbrs.filter(nb => !m.walls[nb.w].open && !m.walls[nb.w].stair);
       if (!closed.length) continue;
       const pref = closed.filter(nb => openCount(m, nb.c) === 1);
       m.walls[rng.pick(pref.length ? pref : closed).w].open = true;
@@ -40,6 +40,30 @@
     const pass = w => w.open;
     m.start = argmax(bfsDist(m, rng.int(m.cells.length), pass));
     m.goal = argmax(bfsDist(m, m.start, pass));
+  };
+
+  // Terrein in vlekken: modder, water, ijs. pct 0..100 → tot ~60% van de cellen.
+  ML.placeTerrain = function (m, rng, pct) {
+    const n = m.cells.length, T = m.terrain;
+    T.fill(0); m.cost.fill(1);
+    let placed = 0;
+    if (pct > 0) {
+      const target = Math.round(n * Math.min(0.6, pct / 100 * 0.6));
+      for (let guard = 0; placed < target && guard < n * 2; guard++) {
+        const s = rng.int(n);
+        if (T[s]) continue;
+        const type = 1 + rng.int(3), size = 3 + rng.int(10), q = [s];
+        T[s] = type; placed++;
+        for (let h = 0; h < q.length && q.length < size; h++)
+          for (const nb of rng.shuffle(m.cells[q[h]].nbrs.slice())) {
+            if (q.length >= size || T[nb.c] || m.walls[nb.w].stair) continue;
+            T[nb.c] = type; q.push(nb.c); placed++;
+          }
+      }
+    }
+    let minC = 1;
+    for (let i = 0; i < n; i++) { m.cost[i] = ML.TERRAIN[T[i]].cost; if (m.cost[i] < minC) minC = m.cost[i]; }
+    m.minCost = minC; m.weighted = placed > 0;
   };
 
   function cellPath(m) {
@@ -57,66 +81,154 @@
     for (let x = m.goal; x !== -1; x = prev[x]) p.push(x);
     return p.reverse();
   }
+  // Muren die een cellenroute doorloopt (geen teleport/wachten).
+  function pathWalls(m, path) {
+    const out = [];
+    for (let i = 0; i + 1 < path.length; i++) {
+      if (path[i] === path[i + 1]) continue;
+      const w = ML.edge(m, path[i], path[i + 1]);
+      if (w) out.push(w);
+    }
+    return out;
+  }
 
-  // Toestand = cel × verzamelde sleutels (bitmasker).
+  // Toestand = cel × tijd (mod periode) × schakelaars (bits) × sleutels (bits), als één getal.
+  // Elke stap = 1 tik. Met getimede deuren mag je ook wachten (stap op de plek).
   ML.makeProblem = function (m) {
-    const K = m.keys.length, M = 1 << K, cells = m.cells, walls = m.walls, keyAt = m.keyAt, tp = m.telePartner;
-    const gain = (c, mask) => keyAt[c] >= 0 ? mask | (1 << keyAt[c]) : mask;
-    const canPass = (c, nb, mask) => {
+    const cells = m.cells, walls = m.walls, keyAt = m.keyAt, swAt = m.switchAt, tp = m.telePartner, costA = m.cost;
+    const K = m.keys.length, KM = 1 << K, SN = m.switches.length, SM = 1 << SN;
+    const T = m.timed.length ? m.period : 1, n = cells.length, per = KM * SM * T;
+    const enc = (c, t, sw, k) => ((c * T + t) * SM + sw) * KM + k;
+    const dec = s => {
+      const k = s % KM; let r = (s - k) / KM;
+      const sw = r % SM; r = (r - sw) / SM;
+      const t = r % T;
+      return { c: (r - t) / T, t, sw, k };
+    };
+    const cellOf = s => Math.floor(s / per);
+    const timedOpen = (w, t) => ((t + w.timed.phase) % m.period) < w.timed.open;
+    const canPass = (c, nb, k, sw, t) => {
       const w = walls[nb.w];
       if (!w.open) return false;
-      if (w.door !== null && !((mask >> w.door) & 1)) return false;
+      if (w.door !== null && !((k >> w.door) & 1)) return false;
       if (w.oneway !== null && w.oneway !== c) return false;
+      if (w.sw !== null && (((sw >> w.sw) & 1) === 1) === w.swInv) return false;
+      if (w.timed && !timedOpen(w, t)) return false;
       return true;
     };
-    const g = cells[m.goal].center, step = m.maxStep, tel = m.teleporters;
-    const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    const enter = (c2, t, sw, k) => {
+      const kk = keyAt[c2] >= 0 ? k | (1 << keyAt[c2]) : k;
+      const ss = swAt[c2] >= 0 ? sw ^ (1 << swAt[c2]) : sw;
+      return enc(c2, (t + 1) % T, ss, kk);
+    };
+    const g = cells[m.goal].lc, step = m.maxStep, tel = m.teleporters, minC = m.minCost, tor = m.torus;
+    const dist = (a, b) => {
+      let dx = Math.abs(a[0] - b[0]), dy = Math.abs(a[1] - b[1]);
+      if (tor) { dx = Math.min(dx, tor.w - dx); dy = Math.min(dy, tor.h - dy); }
+      return Math.hypot(dx, dy);
+    };
     return {
-      M, gain, canPass,
-      start: m.start * M + gain(m.start, 0),
-      cell: s => (s / M) | 0,
-      isGoal: s => ((s / M) | 0) === m.goal,
-      succ(s, out) {
-        out.length = 0;
-        const c = (s / M) | 0, mask = s % M;
-        for (const nb of cells[c].nbrs) if (canPass(c, nb, mask)) out.push(nb.c * M + gain(nb.c, mask));
-        const t = tp[c];
-        if (t >= 0) out.push(t * M + gain(t, mask));
+      T, KM, SM, N: n * per, enc, dec, cell: cellOf, canPass, timedOpen,
+      weighted: !!m.weighted, simple: K === 0 && SN === 0 && T === 1,
+      start: enc(m.start, 0, 0, 0),
+      isGoal: s => cellOf(s) === m.goal,
+      succ(s, out, cost) {
+        out.length = 0; if (cost) cost.length = 0;
+        const { c, t, sw, k } = dec(s);
+        for (const nb of cells[c].nbrs) if (canPass(c, nb, k, sw, t)) { out.push(enter(nb.c, t, sw, k)); if (cost) cost.push(costA[nb.c]); }
+        const tt = tp[c];
+        if (tt >= 0) { out.push(enter(tt, t, sw, k)); if (cost) cost.push(1); }
+        if (T > 1) { out.push(enc(c, (t + 1) % T, sw, k)); if (cost) cost.push(1); }
         return out;
       },
-      h(s) { // ondergrens in stappen (A*/gretig)
-        const c = cells[(s / M) | 0].center;
+      // Voor lopers (muurvolger, Trémaux, speler): zetten met richting en soort.
+      moves(s) {
+        const { c, t, sw, k } = dec(s), res = [];
+        for (const nb of cells[c].nbrs) if (canPass(c, nb, k, sw, t))
+          res.push({ c: nb.c, w: nb.w, ang: nb.ang, s2: enter(nb.c, t, sw, k), kind: walls[nb.w].stair ? 'stair' : 'step' });
+        if (tp[c] >= 0) res.push({ c: tp[c], w: -1, ang: 0, s2: enter(tp[c], t, sw, k), kind: 'tele' });
+        if (T > 1) res.push({ c, w: -1, ang: 0, s2: enc(c, (t + 1) % T, sw, k), kind: 'wait' });
+        return res;
+      },
+      h(s) { // ondergrens van de kosten (A*/gretig); verdiepingen tellen niet mee
+        const c = cells[cellOf(s)].lc;
         let best = dist(c, g);
         for (const t of tel) {
-          const A = cells[t.a].center, B = cells[t.b].center;
+          const A = cells[t.a].lc, B = cells[t.b].lc;
           best = Math.min(best, dist(c, A) + dist(B, g), dist(c, B) + dist(A, g));
         }
-        return best / step;
+        return best / step * minC;
       }
     };
   };
 
-  // Snelle kortste oplossing (cellenlijst) of null.
-  ML.solvePath = function (P) {
-    const prev = new Map([[P.start, -1]]), q = [P.start], out = [];
+  function traceStates(prev, s, P) {
+    const states = [];
+    for (let x = s; x !== -1; x = prev.get(x)) states.push(x);
+    states.reverse();
+    return { path: states.map(P.cell), states };
+  }
+  ML.traceStates = traceStates;
+
+  // Is het doel bereikbaar? (snel, breedte-eerst)
+  ML.canSolve = function (P) {
+    const big = P.N > 5e7, seen = big ? new Set([P.start]) : new Uint8Array(P.N), q = [P.start], out = [];
+    if (!big) seen[P.start] = 1;
     for (let h = 0; h < q.length; h++) {
       const s = q[h];
-      if (P.isGoal(s)) {
-        const path = [];
-        for (let x = s; x !== -1; x = prev.get(x)) path.push(P.cell(x));
-        return path.reverse();
-      }
+      if (P.isGoal(s)) return true;
       P.succ(s, out);
-      for (const t of out) if (!prev.has(t)) { prev.set(t, s); q.push(t); }
+      for (const t of out) {
+        if (big ? seen.has(t) : seen[t]) continue;
+        if (big) seen.add(t); else seen[t] = 1;
+        q.push(t);
+      }
+    }
+    return false;
+  };
+
+  // Goedkoopste oplossing (Dijkstra) → { path, states, cost } of null.
+  ML.solvePath = function (P) {
+    const dist = new Map([[P.start, 0]]), prev = new Map([[P.start, -1]]), done = new Set(), H = new ML.Heap(), out = [], cst = [];
+    H.push(0, P.start);
+    while (H.size) {
+      const s = H.pop();
+      if (done.has(s)) continue;
+      done.add(s);
+      const d = dist.get(s);
+      if (P.isGoal(s)) { const r = traceStates(prev, s, P); r.cost = d; return r; }
+      P.succ(s, out, cst);
+      for (let i = 0; i < out.length; i++) {
+        const t = out[i], nd = d + cst[i];
+        if (!dist.has(t) || nd < dist.get(t)) { dist.set(t, nd); prev.set(t, s); H.push(nd, t); }
+      }
     }
     return null;
+  };
+
+  // Welke cellen zijn bereikbaar, en na hoeveel stappen (eerste keer)?
+  ML.exploreCells = function (P, n) {
+    const depth = new Int32Array(n).fill(-1), dS = new Map([[P.start, 0]]), q = [P.start], out = [];
+    depth[P.cell(P.start)] = 0;
+    for (let h = 0; h < q.length; h++) {
+      const s = q[h], d = dS.get(s);
+      P.succ(s, out);
+      for (const t of out) if (!dS.has(t)) {
+        dS.set(t, d + 1); q.push(t);
+        const c = P.cell(t);
+        if (depth[c] < 0) depth[c] = d + 1;
+      }
+    }
+    return depth;
   };
 
   ML.placePuzzle = function (m, rng, o) {
     const n = m.cells.length;
     m.keys = []; m.keyAt.fill(-1); m.teleporters = []; m.telePartner.fill(-1); m.doors = []; m.oneways = [];
-    for (const w of m.walls) { w.door = null; w.oneway = null; }
+    m.switches = []; m.switchAt.fill(-1); m.swDoors = []; m.timed = [];
+    for (const w of m.walls) { w.door = null; w.oneway = null; w.sw = null; w.swInv = false; w.timed = null; }
     const used = new Set([m.start, m.goal]);
+    const busy = w => w.b === null || w.stair || w.door !== null || w.sw !== null || w.timed || w.oneway !== null;
 
     // Teleporters: bij voorkeur in doodlopende hoekjes.
     const pool = [];
@@ -128,8 +240,8 @@
       for (let t = 0; t < n * 2; t++) { const c = rng.int(n); if (!used.has(c)) { used.add(c); return c; } }
       return -1;
     };
-    const T = Math.min(o.teleports | 0, Math.floor((n - 2) / 2));
-    for (let t = 0; t < T; t++) {
+    const TP = Math.min(o.teleports | 0, Math.floor((n - 2) / 2));
+    for (let t = 0; t < TP; t++) {
       const a = take(), b = take();
       if (a < 0 || b < 0) break;
       m.teleporters.push({ a, b }); m.telePartner[a] = b; m.telePartner[b] = a;
@@ -138,11 +250,7 @@
     // Deuren op de route, sleutel k ligt altijd vóór deur k (eventueel achter eerdere deuren).
     const K0 = Math.min(o.keys | 0, ML.KEY_COLORS.length);
     if (K0 > 0) {
-      const cp = cellPath(m), pathSet = new Set(cp), pw = [];
-      for (let i = 0; i + 1 < cp.length; i++) {
-        const nb = m.cells[cp[i]].nbrs.find(x => x.c === cp[i + 1]);
-        if (nb) pw.push(nb.w);
-      }
+      const cp = cellPath(m), pathSet = new Set(cp), pw = pathWalls(m, cp).filter(w => !w.stair).map(w => w.i);
       const K = Math.min(K0, Math.max(0, pw.length - 1));
       for (let k = 0; k < K; k++) m.walls[pw[Math.floor((k + 1) * pw.length / (K + 1))]].door = k;
       for (let k = 0; k < K; k++) {
@@ -160,11 +268,58 @@
       m.doors = m.walls.filter(w => w.door !== null).map(w => w.i);
     }
 
+    // Schakelaars: hendel j opent deur(en) j op de route en sluit 1–2 andere gangen (val).
+    const SN = Math.min(o.switches | 0, ML.SWITCH_COLORS.length);
+    for (let j = 0; j < SN; j++) {
+      const sol = ML.solvePath(ML.makeProblem(m));
+      if (!sol) break;
+      const pws = pathWalls(m, sol.path).filter(w => !busy(w));
+      if (pws.length < 2) break;
+      const w = pws[Math.min(pws.length - 1, Math.floor(pws.length * (0.35 + 0.5 * rng())))];
+      w.sw = j; w.swInv = false;
+      m.switches.push({ cell: -1, color: ML.SWITCH_COLORS[j] });
+      const depth = ML.exploreCells(ML.makeProblem(m), n), onPath = new Set(sol.path);
+      let best = -1, score = -1;
+      for (let i = 0; i < n; i++) {
+        if (depth[i] < 0 || used.has(i) || m.telePartner[i] >= 0) continue;
+        const s = depth[i] + (onPath.has(i) ? 0 : n) + (openCount(m, i) === 1 ? n : 0);
+        if (s > score) { score = s; best = i; }
+      }
+      if (best < 0) { w.sw = null; m.switches.pop(); break; }
+      m.switches[j].cell = best; m.switchAt[best] = j; used.add(best);
+      if (!ML.canSolve(ML.makeProblem(m))) { w.sw = null; m.switchAt[best] = -1; m.switches.pop(); break; }
+      const pathIdx = new Set(pathWalls(m, sol.path).map(x => x.i));
+      const others = rng.shuffle(m.walls.filter(x => x.open && !busy(x) && !pathIdx.has(x.i)));
+      let added = 0;
+      for (let t = 0; t < Math.min(others.length, 8) && added < 2; t++) {
+        const x = others[t];
+        x.sw = j; x.swInv = true;
+        if (ML.canSolve(ML.makeProblem(m))) added++; else { x.sw = null; x.swInv = false; }
+      }
+    }
+    m.swDoors = m.walls.filter(w => w.sw !== null).map(w => w.i);
+
+    // Getimede deuren: open 3 van elke 6 tikken, elk met eigen fase. Wachten mag, dus altijd oplosbaar.
+    const TD = o.timed | 0;
+    if (TD > 0) {
+      m.period = 6;
+      const sol = ML.solvePath(ML.makeProblem(m));
+      const onRoute = rng.shuffle(sol ? pathWalls(m, sol.path).filter(w => !busy(w)) : []);
+      const rest = rng.shuffle(m.walls.filter(w => w.open && !busy(w)));
+      const pick = [...onRoute.slice(0, Math.ceil(TD / 2)), ...rest];
+      for (const w of pick) {
+        if (m.timed.length >= TD) break;
+        if (w.timed) continue;
+        w.timed = { phase: rng.int(m.period), open: 3 };
+        m.timed.push(w.i);
+      }
+    }
+
     // Eenrichting: alleen als het doolhof oplosbaar blijft.
     const O = o.oneways | 0;
     if (O > 0) {
-      const ok = () => ML.solvePath(ML.makeProblem(m)) !== null;
-      const cands = rng.shuffle(m.walls.filter(w => w.open && w.b !== null && w.door === null));
+      const ok = () => ML.canSolve(ML.makeProblem(m));
+      const cands = rng.shuffle(m.walls.filter(w => w.open && !busy(w) && !w.wrap));
       let placed = 0, tries = 0;
       for (const w of cands) {
         if (placed >= O || tries++ > O * 6) break;
@@ -180,12 +335,39 @@
     }
   };
 
+  // Na het maken: lussen, start/doel, terrein, puzzel, goedkoopste oplossing.
+  ML.finishMaze = function (m, s, genId) {
+    const prng = ML.makeRng(s.seed + '|p|' + genId);
+    ML.braid(m, prng, (s.braid || 0) / 100);
+    ML.placeEnds(m, prng);
+    ML.placeTerrain(m, prng, s.terrain || 0);
+    ML.placePuzzle(m, prng, s);
+    const sol = ML.solvePath(ML.makeProblem(m));
+    m.solution = sol ? sol.path : null;
+    m.solutionStates = sol ? sol.states : null;
+    m.solutionCost = sol ? sol.cost : 0;
+    m.ready = true;
+    return m;
+  };
+
+  // Compleet doolhof zonder animatie (moeilijkheid zoeken, dagelijks doolhof).
+  ML.buildFull = function (s, genId, aspect) {
+    const m = ML.makeMaze(s, aspect), gen = ML.GENERATORS.find(g => g.id === genId) || ML.GENERATORS[0];
+    const it = gen.fn(m, ML.makeRng(s.seed + '|' + gen.id), { mix: (s.mix == null ? 75 : s.mix) / 100 });
+    for (let r = it.next(); !r.done; r = it.next());
+    return ML.finishMaze(m, s, gen.id);
+  };
+
   ML.mazeStats = function (m) {
-    let de = 0, jn = 0;
+    let de = 0, jn = 0, st = 0;
     for (let i = 0; i < m.cells.length; i++) {
       const k = openCount(m, i);
       if (k === 1) de++; else if (k >= 3) jn++;
     }
-    return { cells: m.cells.length, deadEnds: de, junctions: jn, route: m.solution ? m.solution.length : 0 };
+    for (const w of m.walls) if (w.stair && w.open) st++;
+    return {
+      cells: m.cells.length, deadEnds: de, junctions: jn, stairs: st,
+      route: m.solution ? m.solution.length - 1 : 0, cost: m.solutionCost, weighted: m.weighted
+    };
   };
 })(window.ML = window.ML || {});
