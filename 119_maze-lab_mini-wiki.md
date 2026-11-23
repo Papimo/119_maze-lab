@@ -22,9 +22,37 @@
 - Zelf spelen + Vandaag + records → `src/play.js` (`ML.Daily`, `ML.Play`; localStorage `mazelab.daily`)
 - Race → app.js `Runner.race`/`tickRace` (`r.racers`, `S.compare = 'race'`, `makeRace`, `raceInfo`, `S.raceSel`); tekenen render2d `drawRace` (kwadrant per deelnemer, vlag winnaar). Kleuren `ML.RACECOL` (chart.js)
 - Grafiek Lab → `src/chart.js` (`ML.Chart.draw`: curves = bezocht per stap, blocks = kartonnen blokjes); app `drawChart` (≤8×/s), verloop `mkHist`/`histPush` (`r.hist`, `racer.hist`)
+- Aanhaakpunten render2d `draw`: `vs.floorFx(g, r, now)` (onder muren, na terrein) en `vs.topFx` (helemaal aan het eind, maquette op -hp/2); `vs.theme.floor/top` idem voor thema-leven; `vs.cam` = camera {x,y,z,px,py}; `vs.riseT` = muren klappen omhoog; `vs.noVisit` = volgordekleuren uit. Alle hooks: true = blijft bewegen
+- Zwerm → `src/swarm.js` (`ML.Swarm`: elke loper willekeurige DFS over `P.succ`, `step`/`win`/`leader`/`draw`; `ML.drawHeat` + `ML.HEAT_STOPS` = hittekaart); app `Runner.swarm`/`tickSwarm`, Lab `S.compare = 'swarm'` (`makeSwarm`, `swarmInfo`, `S.swarmN`), Kijken 30% kans (`watchNext`)
+- Pootjes → `src/fx.js` `ML.Prints` (add bij cur-wissel in `tick`, `vs.prints`), `S.feet`/`S.under`
+- Commentator → app.js `SAY`, `say()`, `leadCheck()` (ballon `.say` in race/zwerm-paneel, CSS-animatie)
+- Kijkcijfers → app.js `raceWin`/`boardHtml` (localStorage `mazelab.races`, `.board` in racepaneel)
+- Hittekaart na afloop → app.js `heatFx` (`vs.heat`, `vs.doneT`, `S.heat`); race `drawRace` verbergt stipjes via `hideList`
+- Tuinthema → `src/themes.js` (`ML.PALETTES.tuin` met `life: 'tuin'`, `ML.THEME_LIFE`, `ML.drawBird`); app `Runner.draw` maakt `this.tl`
+- Muren klappen (maquette) → render2d `draw` blok "maquette: muur klapt neer", `this.rise` in `maqWalls`
+- Oneindig inzoomen → app.js `watchFrame` stage `zoom` + `W.enterT`
+- 2.0-beeldlagen → `src/v2fx.js` (`ML.V2.layers(z)`; z = `floor`/`top`/`screen`, aangeroepen in render2d `draw`; lagen `patch`, `rainbow`, `wave`, `aurora` (+zon), `flow`, `glint`, `mood` (+`flies`, zaklamp-masker), `vignette`, `bloom`; `ML.distFrom`; geluid `ML.Sound`). Instellingen = `S` via `ML.V2.S`
+- Regenboog-bouw: app `generate` → `vs.gord/gn`, `finishGen` → `vs.rainbow` + `vs.readyT` (golf/glans)
+- Snelheid bouwen → app.js `GEN_X`/`GEN_MAX`, `tick` (`eff`, `this.genMin`, Kijken `r.genX = 1`); vervagen route → render2d `PATH_FADE_*`; zwermgloed → swarm.js `HEAT_FADE/HEAT_TO`
+- Makers 2.0 → generators.js `patchwork` (zet `m.blocks/blockN/blockStyle`), `mirror`
+- Mierenkolonie → swarm.js `Ants extends Swarm` (hooks `pick`/`stuck`/`onGoal`, `pher`); sliertjes `Swarm.trails`. App: solver `'swarm'/'ants'` in Bouwen (`isSwarmSolver`), Lab `SWARMY()`
+- 3D → `src/view3d.js` (`ML.View3D`; app `v3of`, `set3D`, render na `draw` in `frame`/`watchFrame`; `r.noWalls` = 2D tekent alleen vloer = textuur; `runner.drew`). three.js r160 UMD in `vendor/three.js` (+ CDN-terugval)
+- Volgcamera 2D → app `Runner.draw` (`this.fc` → `vs.cam`); sneltoetsen 3/C/M/F → keydown, `cycleKey`, `flash`
+- Evolutie (tab `evo`, startscherm) → kern `src/evo.js` (`ML.Evo`): `GENES` (9), `PRESETS`; `ENGINE()` = zelfstandige loper-engine (Walker op CSR-rijen, `evalOne` met hergebruikte loper, `evalList`) → ook als Worker-bron via `toString()`; `context(m)` bouwt CSR over alle toestanden (`off/to/tc/kd/ex/ey/cellOf`), `pack` = alleen rijen; `cap` = min(6n, 25×kortste); `buildMaze` met cache (`mzCache`); `testScore` → `per` + `cats` (`TEST_CATS`); `Pool` = Web Workers uit Blob (`ensure`/`evaluate`, terugval hoofddraad); bibliotheek `loadAlgos` (migratie: `parent`, `ver`, `folder`, `tags`, `note`, `created`, `hist`), `newAlgo`, `stampHist` (per `ENGINE_V`); deelcode `MLDNA1:`
+- Evolutie-scherm → `src/evoui.js` (`ML.EvoUI`): soorten `speciate` (DNA-afstand, zelfregelende `E.spThr` → 3–7 soorten, `colorFor`); doolhof-modus `mm()`/`nEval()`/`nPanes()` (`S.evoMazeMode` new/fixed/set, `S.evoSetN`; new = min. 4 doolhoven, rest achtergrond via `evalOne` in `endGen`); `E.show` = kijken/werkbank/duel (`{kind, list}`); `turbo(n)` async (0 = ∞, `S.evoFast` max → `Pool`); lade `openDrawer` → `libRender/libList/libDetail/libField`, `benchRender/benchInput/benchRide/benchSave`, `startDuel/duelDone/duelRender`; klikken centraal in `onClick` (`data-ev`). HTML: `#evo-top` (`#evo-mm`, `#evo-species`), `#evo-drawer`/`#evo-dbody`, toolbar `[data-turbo]`. Instellingen `S.evo*` + migratie `S.evoV` in app.js
+- Evolutie 3 (evo.js): `evalList(…, runs, i0)` (runs = gemiddelde), `Walker.explain()` (punten per gen + kans, zelfde formule als `step`), `specMaze`/`spName` (doolhof uit beschrijving), `HEAVY`/`heavyScore`/`heavyReady` (zware testbaan, opwarmen in `enter`), `nextGenIslands`/`assignIslands` (`ge.isl`, migratie elke 8), `loadFame`/`addFame`/`delFame` (localStorage `mazelab.fame`, top 20), `syncSolvers` (bewaarde algos → `ML.SOLVERS` met `evo: true`, `solverFn`; app `fillSolvers` via `ML.onSolversChanged`; Kijken 14% kans)
+- Workers bouwen doolhoven: zes bibliotheken (rng, model, generators, puzzle, swarm, evo) registreren zich in `window.MLDEF`; `Pool.ensure` plakt ze in de Blob-worker → `Pool.evaluateSpecs` (alleen zaadjes heen, per doolhof 1 worker); terugval `Pool.evaluate` (rijen) / hoofddraad
+- Evolutie 3 (evoui.js), lade-tabs: `famRender` (eregalerij), `mutSrc/mutRound/mutDone/mutRender/mutSave` (mutantenlab, `E.mut`, show kind `mut`), `huntSrc/huntRun/huntCand/huntShow` (doolhof-zoeker, `E.hunt`, `E.forced` = opgelegd doolhof bij show, training = `S.evoHunt` + modus `hunt`), `treeRender` (SVG-stamboom), `whyStart/whyStep/whyTable/drawWhy` (uitleg-replay, `E.xp`; terug = opnieuw lopen met `w.seed`), `report` (HTML-download). Hitte per soort: `heatAdd` (`run.heatBy`, sleutel `w.hk`), `E.heatSel`, klik in legenda `[data-heat]`. Instellingen `S.evoRuns`, `S.evoIslands`
+- Turbo-snelheid: model.js `tplCache`/`cloneMaze` (leeg raster per grid/size/aspect hergebruikt; niet bij verdiepingen/breed); evo.js Walker: stapel = `stk`/`sl` (Int32Array, `get st()` voor oud gebruik), `LG` = log-tabel, hand-gen via hoekverschil `ctx.an` (geen atan2), n=1 zonder exp; `Pool.evaluateSpecs(…, x)`: `x.next` = volgende generatie alvast bouwen in dezelfde worker (`pre`), `x.test` = testbaan verdeeld over alle jobs (`testPart`/`testCombine`/`testPut`). evoui: `advance(quiet, later)` → `E.pend` + `record()` / `flushPend()`
 - UI, standen, lus → `src/app.js` (`Runner` met tick/draw/stepFx/goalFx, `makeLab`, `dailyEnsure`, `findTarget`, `watchNext`, `S` in localStorage `mazelab.settings`)
 
 ## Status
+- v2.0.0 (2026-11-23): alles hieronder + turbo sneller. Meting (8 kernen, 40 lopers, 4 doolhoven van 14, browser): Eenvoudig 66 → ~95 gens/s, Maximaal 73–86 → ~125–150 gens/s; Node hoofddraad 31 → 65 gens/s. Uitkomsten bit-gelijk (vingerafdruk testscores/fitness).
+- Evolutie 3 (2026-11-23, niet gecommit): eregalerij, mutantenlab, zware testbaan, bouwen in workers, runs per doolhof, eilanden, grafische stamboom, hittekaart per soort, doolhof-zoeker (+ trainen), eigen algoritmes als oplosser, uitleg-replay, HTML-rapport. Rooktest (Playwright) zonder JS-fouten; gebruiker moet nog kijken.
+- Evolutie 2 (2026-11-23, niet gecommit): startscherm, 1 groot paneel, kleur per soort + legenda, schakelaar nieuw/vast/vaste set, werkbank (9 schuifjes, live proefrit, testbaan per soort, bewaren als versie), duel 2–4 (spoor per kleur, tabel testbaan + soorten), bibliotheek (zoeken, mappen, labels, notitie, stamboom, scoregeschiedenis), CSR-engine, Web Workers, turbo ×25/×100/×1000/∞. Rooktest (Playwright) zonder JS-fouten; gebruiker moet nog kijken.
+- Evolutie-tab (2026-11-23, niet gecommit): zwerm met DNA per loper op 1–6 doolhoven, turbo, grafiek tegen beste klassieker, kampioen + DNA-balkjes, ranglijst, bewaren/hernoemen/deelcode/export/import, ‘kijk alleen’ en ‘zaai’. Rooktest + rekencontrole ok (na ~28 generaties verslaat een eigen algoritme Kompas 53,7). Gebruiker moet nog kijken.
+- v2.0 (2026-11-23, niet gecommit): sneller bouwen, route/zwerm vervaagt, 3D (3 camera's), doolhof van doolhoven, spiegel, mierenkolonie, sliertjes, regenboog-bouw, ademgolf, glans, lichtstroom, sfeer (avond/nacht/zaklamp/cyclus, vuurvliegjes), volgcamera, Aurora + Zonsondergang, gloed, vignet, geluid, stofwolkjes, schermvullend. Rooktest zonder JS-fouten; gebruiker moet nog kijken.
+- Na v0.3.0 (2026-11-22, niet gecommit): zwerm (warmtegloed, 100 lopers), pootjes, commentator, tuinthema, klappende muren, oneindig inzoomen (Kijken), hittekaart na afloop, kijkcijfers. Ongetest.
 - v0.3.0 (2026-11-22): + maquette-stijl, varianten zalen/breed/weave, race in Lab, vergelijkingsgrafiek, ijking moeilijkheid. Ongetest door gebruiker.
 - v0.2 (2026-11-22): + verdiepingen, terrein, hendels, tijddeuren, torus, 4 makers, 4 oplossers, animaties, moeilijkheid, tab Vandaag. Ongetest door gebruiker.
 - Online: https://papimo.github.io/119_maze-lab/ (GitHub Pages, branch master, repo openbaar).
@@ -38,6 +66,20 @@
 - Stijl: kartonnen maquette (standaard, migratie via `S.styleV`); oude paletten blijven kiesbaar. Prototype + andere stijlen: `design/index.html`.
 
 ## Valkuilen
+- Turbo Maximaal: hoofddraad ~60% idle; worker-rekenwerk ~3,8 ms maar wachten ~7,4 ms per generatie → rest = berichten/planning (8 workers + hoofddraad op 8 kernen). Volgende winst: meerdere generaties per worker-ronde (alleen Vast/Vaste set) of minder workers dan kernen proberen. Loper zelf: ~180 ns/stap, ~25% is `Math.exp` (nodig voor gelijke uitkomsten). Kortere `cap` = sneller maar andere scores (ENGINE_V ophogen).
+- Meetscripts in `prullenbak/` (bench.js = Node per onderdeel, same.js = vingerafdruk gelijke uitkomsten, turbo_pw.js = browser-turbo via Playwright).
+- Nieuw bestand dat de worker nodig heeft → zelfde `MLDEF`-omhulling (eerste/laatste regel) en `Pool.canBuild`-drempel (≥6) nalopen. Geen DOM op topniveau in die bestanden.
+- Doolhof-zoeker vindt bijna altijd puzzel-doolhoven (sleutel → loper haalt de stapgrens niet): echte zwakte, geen fout.
+- Evolutie: 1 doolhof per generatie = fitness is geluk (beste haalt vaak 100) → "nieuw per generatie" telt altijd ≥4 doolhoven. Vaste soortdrempel → na ~100 generaties 1 soort; daarom zelfregelend.
+- Workers bij kleine populatie (40 × 4 doolhoven): nauwelijks sneller dan eenvoudig (berichten + doolhoven bouwen op de hoofddraad domineren); winst pas bij grote populatie/vaste set.
+- `⚔`-teken ontbreekt in sommige lettertypen → knop heet "vs".
+- Evolutie: preset-gewichten moeten kloppen (Kompas met comp > fresh−back pendelt eindeloos). Fitness wisselt per generatie door nieuwe doolhoven → testbaan-lijn is de echte maat. Rekencheck in Node `vm` is ~6× trager dan echt (globale lookups); los samengevoegd script gebruiken.
+- three.js: alleen UMD werkt via file:// (geen modules); r160 is de laatste met `build/three.js`. Gekopieerd uit `games/112_froggers/vendor`. Downloaden via curl/python liep vast op zuinigheidswaker (woord in URL) + auto-modus.
+- Mieren in een perfect doolhof: maar één route → leren is pas zichtbaar met lussen (Kijken zet dan braid).
+- 'lighter'-compositie is onzichtbaar op lichte stijlen (maquette) → daar source-over met donkere kleur.
+- 3D: Kijken-inzoomen (`vs.cam`) werkt alleen in 2D; in 3D wisselt het doolhof gewoon.
+- Zwerm-backtrack over de toestandsstapel is geen echte tijd-stap (tijddeuren): visueel prima, fysiek niet exact.
+- Hittekaart bij BFS/A*: elke cel ~1 bezoek → egaal oranje (log-schaal met min-max 4); boeiend bij Rechterhand/Trémaux/DFS/race.
 - Tekst-silhouet: alleen grootste samenhangende stuk blijft → onderstreping verbindt letters; puntjes (i) vallen weg.
 - Weave: bruggen pas na het bouwen (in `finishMaze`), dus niet zichtbaar tijdens de bouw-animatie. Alleen vierkant, geen bruggen naast elkaar.
 - Rechterhand-oplosser loopt vast bij lussen/eenrichting (bewust, laat zien waarom).
@@ -45,5 +87,10 @@
 - Zuinigheidswaker-hook blokkeert Bash-commando's met het woord `node_modules` of `build` (ook `view-build` in een heredoc) (ook in een heredoc voor .gitignore) → Write gebruiken.
 
 ## Volgende stappen
-- Gebruiker test: weave, race, grafiek, ijking (allemaal ongetest).
+- Mutantenlab duidelijker/sneller (gebruiker 2026-11-23): niet wachten op mutanten die het nooit halen (stoppen zodra eerste/genoeg gehaald, of uitzichtlozen afkappen), duidelijk tonen waarop je wacht en waar de uitkomst te zien is. Ook: lopers sneller laten bewegen (max snelheid nagaan in `S.evoSpeed`/frame).
+- UX Evolutie-pagina: `design/index.html` nieuwe sectie, 5 richtingen (cockpit 3 kolommen · tijdlijn · werkplaats-tabs · theater + commandopalet · kartonnen bureau); pijnpunten: lang linkerpaneel, lade met 8 tabs, dubbele knoppen, volle bovenbalk.
+- Evolutie-ideeën nog open: 4 meegroeiende moeilijkheid, 6 nieuwe genen (geheugen, feromoon), 15 auto-bewaren + QR-deelcode.
+- Gebruiker test 2.0 (vooral 3D op echte GPU, mieren, zaklamp, geluid).
+- Gebruiker test: weave, race, grafiek, ijking + alles uit de kijkplezier-ronde (ongetest).
+- Overige thema's uit design (ijs, grot, water) en voetstap-stijlen (schoenen, diep, pijltjes, kruimels) liggen klaar in `design/index.html` als ze later gewenst zijn.
 - Later: bol, silhouet uit afbeelding, 3D-weergave (three.js).

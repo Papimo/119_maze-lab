@@ -1,6 +1,6 @@
 // Lussen, start/doel, terrein, puzzel-elementen (sleutels+deuren, schakelaars, getimede deuren,
 // eenrichting, teleporters) en het zoekprobleem dat alle oplossers gebruiken.
-(function (ML) {
+(window.MLDEF = window.MLDEF || []).push(function (ML) { // MLDEF: ook in de Web Worker (evo.js Pool)
   'use strict';
 
   const openCount = (m, c) => { let k = 0; for (const nb of m.cells[c].nbrs) if (m.walls[nb.w].open) k++; return k; };
@@ -447,4 +447,4 @@
       route: m.solution ? m.solution.length - 1 : 0, cost: m.solutionCost, weighted: m.weighted
     };
   };
-})(window.ML = window.ML || {});
+}); MLDEF[MLDEF.length - 1](window.ML = window.ML || {});

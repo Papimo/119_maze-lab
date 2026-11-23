@@ -8,6 +8,7 @@
     // 0→1 met doorschieten (veer)
     spring: x => x >= 1 ? 1 : 1 - Math.exp(-5 * x) * Math.cos(9 * x),
     easeOut: x => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3),
+    easeInOut: x => { x = Math.min(1, Math.max(0, x)); return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; },
 
     sparks(list, x, y, col, n) {
       for (let i = 0; i < (n || 22); i++) {
@@ -56,6 +57,40 @@
         }
       }
       g.globalAlpha = 1;
+    }
+  };
+
+  // ---- Voetstappen (pootjes) langs de route van een oplosser ----
+  // Afdruk = { x, y, a, sd, t }; twee per stap (links/rechts). Lijst houdt zichzelf kort.
+  const PRINT_FADE = 7, PRINT_MAX = 700;
+  ML.drawPaw = function (g, X, Y, a, side, s, col) {
+    g.save(); g.translate(X, Y); g.rotate(a); g.translate(0, side * s * 0.09); g.fillStyle = col;
+    g.beginPath(); g.ellipse(-s * 0.02, 0, s * 0.045, s * 0.055, 0, 0, TAU); g.fill();
+    for (const [dx, dy] of [[0.05, -0.055], [0.075, -0.018], [0.075, 0.022], [0.05, 0.058]]) { g.beginPath(); g.arc(dx * s, dy * s, s * 0.022, 0, TAU); g.fill(); }
+    g.restore();
+  };
+  ML.Prints = {
+    add(list, m, c0, c1, t) {
+      const B = m.cells[c1].center, w = c0 >= 0 && c0 !== c1 ? ML.edge(m, c0, c1) : null;
+      if (w && !w.stair && !w.wrap) {
+        const A = m.cells[c0].center, a = Math.atan2(B[1] - A[1], B[0] - A[0]);
+        for (const [f, sd] of [[0.25, -1], [0.75, 1]]) list.push({ x: A[0] + (B[0] - A[0]) * f, y: A[1] + (B[1] - A[1]) * f, a, sd, t });
+      } else { // sprong (BFS-golf, teleporter, trap): één paar op de nieuwe plek
+        const a = c0 >= 0 ? Math.atan2(B[1] - m.cells[c0].center[1], B[0] - m.cells[c0].center[0]) : 0;
+        list.push({ x: B[0], y: B[1], a, sd: -1, t }, { x: B[0], y: B[1], a, sd: 1, t });
+      }
+      if (list.length > PRINT_MAX) list.splice(0, list.length - PRINT_MAX);
+    },
+    // geeft true zolang er afdrukken vervagen
+    draw(g, r, list, now) {
+      let i = 0;
+      while (i < list.length && now - list[i].t > PRINT_FADE) i++;
+      if (i) list.splice(0, i);
+      if (!list.length) return false;
+      const s = r.s, col = r.pal.maq ? '#4b3b2c' : r.pal.walk;
+      for (const p of list) { g.globalAlpha = (1 - (now - p.t) / PRINT_FADE) * 0.85; ML.drawPaw(g, r.X(p.x), r.Y(p.y), p.a, p.sd, s, col); }
+      g.globalAlpha = 1;
+      return true;
     }
   };
 })(window.ML = window.ML || {});

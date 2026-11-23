@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Maze Lab</title>
+<title>Maze Lab 2.0</title>
 <style>
   :root {
     --bg: #0d1117; --panel: #151b23; --line: #263040; --text: #dbe4ee; --muted: #8b98a8;
@@ -42,6 +42,12 @@
   .toolbar .keys { margin-left: auto; color: var(--muted); font-size: 12px; }
   .view { flex: 1; min-height: 0; position: relative; }
   .view[hidden] { display: none; }
+  .v3 { position: absolute; inset: 0; width: 100%; height: 100%; display: none; z-index: 1; touch-action: none; cursor: grab; }
+  .hud, #watch-info, #watch-exit, .say { z-index: 3; }
+  .new, .ver { font-size: 10px; font-weight: 700; letter-spacing: .05em; padding: 1px 6px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); vertical-align: middle; }
+  #v2-flash { position: fixed; left: 50%; top: 18%; transform: translate(-50%, 0) scale(.9); padding: 10px 22px; border-radius: 999px; background: rgba(20,14,30,.78); color: #fff; font: 600 16px system-ui, sans-serif; pointer-events: none; opacity: 0; z-index: 50; }
+  #v2-flash.on { animation: v2flash 1.3s ease-out; }
+  @keyframes v2flash { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.9); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1); } 70% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -6px) scale(1); } }
   #cv-build { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .hud { position: absolute; left: 14px; bottom: 10px; right: auto; max-width: calc(100% - 28px); padding: 3px 9px; border-radius: 6px; background: #0d1117c0; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; pointer-events: none; text-shadow: 0 1px 2px #000a; }
   .hud:empty { display: none; }
@@ -63,10 +69,22 @@
   .pane-head .rank { font-weight: 800; color: var(--accent); min-width: 32px; text-align: right; }
   .pane-cv { flex: 1; min-height: 0; position: relative; }
   .pane-cv canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .say { position: absolute; left: 12px; top: 10px; max-width: calc(100% - 200px); background: #fffaf0; color: #2b2118; border-radius: 14px; padding: 6px 12px 6px 10px; font-weight: 650; font-size: 13px; box-shadow: 0 3px 12px #0005; pointer-events: none; opacity: 0; display: flex; gap: 7px; align-items: center; }
+  .say::after { content: ''; position: absolute; left: 18px; bottom: -7px; border: 7px solid transparent; border-bottom: 0; border-top-color: #fffaf0; }
+  .say.on { animation: say 3.4s ease forwards; }
+  @keyframes say { 0% { opacity: 0; transform: translateY(-6px) scale(.96); } 8% { opacity: 1; transform: none; } 85% { opacity: 1; } 100% { opacity: 0; } }
+  .board { position: absolute; right: 10px; top: 10px; background: #151b23e0; border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; font-size: 12px; min-width: 150px; pointer-events: none; }
+  .board b { display: block; color: var(--accent); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 4px; }
+  .board small { display: block; color: var(--muted); margin-top: 4px; font-size: 11px; }
+  .brow { display: grid; grid-template-columns: 1fr 50px 22px; gap: 6px; align-items: center; }
+  .brow i { height: 6px; border-radius: 3px; background: var(--muted); }
+  .brow.top i { background: var(--accent); }
+  .brow em { font-style: normal; text-align: right; font-variant-numeric: tabular-nums; }
   .pane-stats { padding: 5px 8px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 26px; }
   #watch { position: fixed; inset: 0; background: #07060d; z-index: 10; }
   #watch[hidden] { display: none; }
   #cv-watch { width: 100%; height: 100%; display: block; transition: opacity .7s ease; }
+  #watch .v3 { transition: opacity .7s ease; }
   #watch-info { position: absolute; left: 20px; bottom: 16px; color: #ffffff70; font-size: 13px; letter-spacing: .05em; }
   #watch-exit { position: absolute; right: 16px; top: 14px; background: #ffffff14; color: #fffc; border-color: #ffffff22; opacity: .4; transition: opacity .3s; }
   #watch-exit:hover { opacity: 1; }
@@ -85,6 +103,170 @@
   body:not([data-mode="daily"]) #sec-daily, body:not([data-mode="daily"]) .tb-daily { display: none; }
   body[data-mode="daily"] .tb-std { display: none; }
   body:not([data-mode="build"]) #sec-score { display: none; }
+  /* ---- Evolutie ---- */
+  body[data-mode="evo"] #panel > .sec:not(.evo):not(.keep) { display: none; }
+  body:not([data-mode="evo"]) #panel > .sec.evo, body:not([data-mode="evo"]) .tb-evo { display: none; }
+  body[data-mode="evo"] .tb-std { display: none; }
+  #evo-grid { position: absolute; inset: 56px 10px 236px; display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+  #evo-grid[data-n="1"] { grid-template-columns: 1fr; }
+  #evo-grid[data-n="4"] { grid-template-rows: 1fr 1fr; }
+  #evo-grid[data-n="6"] { grid-template-columns: repeat(3, 1fr); grid-template-rows: 1fr 1fr; }
+  #evo-grid .pane-head { font-size: 12px; color: var(--muted); padding: 6px 9px; }
+  #evo-bottom { position: absolute; left: 10px; right: 10px; bottom: 10px; height: 216px; display: grid; grid-template-columns: 1fr 400px; gap: 10px; }
+  #evo-chart, #evo-champ { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); min-width: 0; overflow: hidden; }
+  #cv-evo { width: 100%; height: 100%; display: block; }
+  #evo-champ { padding: 9px 12px; overflow-y: auto; position: relative; }
+  #evo-champ h4 { margin: 0 0 4px; font-size: 15px; display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+  #evo-champ h4 small { font-weight: 400; color: var(--muted); font-size: 11px; }
+  #evo-champ .desc { margin: 4px 0 6px; font-size: 12px; color: var(--text); }
+  .evo-score { display: flex; gap: 10px; align-items: center; }
+  .evo-score b { font-size: 30px; line-height: 1; color: #4cc9f0; font-variant-numeric: tabular-nums; }
+  .evo-score span { font-size: 11px; color: var(--muted); line-height: 1.3; }
+  .evo-score em { font-style: normal; font-weight: 700; } .evo-score .up { color: #80ed99; } .evo-score .down { color: #ff6b6b; }
+  .evo-msg { background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 12px; border-radius: 7px; padding: 5px 8px; margin-bottom: 6px; animation: evoPop .5s ease-out; }
+  @keyframes evoPop { from { transform: scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; box-shadow: 0 0 0 1px #0006; }
+  .dna { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; margin: 4px 0 8px; }
+  .gene { display: grid; grid-template-columns: 104px 1fr; white-space: nowrap; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+  .gene b { position: relative; height: 7px; border-radius: 4px; background: var(--field); border: 1px solid var(--line); }
+  .gene b::after { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--line); }
+  .gene i { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+  #evo-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11px; color: var(--muted); }
+  #evo-legend span { display: inline-flex; align-items: center; gap: 4px; }
+  #evo-rank { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+  .erow { display: grid; grid-template-columns: 18px 12px 1fr auto; grid-template-areas: "p s n c" "p s b b" "a a a a"; gap: 1px 6px; align-items: center; padding: 5px 6px; border-radius: 7px; font-size: 12px; }
+  .erow:hover { background: var(--field); }
+  .erow.live { box-shadow: inset 0 0 0 1px var(--accent); }
+  .erow .pos { grid-area: p; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+  .erow .sw { grid-area: s; }
+  .erow .nm { grid-area: n; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .erow.classic .nm { font-weight: 400; }
+  .erow .nm small, .erow .sc small { display: block; font-weight: 400; color: var(--muted); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; }
+  .erow .sc { grid-area: c; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; color: #4cc9f0; }
+  .erow .bar { grid-area: b; height: 4px; border-radius: 2px; background: var(--field); overflow: hidden; }
+  .erow .bar i { display: block; height: 100%; background: #4cc9f0; opacity: .7; }
+  .erow.classic .bar i { background: var(--muted); }
+  .erow .acts { grid-area: a; display: none; gap: 4px; justify-content: flex-end; }
+  .erow:hover .acts, .erow:focus-within .acts { display: flex; }
+  .erow .acts button { background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 1px 7px; cursor: pointer; font: inherit; font-size: 12px; }
+  .erow .acts button:hover { border-color: var(--accent); }
+  #evo-status { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  /* Evolutie 2: bovenbalk, lade, werkbank, duel, bibliotheek */
+  #evo-top { position: absolute; left: 10px; right: 10px; top: 10px; height: 38px; display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .seg { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); overflow: hidden; flex: none; }
+  .seg > span { font-size: 12px; color: var(--muted); padding: 0 8px 0 10px; }
+  .seg button { background: none; border: 0; border-left: 1px solid var(--line); color: var(--text); font: inherit; font-size: 12.5px; padding: 8px 10px; cursor: pointer; }
+  .seg button.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .seg select { margin: 0 6px; background: var(--field); color: var(--text); border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 12px; padding: 3px 4px; }
+  label.mini { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 5px; flex: none; }
+  label.mini select { background: var(--field); color: var(--text); border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 12px; padding: 3px 4px; }
+  #evo-species { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 12px; color: var(--text); max-height: 38px; overflow: hidden; align-content: flex-start; }
+  #evo-species span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  #evo-species small { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .turbo-grp { display: inline-flex; align-items: center; gap: 3px; }
+  .turbo-grp > span { font-size: 12px; color: var(--muted); margin-right: 2px; }
+  .turbo-grp .btn { padding-left: 8px; padding-right: 8px; }
+  .turbo-grp .btn.on { background: #ff6b6b; color: #1a0d10; border-color: #ff6b6b; }
+  #evo-drawer { display: none; position: absolute; top: 10px; right: 10px; bottom: 10px; width: 390px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); flex-direction: column; overflow: hidden; z-index: 3; box-shadow: 0 10px 30px #0005; }
+  #view-evo.drawer #evo-drawer { display: flex; }
+  #view-evo.drawer #evo-top, #view-evo.drawer #evo-grid, #view-evo.drawer #evo-bottom { right: 410px; }
+  #view-evo.drawer #evo-bottom { grid-template-columns: 1fr; }
+  #view-evo.drawer #evo-champ { display: none; }
+  .dhead { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--line); flex: none; }
+  .dhead button { flex: 1 0 22%; background: none; border: 0; color: var(--muted); font: inherit; font-size: 12.5px; padding: 8px 4px; cursor: pointer; border-bottom: 2px solid transparent; }
+  .dhead #evo-dclose { position: absolute; top: 0; right: 0; flex: none; width: 30px; padding: 4px; }
+  .dhead { position: relative; padding-right: 30px; }
+  /* Evolutie 3: eregalerij, mutantenlab, zoeker, stamboom, uitleg, hittekaart per soort */
+  #evo-species span[data-heat] { cursor: pointer; border-radius: 6px; padding: 1px 4px; }
+  #evo-species span[data-heat]:hover { background: var(--field); }
+  #evo-species span.on { background: var(--accent); color: var(--accent-ink); }
+  #evo-species span.all { color: var(--muted); }
+  .evo-score .hv { font-size: 22px; color: #b388ff; margin-left: 8px; }
+  .podium { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+  .pod { border: 1px solid var(--line); border-radius: 9px; padding: 7px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; background: var(--field); }
+  .pod.p1 { border-color: #ffd166; box-shadow: 0 0 0 1px #ffd16655 inset; }
+  .pod .md { font-size: 20px; line-height: 1; }
+  .pod b { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .pod .big { font-size: 22px; font-weight: 700; color: #4cc9f0; font-variant-numeric: tabular-nums; }
+  .pod small { color: var(--muted); font-size: 10px; }
+  .pod .acts { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+  .pod .acts button, .duel td.acts button { background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 0 5px; cursor: pointer; font: inherit; font-size: 11px; }
+  .fame .erow .acts { display: flex; }
+  .mut-set { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 6px 0; font-size: 12px; color: var(--muted); }
+  .mut-set select { background: var(--field); color: var(--text); border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 12px; padding: 2px 4px; margin-left: 4px; }
+  .duel tr.top th { color: var(--accent); }
+  .duel th small { display: block; font-weight: 400; color: var(--muted); font-size: 10px; }
+  .duel td.worse { color: #ff6b6b; font-weight: 700; }
+  .duel.hunt th, .duel.hunt td { white-space: normal; } .duel.hunt td small { display: block; color: var(--muted); font-size: 10px; } .duel.hunt td.acts { white-space: nowrap; }
+  .treewrap { overflow: auto; max-height: calc(100vh - 160px); border: 1px solid var(--line); border-radius: 8px; background: var(--field); }
+  .stree .edges path { fill: none; stroke: var(--muted); stroke-width: 1.5; opacity: .7; }
+  .stree .tn { cursor: pointer; }
+  .stree .tn rect:first-of-type { fill: var(--panel); stroke: var(--line); }
+  .stree .tn:hover rect:first-of-type { stroke: var(--accent); }
+  .stree .tn.classic rect:first-of-type { stroke-dasharray: 4 3; }
+  .stree text { font: 600 11px system-ui, sans-serif; fill: var(--text); }
+  .stree text.s { font-weight: 400; fill: var(--muted); font-size: 10.5px; }
+  .stree .up { fill: #80ed99; } .stree .down { fill: #ff6b6b; }
+  .wsec { margin: 8px 0 3px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .wrow { display: grid; grid-template-columns: 42px 1fr; gap: 2px 8px; padding: 5px 6px; border-radius: 7px; border: 1px solid transparent; }
+  .wrow.pick { border-color: var(--accent); background: var(--field); }
+  .wrow > b { grid-row: span 2; font-size: 16px; font-variant-numeric: tabular-nums; color: #4cc9f0; }
+  .wrow > span { font-size: 11px; color: var(--muted); }
+  .wrow .chips { display: flex; flex-wrap: wrap; gap: 3px; }
+  .wrow .chips em { font-style: normal; font-size: 11px; border-left: 3px solid; padding: 0 5px; background: var(--panel); border-radius: 3px; }
+  .dhead button.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+  .dhead #evo-dclose { flex: none; width: 40px; }
+  #evo-dbody { flex: 1; overflow-y: auto; padding: 10px 12px; font-size: 12.5px; }
+  #evo-dbody .desc { font-size: 12px; margin: 6px 0; }
+  .lib-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+  .lib-tools input { grid-column: 1 / -1; }
+  .lib-tools input, .lib-tools select, .frow input, .frow textarea { background: var(--field); color: var(--text); border: 1px solid var(--line); border-radius: 7px; font: inherit; font-size: 12.5px; padding: 6px 8px; min-width: 0; width: 100%; box-sizing: border-box; }
+  .lrow { display: grid; grid-template-columns: 12px 1fr auto 28px; gap: 8px; align-items: center; padding: 6px; border-radius: 7px; cursor: pointer; }
+  .lrow:hover, .lrow.open { background: var(--field); }
+  .lrow.live { box-shadow: inset 0 0 0 1px var(--accent); }
+  .lrow .nm { min-width: 0; font-weight: 600; overflow: hidden; }
+  .lrow.classic .nm { font-weight: 400; }
+  .lrow .nm small, .lrow .sc small { display: block; font-weight: 400; color: var(--muted); font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lrow .sc { text-align: right; font-weight: 700; color: #4cc9f0; font-variant-numeric: tabular-nums; }
+  .ver, .tag { font-style: normal; font-weight: 500; font-size: 10px; border-radius: 9px; padding: 0 6px; margin-left: 4px; vertical-align: 1px; }
+  .ver { background: var(--accent); color: var(--accent-ink); }
+  .tag { border: 1px solid var(--line); color: var(--muted); }
+  .duel-tog { font-size: 11px !important; font-weight: 600; }
+  .duel-tog, .erow .acts button.on { background: var(--panel); border: 1px solid var(--line); color: var(--muted); border-radius: 6px; cursor: pointer; font: inherit; padding: 2px 0; }
+  .duel-tog.on, .erow .acts button.on { background: #ff6b6b; border-color: #ff6b6b; color: #1a0d10; }
+  .ldet { margin: 2px 0 8px 20px; padding: 6px 8px 8px; border-left: 2px solid var(--accent); }
+  .frow { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 8px; margin: 5px 0; font-size: 12px; color: var(--muted); }
+  .frow textarea { resize: vertical; }
+  .tree { font-size: 11.5px; color: var(--muted); margin: 5px 0; line-height: 1.45; }
+  .tree b { color: var(--text); margin-right: 4px; } .tree u { color: var(--text); text-decoration: none; font-weight: 600; }
+  .cats { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 11.5px; color: var(--muted); margin: 6px 0; }
+  .cats b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .cats em, #bench-score em { font-style: normal; font-weight: 700; } .cats .up { color: #80ed99; } .cats .down { color: #ff6b6b; }
+  .lib-foot { position: sticky; bottom: -10px; background: var(--panel); padding: 8px 0 4px; border-top: 1px solid var(--line); margin-top: 8px; }
+  .duelbar { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .duelbar span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bench-sl { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+  .bsl { position: relative; display: grid; grid-template-columns: 128px 1fr 36px; align-items: center; gap: 8px; font-size: 12px; }
+  .bsl span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .bsl output { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .bsl input { width: 100%; margin: 0; }
+  .bsl .bw { position: relative; display: block; }
+  .bsl s { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text); opacity: .45; pointer-events: none; transform: translateX(-1px); }
+  .duel-wrap { overflow-x: auto; }
+  table.duel { border-collapse: collapse; font-size: 12px; width: 100%; font-variant-numeric: tabular-nums; }
+  table.duel th, table.duel td { padding: 5px 4px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  table.duel thead th { color: var(--muted); font-weight: 500; font-size: 10.5px; }
+  table.duel tbody th { text-align: left; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  table.duel td small { display: block; color: var(--muted); font-size: 10px; }
+  table.duel td.best { color: #80ed99; font-weight: 700; }
+  @media (max-width: 760px) {
+    #evo-grid { inset: 96px 10px 420px; grid-template-columns: 1fr 1fr; }
+    #evo-grid[data-n="1"] { grid-template-columns: 1fr; }
+    #evo-top { height: auto; flex-wrap: wrap; gap: 6px; }
+    #evo-drawer { left: 10px; width: auto; }
+    #view-evo.drawer #evo-top, #view-evo.drawer #evo-grid, #view-evo.drawer #evo-bottom { right: 10px; }
+    #evo-bottom { height: 400px; grid-template-columns: 1fr; grid-template-rows: 170px 1fr; }
+  }
   @media (max-width: 760px) {
     .wrap { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
     #panel { max-height: 42vh; border-right: 0; border-bottom: 1px solid var(--line); }
@@ -95,8 +277,9 @@
 </head>
 <body>
 <header class="top">
-  <div class="brand">MAZE <span>LAB</span></div>
+  <div class="brand">MAZE <span>LAB</span> <small class="ver">2.0</small></div>
   <nav class="tabs">
+    <button data-mode="evo">Evolutie <span class="new">2</span></button>
     <button data-mode="build">Bouwen</button>
     <button data-mode="lab">Lab</button>
     <button data-mode="daily">Vandaag</button>
@@ -170,15 +353,69 @@
     <section class="sec std" id="sec-lab">
       <h3>Lab</h3>
       <label class="row"><span>Vergelijk</span>
-        <select data-key="compare"><option value="solvers">Oplossers (zelfde doolhof)</option><option value="makers">Makers (zelfde oplosser)</option><option value="race">Race (oplossers op één doolhof)</option></select></label>
-      <label class="row"><span>Aantal</span>
+        <select data-key="compare"><option value="solvers">Oplossers (zelfde doolhof)</option><option value="makers">Makers (zelfde oplosser)</option><option value="race">Race (oplossers op één doolhof)</option><option value="swarm">Zwerm (100 lopers, warmtegloed)</option><option value="ants">Mierenkolonie (leert via feromoon)</option></select></label>
+      <label class="row" id="row-swarm"><span>Lopers</span>
+        <select data-key="swarmN" data-num><option value="25">25</option><option value="50">50</option><option value="100">100</option><option value="200">200</option></select></label>
+      <label class="row" id="row-panes"><span>Aantal</span>
         <select data-key="panes" data-num><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
     </section>
 
-    <section class="sec">
+    <section class="sec evo">
+      <h3>Evolutie</h3>
+      <p class="hint" style="margin:0 0 6px">Elke loper heeft eigen DNA: hoe zwaar hij nieuwe gangen, zijn eigen spoor, het kompas, zijn hand aan de muur… laat meewegen. Na elke ronde krijgen de besten kinderen met kleine mutaties.</p>
+      <label class="row"><span>Lopers</span><select data-key="evoPop" data-num><option value="20">20</option><option value="40">40</option><option value="80">80</option><option value="150">150</option></select></label>
+      <label class="row"><span>Raster</span><select data-key="evoGrid"><option value="square">Vierkant</option><option value="hex">Zeshoek</option><option value="tri">Driehoek</option><option value="polar">Ringen</option><option value="mix">Gemengd (elk paneel anders)</option></select></label>
+      <label class="row"><span>Makers</span><select data-key="evoMakers"><option value="mix">Gemengd (5 makers)</option><option value="backtracker">Alleen diepte-eerst</option></select></label>
+      <label class="row"><span>Grootte</span><input type="range" data-key="evoSize" min="8" max="80"><output data-out="evoSize"></output></label>
+      <label class="row"><span>Lussen</span><input type="range" data-key="evoBraid" min="0" max="60"><output data-out="evoBraid"></output></label>
+      <div class="row"><span>Puzzel</span><label class="check"><input type="checkbox" data-key="evoPuzzle"> sleutel, teleporter, eenrichting</label></div>
+      <label class="row"><span>Mutatie</span><input type="range" data-key="evoMut" min="5" max="60"><output data-out="evoMut"></output></label>
+      <label class="row"><span>Snelheid</span><input type="range" data-key="evoSpeed" min="0" max="100"><output data-out="evoSpeed"></output></label>
+      <label class="row"><span>Kleur</span><select data-key="evoColor"><option value="species">Per soort (familie)</option><option value="gene">Sterkste gen</option></select></label>
+      <label class="row" title="Elk doolhof meerdere keren lopen (andere loting) en het gemiddelde nemen: minder geluk, wel trager"><span>Runs</span><select data-key="evoRuns" data-num><option value="1">1 per doolhof</option><option value="2">2 per doolhof (gemiddeld)</option><option value="3">3 per doolhof (gemiddeld)</option><option value="5">5 per doolhof (gemiddeld)</option></select></label>
+      <label class="row" title="Aparte populaties die los van elkaar evolueren; elke 8 generaties verhuist de beste naar het volgende eiland"><span>Eilanden</span><select data-key="evoIslands" data-num><option value="1">Geen (één populatie)</option><option value="2">2 eilanden</option><option value="3">3 eilanden</option><option value="4">4 eilanden</option></select></label>
+      <label class="row" title="Voor Turbo: eenvoudig = slanke loper op de hoofddraad; maximaal = Web Workers op alle processorkernen (bouwen ook zelf de doolhoven)"><span>Rekenkracht</span><select data-key="evoFast"><option value="simple">Eenvoudig sneller</option><option value="max">Maximaal (alle kernen)</option></select></label>
+      <div class="row"><span>Begin met</span><label class="check"><input type="checkbox" data-key="evoClassics"> de klassiekers</label></div>
+      <div class="row"><span></span><label class="check"><input type="checkbox" data-key="evoSeedSaved"> mijn bewaarde algoritmes</label></div>
+      <div class="btns"><button class="btn" id="evo-reset">Opnieuw beginnen</button></div>
+      <p class="hint">Kleur = soort: lopers met lijkend DNA vormen een familie (legenda boven het doolhof). Witte ring = kampioen van de vorige ronde, gouden ring = koploper.</p>
+    </section>
+
+    <section class="sec evo">
+      <h3>Ranglijst · testbaan</h3>
+      <p class="hint" style="margin:0 0 4px">Vaste toets: 12 doolhoven (4 rasters, met en zonder lussen), elk algoritme 2×. Score = kortste route ÷ gelopen stappen. Klassiekers zijn óók DNA, dus het is eerlijk. Klein getal “zwaar” = zware testbaan (8 grote doolhoven 40–70 met lussen en puzzels).</p>
+      <div id="evo-rank"></div>
+      <div class="btns" style="margin-top:8px"><button class="btn primary" data-open-drawer="lib">Bibliotheek (L)</button><button class="btn" data-open-drawer="fame">Eregalerij</button><button class="btn" data-open-drawer="duel">Duel</button></div>
+      <div class="btns"><button class="btn" data-open-drawer="mut">🧬 Mutantenlab</button><button class="btn" data-open-drawer="hunt">🎯 Zoeker</button><button class="btn" data-open-drawer="tree">Stamboom</button><button class="btn" data-open-drawer="why">Uitleg</button><button class="btn" id="evo-report">Rapport</button></div>
+      <div class="btns"><button class="btn" id="evo-export">Exporteer</button><button class="btn" id="evo-import">Importeer</button><button class="btn" id="evo-paste">Plak code</button></div>
+      <input type="file" id="evo-file" accept=".json,application/json" hidden>
+    </section>
+
+    <section class="sec keep">
       <h3>Weergave</h3>
       <label class="row"><span>Stijl</span><select data-key="palette"></select></label>
+      <label class="row"><span>Voetstappen</span><select data-key="feet"><option value="color">Kleur (bezochte cellen)</option><option value="paws">Pootjes</option></select></label>
+      <div class="row" id="row-under"><span></span><label class="check"><input type="checkbox" data-key="under"> kleur eronder</label></div>
+      <div class="row"><span>Hittekaart</span><label class="check"><input type="checkbox" data-key="heat"> na afloop (bezoeken per cel)</label></div>
       <div class="row"><span>Leven</span><label class="check"><input type="checkbox" data-key="life"> rustig leven (maquette)</label></div>
+    </section>
+
+    <section class="sec">
+      <h3>Beleving <span class="new">2.0</span></h3>
+      <div class="row"><span>3D</span><label class="check"><input type="checkbox" data-key="view3d"> echte muren (toets 3)</label></div>
+      <label class="row" id="row-cam3d"><span>Camera 3D</span><select data-key="cam3d"><option value="orbit">Rondcirkelen (slepen/scrollen)</option><option value="chase">Achtervolgen</option><option value="first">Eerste persoon</option></select></label>
+      <label class="row"><span>Sfeer</span><select data-key="mood"><option value="dag">Dag</option><option value="avond">Avond</option><option value="nacht">Nacht (lantaarn, vuurvliegjes)</option><option value="zaklamp">Zaklamp</option><option value="cyclus">Dag-en-nachtcyclus</option></select></label>
+      <div class="row"><span>Camera</span><label class="check"><input type="checkbox" data-key="follow"> volgt de zoeker (2D)</label></div>
+      <div class="row"><span>Bouwen</span><label class="check"><input type="checkbox" data-key="rainbow"> regenboog van het uitgraven</label></div>
+      <div class="row"><span></span><label class="check"><input type="checkbox" data-key="wave"> ademgolf als hij klaar is</label></div>
+      <div class="row"><span></span><label class="check"><input type="checkbox" data-key="glint"> glans-veeg</label></div>
+      <div class="row"><span></span><label class="check"><input type="checkbox" data-key="patch"> kleuren per blok (doolhof van doolhoven)</label></div>
+      <div class="row"><span>Oplossen</span><label class="check"><input type="checkbox" data-key="flow"> lichtstroom over de route</label></div>
+      <div class="row"><span></span><label class="check"><input type="checkbox" data-key="trails"> sliertjes achter zwerm/mieren</label></div>
+      <div class="row"><span>Beeld</span><label class="check"><input type="checkbox" data-key="vignette"> vignet + korrel</label></div>
+      <div class="row"><span></span><label class="check"><input type="checkbox" data-key="bloom"> gloed (lichtgevende stijlen)</label></div>
+      <div class="row"><span>Geluid</span><label class="check"><input type="checkbox" data-key="sound"> zachte tonen</label></div>
+      <p class="hint">Toetsen: 3 = 3D · C = camera · M = sfeer · F = schermvullend.</p>
     </section>
 
     <section class="sec">
@@ -194,13 +431,29 @@
       <button class="btn primary tb-std" id="btn-solve">Los op</button>
       <button class="btn tb-std" id="btn-pause">Pauze</button>
       <button class="btn tb-std" id="btn-clear">Wis oplossing</button>
-      <span class="keys tb-std">N nieuw · S oplossen · spatie pauze</span>
+      <span class="keys tb-std">N nieuw · S oplossen · spatie pauze · 3 3D · M sfeer · F scherm</span>
       <button class="btn primary tb-daily" id="btn-restart">Opnieuw (R)</button>
       <button class="btn tb-daily" id="btn-giveup">Geef op, toon oplossing</button>
       <span class="keys tb-daily">pijltjes of klik = lopen · T = trap/teleporter · spatie = wachten</span>
+      <button class="btn primary tb-evo" id="evo-run">Pauze</button>
+      <button class="btn tb-evo" id="evo-skip" title="Rest van deze generatie direct uitrekenen">Volgende generatie</button>
+      <span class="tb-evo turbo-grp" title="Generaties zonder animatie"><span>Turbo</span><button class="btn" data-turbo="25">×25</button><button class="btn" data-turbo="100">×100</button><button class="btn" data-turbo="1000">×1000</button><button class="btn" data-turbo="0" title="Tot ik stop">∞</button></span>
+      <button class="btn tb-evo" id="evo-save">Bewaar kampioen</button>
+      <span class="tb-evo" id="evo-status"></span>
+      <span class="keys tb-evo">spatie pauze · V volgende · T turbo · B bewaar · L bibliotheek</span>
     </div>
     <section class="view" id="view-build"><canvas id="cv-build"></canvas><div class="hud" id="hud-build"></div></section>
     <section class="view" id="view-lab" hidden><div id="lab-grid"></div><div id="lab-chart"><canvas id="cv-chart"></canvas></div></section>
+    <section class="view" id="view-evo" hidden>
+      <div id="evo-top">
+        <div class="seg" id="evo-mm"><span>Doolhof</span><button data-mm="new" title="Elke generatie nieuwe doolhoven: algoritmes moeten algemeen goed zijn">Nieuw per generatie</button><button data-mm="fixed" title="Steeds hetzelfde doolhof: algoritmes leren dit ene doolhof">Vast doolhof</button><button data-mm="set" title="Vaste set; fitness = gemiddelde over de hele set, de rest rekent op de achtergrond">Vaste set van</button><select data-key="evoSetN" data-num><option value="2">2</option><option value="4">4</option><option value="6">6</option><option value="8">8</option><option value="12">12</option></select><button data-mm="hunt" hidden>Zoeker-set</button></div>
+        <label class="mini">Panelen <select data-key="evoMazes" data-num><option value="1">1</option><option value="2">2</option><option value="4">4</option><option value="6">6</option></select></label>
+        <div id="evo-species"></div>
+        <button class="btn" data-open-drawer="lib">Bibliotheek</button>
+      </div>
+      <div id="evo-grid"></div><div id="evo-bottom"><div id="evo-chart"><canvas id="cv-evo"></canvas></div><div id="evo-champ"></div></div>
+      <aside id="evo-drawer"><div class="dhead"><button data-tab="lib">Bibliotheek</button><button data-tab="fame">Eregalerij</button><button data-tab="bench">Werkbank</button><button data-tab="duel">Duel</button><button data-tab="mut">Mutanten</button><button data-tab="hunt">Zoeker</button><button data-tab="tree">Stamboom</button><button data-tab="why">Uitleg</button><button id="evo-dclose" title="Sluiten (Esc)">✕</button></div><div id="evo-dbody"></div></aside>
+    </section>
     <section class="view" id="view-daily" hidden><canvas id="cv-daily"></canvas><div class="hud" id="hud-daily"></div></section>
   </main>
 </div>
@@ -219,8 +472,16 @@
 <script src="src/score.js"></script>
 <script src="src/fx.js"></script>
 <script src="src/render2d.js"></script>
+<script src="src/swarm.js"></script>
+<script src="src/themes.js"></script>
 <script src="src/chart.js"></script>
 <script src="src/play.js"></script>
+<script src="vendor/three.js"></script>
+<script>window.THREE || document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"><\/script>')</script>
+<script src="src/v2fx.js"></script>
+<script src="src/view3d.js"></script>
+<script src="src/evo.js"></script>
+<script src="src/evoui.js"></script>
 <script src="src/app.js"></script>
 </body>
 </html>

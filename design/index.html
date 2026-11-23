@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Maze Lab ontwerp</title>
+<title>Maze Lab kijkplezier</title>
 <style>
 :root {
   --bg: #11100e; --card: #1b1a17; --card2: #24221e; --line: rgba(240, 225, 200, 0.12);
@@ -11,14 +11,15 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+a { color: var(--accent); }
 .wrap { max-width: 1360px; margin: 0 auto; padding: 0 20px 130px; }
 header.page { padding: 38px 0 6px; }
 header.page h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: -0.01em; }
-header.page p { margin: 0; color: var(--muted); max-width: 820px; }
+header.page p { margin: 0; color: var(--muted); max-width: 860px; }
 nav.toc { display: flex; gap: 8px; margin: 16px 0 0; flex-wrap: wrap; }
 nav.toc a { text-decoration: none; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--text); font-size: 14px; }
 h2.sec { margin: 52px 0 4px; font-size: 22px; }
-p.lead { margin: 0 0 16px; color: var(--muted); max-width: 860px; }
+p.lead { margin: 0 0 16px; color: var(--muted); max-width: 880px; }
 .row { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; margin: 0 0 16px; }
 .row .label { color: var(--muted); font-size: 14px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 18px; }
@@ -32,7 +33,7 @@ p.lead { margin: 0 0 16px; color: var(--muted); max-width: 860px; }
 .card p { margin: 0; color: var(--muted); font-size: 14px; }
 .card ul { margin: 0; padding-left: 18px; font-size: 14px; }
 .card ul li { margin: 2px 0; }
-.stats { font: 12px/1.4 ui-monospace, monospace; color: var(--muted); }
+.stats { font: 12px/1.4 ui-monospace, monospace; color: var(--muted); min-height: 1.4em; }
 .tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .tag { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--card2); border: 1px solid var(--line); color: var(--muted); }
 .tag.low { color: #8ce0a8; } .tag.mid { color: #f2c46d; } .tag.warn { color: #ff9b8a; }
@@ -44,7 +45,6 @@ button.pick.on { background: rgba(106, 212, 138, 0.16); border-color: var(--pick
 .seg button { border: none; border-radius: 0; background: transparent; padding: 6px 12px; }
 .seg button.on { background: rgba(255, 181, 71, 0.18); color: #ffe2b3; }
 
-/* groot bekijken */
 #big { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88); display: none; z-index: 50; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; }
 #big.on { display: flex; }
 #big .stage { position: relative; width: min(96vw, 1400px); aspect-ratio: 16 / 10; max-height: 80vh; }
@@ -55,7 +55,6 @@ button.pick.on { background: rgba(106, 212, 138, 0.16); border-color: var(--pick
 #big .ctl { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; color: var(--muted); font-size: 14px; }
 #big input[type=range] { width: min(60vw, 520px); }
 
-/* keuzebalk */
 #bar { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(20, 19, 17, 0.96); border-top: 1px solid var(--line); padding: 10px 20px; display: flex; gap: 14px; align-items: center; z-index: 40; }
 #bar .txt { flex: 1; font-size: 14px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #bar .txt b { color: var(--text); font-weight: 600; }
@@ -66,33 +65,34 @@ button.pick.on { background: rgba(106, 212, 138, 0.16); border-color: var(--pick
 <body>
 <div class="wrap">
   <header class="page">
-    <h1>Maze Lab · ontwerp</h1>
-    <p>Alles hieronder draait live op het echte doolhofmodel uit <code>src/</code> (dezelfde makers, zaadjes en oplossing). Klik een beeld om het groot te bekijken met een schuif tussen Huidig en die optie. Kies onderaan en plak de tekst in de chat.</p>
-    <nav class="toc"><a href="#s1">1 · Stijl met diepte</a><a href="#s2">2 · Varianten op het vierkant</a></nav>
+    <h1>Maze Lab · kijkplezier</h1>
+    <p>Alles draait live in de echte tekencode van de app (<code>src/render2d.js</code>, maquette-stijl) op een echt doolhof met een paar lussen. Klik een beeld om het groot te bekijken met een schuif tussen Huidig en die optie. Kies onderaan en plak de tekst in de chat. Eerdere keuzes (stijl, varianten): <a href="v03-stijl-varianten.html">v0.3-ontwerp</a>.</p>
+    <nav class="toc"><a href="#s1">1 · Zwerm</a><a href="#s2">2 · Voetstappen</a><a href="#s3">3 · Thema's met leven</a></nav>
   </header>
-
-  <h2 class="sec" id="s1">1 · Stijl met diepte + rustig leven</h2>
-  <p class="lead">Elke stijl heeft muren met hoogte (een maquette van bovenaf) en beweegt zachtjes als er niets gebeurt: teleporters draaien, water golft, ijs glinstert, het doel klopt. <b>Eindscène</b> speelt af wat je ziet als je het doel haalt: de route licht in één golf op en de camera zoomt even uit. Kies er één.</p>
   <div class="row">
-    <span class="label">Raster</span>
-    <div class="seg" id="optGrid"><button data-v="square" class="on">Vierkant</button><button data-v="hex">Zeshoek</button><button data-v="polar">Ringen</button></div>
-    <span class="label">Muurhoogte</span>
-    <div class="seg" id="optDepth"><button data-v="0">Plat</button><button data-v="0.6">Laag</button><button data-v="1" class="on">Normaal</button><button data-v="1.6">Hoog</button></div>
-    <span class="label">Rustig leven</span>
-    <div class="seg" id="optLife"><button data-v="1" class="on">Aan</button><button data-v="0">Uit</button></div>
     <button id="reseed">Ander doolhof</button>
-    <button id="endAll">Eindscène overal</button>
+    <button id="restart">Alles opnieuw</button>
+    <span class="label">Tempo</span>
+    <div class="seg" id="optSpeed"><button data-v="0.6">Rustig</button><button data-v="1" class="on">Normaal</button><button data-v="2">Snel</button></div>
   </div>
-  <div class="grid" id="styleGrid"></div>
 
-  <h2 class="sec" id="s2">2 · Varianten op het klassieke vierkant</h2>
-  <p class="lead">Voorstel: nieuwe soorten vierkante doolhoven. Getekend in de stijl die je hierboven kiest. Bij elke kaart staat wat het in het model kost. Meerdere kiezen mag.</p>
-  <div class="grid" id="varGrid"></div>
+  <h2 class="sec" id="s1">1 · Zwerm</h2>
+  <p class="lead">~100 kleine zoekers lopen tegelijk vanaf de start. Wie het doel vindt, loopt terug en legt een geurspoor; dat spoor verdampt langzaam. Zo trekt de zwerm vanzelf naar de kortste weg (er zitten lussen in, dus er is echt iets te kiezen). Zelfde mieren, vijf manieren om ze te tonen. Kies er één.</p>
+  <div class="grid" id="g1"></div>
+
+  <h2 class="sec" id="s2">2 · Voetstappen</h2>
+  <p class="lead">Een loper zoekt de weg (diepte-eerst, met terugkeren). In plaats van gekleurde cellen laat hij een spoor achter dat langzaam vervaagt. Wordt een schakelaar naast de huidige kleur. Kies er één.</p>
+  <div class="row"><span class="label">Kleur eronder</span><div class="seg" id="optUnder"><button data-v="0" class="on">Uit</button><button data-v="1">Aan</button></div></div>
+  <div class="grid" id="g2"></div>
+
+  <h2 class="sec" id="s3">3 · Thema's met leven</h2>
+  <p class="lead">Nieuwe stijlen naast de maquette, elk met eigen rustig leven. Meerdere kiezen mag.</p>
+  <div class="grid" id="g3"></div>
 </div>
 
 <div id="big">
-  <div class="stage" id="bigStage"><canvas id="bigA"></canvas><canvas id="bigB"></canvas><div class="knife" id="knife"><span class="l">Huidig</span><span class="r" id="knifeR"></span></div></div>
-  <div class="ctl"><span>Huidig</span><input type="range" id="slider" min="0" max="100" value="50"><span id="bigName"></span><button id="bigEnd">Eindscène</button><button id="bigClose">Sluiten (Esc)</button></div>
+  <div class="stage"><canvas id="bigA"></canvas><canvas id="bigB"></canvas><div class="knife" id="knife"><span class="l">Huidig</span><span class="r" id="knifeR"></span></div></div>
+  <div class="ctl"><span>Huidig</span><input type="range" id="slider" min="0" max="100" value="50"><span id="bigName"></span><button id="bigClose">Sluiten (Esc)</button></div>
 </div>
 <div id="bar"><div class="txt" id="barTxt"></div><button id="copy">Kopieer</button></div>
 
@@ -101,615 +101,638 @@ button.pick.on { background: rgba(106, 212, 138, 0.16); border-color: var(--pick
 <script src="../src/generators.js"></script>
 <script src="../src/puzzle.js"></script>
 <script src="../src/solvers.js"></script>
-<script src="../src/score.js"></script>
 <script src="../src/fx.js"></script>
 <script src="../src/render2d.js"></script>
 <script>
 'use strict';
 const TAU = Math.PI * 2;
-const OPT = { grid: 'square', depth: 1, life: true, seed: 'ontwerp-7' };
-const PICK = { style: null, vars: new Set() };
+const OPT = { seed: 'kijk-3', under: false, speed: 1 };
+const PICK = { s1: null, s2: null, s3: new Set() };
 
-// ---------- doolhoven (echt model) ----------
-const BASE = { shape: 'rect', text: 'MAZE', levels: 1, torus: false, mix: 75, braid: 12, keys: 1, oneways: 0, teleports: 1, switches: 0, timed: 0, terrain: 22 };
-function styleMaze() {
-  const s = Object.assign({}, BASE, { grid: OPT.grid, size: OPT.grid === 'polar' ? 16 : OPT.grid === 'hex' ? 15 : 17, seed: OPT.seed });
-  return ML.buildFull(s, 'backtracker', 0.6);
+// ---------- doolhof ----------
+const SETTINGS = seed => ({ shape: 'rect', text: 'MAZE', grid: 'square', size: 19, seed, levels: 1, torus: false, mix: 75, braid: 14, keys: 0, oneways: 0, teleports: 0, switches: 0, timed: 0, terrain: 0 });
+let MAZE = null;
+function bfs(m, from) {
+  const d = new Int32Array(m.cells.length).fill(-1), q = [from]; d[from] = 0;
+  for (let h = 0; h < q.length; h++) for (const j of m.adj[q[h]]) if (d[j] < 0) { d[j] = d[q[h]] + 1; q.push(j); }
+  return { d, q };
 }
-function genOn(m, seed, gen) {
-  const g = ML.GENERATORS.find(x => x.id === (gen || 'backtracker'));
-  const it = g.fn(m, ML.makeRng(seed + '|' + g.id), { mix: 0.75 });
-  for (let r = it.next(); !r.done; r = it.next());
-  return m;
+function newMaze() {
+  const m = ML.buildFull(SETTINGS(OPT.seed), 'backtracker', 0.6);
+  m.adj = m.cells.map(c => c.nbrs.filter(nb => m.walls[nb.w].open && !m.walls[nb.w].stair).map(nb => nb.c));
+  m.fromStart = bfs(m, m.start); m.fromGoal = bfs(m, m.goal);
+  m.open = m.walls.filter(w => w.open && !w.stair && w.a != null && w.b != null);
+  MAZE = m;
 }
-const varSettings = seed => Object.assign({}, BASE, { grid: 'square', size: 17, seed, terrain: 10, braid: 0 });
+const cen = (m, i) => m.cells[i].center;
+const hash = (i, k) => { let x = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); };
 
-// ---------- stijlen ----------
-// Elke stijl: kleuren + muur (dikte w, hoogte h in celmaten) + schaduw + extra lagen.
-const STYLES = [
-  { id: 'huidig', name: 'Huidig', current: true, line: 'De blauwdruk zoals hij nu in de app staat, plat.',
-    pts: ['Ter vergelijking', 'Geen hoogte, geen rustig leven'], tags: [] },
-  { id: 'maquette', name: 'Kartonnen maquette', line: 'Een architectenmodel op tafel: crème karton, zachte schaduw, een rode draad als route.',
-    pts: ['Muren als opstaande kartonstroken met zachte slagschaduw', 'Water als blauwe hars, ijs als mat plexiglas', 'Route = rode draad met eigen schaduwtje'],
-    tags: [['low', 'GPU laag (vaste laag in cache)'], ['low', 'past bij 3D-plannen']],
-    bg: '#cfc6b6', bg2: '#a99f8e', floor: '#f1ebdf', grain: 'rgba(120,95,60,0.05)', top: '#fffaf0', side: '#cdbfa6', sideLo: '#b4a589', w: 0.13, h: 0.34, cap: 'square',
-    shadow: ['rgba(70,48,20,0.36)', 0.2, 0.26, 0.3], path: '#c8322f', pathW: 0.09, pathShadow: true, start: '#2f8f74', goal: '#c8322f', tele: '#b98a2c',
-    ter: [null, '#a07a52', '#5aa0d8', '#dceef5'], terA: [0, 0.55, 0.75, 0.8], border: '#8d806a' },
-  { id: 'tuin', name: 'Tuinlabyrint', line: 'Heggen van bovenaf op grindpaden, met een fontein als doel.',
-    pts: ['Dikke heggen met bladstructuur en donkere zijkant', 'Vijver met kringen, rijp op ijsvakken', 'Route als lantaarntjes langs het pad'],
-    tags: [['mid', 'GPU midden (bladstructuur 1× getekend)'], ['low', 'eigen karakter']],
-    bg: '#2b3a24', bg2: '#16210f', floor: '#d9cfb4', grain: 'rgba(90,70,40,0.16)', top: '#5c9a3e', side: '#2f5c22', sideLo: '#22451a', w: 0.28, h: 0.34, cap: 'round', leaves: ['#79b852', '#4a8530', '#3d7228'],
-    shadow: ['rgba(18,30,8,0.5)', 0.22, 0.3, 0.26], path: '#ffcf5c', lanterns: true, start: '#f4f0e0', goal: '#58b6e8', tele: '#e3d9c0',
-    ter: [null, '#6b4b2a', '#3d8fd0', '#f2f7fa'], terA: [0, 0.6, 0.85, 0.85], border: null },
-  { id: 'neon', name: 'Neon-arcade', line: 'Gloeiende buizen die boven een spiegelende vloer zweven.',
-    pts: ['Muur = buis met donkere zijkant en gloed bovenop', 'Weerspiegeling in de vloer, zacht flikkeren, scanlijn', 'Teleporters draaien als ringen'],
-    tags: [['mid', 'GPU midden (gloed per beeld)'], ['warn', 'lijkt op huidige palet Neon']],
-    bg: '#06050c', bg2: '#020106', floor: '#0d0b18', gridLines: 'rgba(125,249,255,0.06)', top: '#7df9ff', side: '#0d4652', sideLo: '#062a31', w: 0.1, h: 0.3, cap: 'round', glow: true,
-    shadow: null, reflect: 'rgba(125,249,255,0.16)', path: '#fffb7d', pathW: 0.12, start: '#39ff14', goal: '#ff3864', tele: '#ff4fd8',
-    ter: [null, '#5b2f8a', '#1166ff', '#bff6ff'], terA: [0, 0.35, 0.45, 0.35], border: null, scan: true },
-  { id: 'inkt', name: 'Inkt & arcering', line: 'Met de pen getekend op oud papier; diepte door arcering aan de schaduwkant.',
-    pts: ['Licht trillende inktlijnen (tekenfilm-"kook" 4× per seconde)', 'Arcering geeft hoogte zonder echte schaduw', 'Route als rood potlood'],
-    tags: [['low', 'GPU laag'], ['mid', 'veel lijnwerk bij grote doolhoven']],
-    bg: '#e8dcc2', bg2: '#cdbb98', floor: '#f4ecda', grain: 'rgba(110,80,40,0.08)', top: '#2a1f17', side: '#2a1f17', w: 0.07, h: 0.0, ink: true, hatch: '#5a4632',
-    shadow: null, path: '#c0392b', pathW: 0.07, pencil: true, start: '#2a6f63', goal: '#b02a1e', tele: '#3f5f8f',
-    ter: [null, '#8a6a46', '#4b7fae', '#a9c6d6'], terA: [0, 0.3, 0.32, 0.3], border: null },
-  { id: 'blauwdruk3d', name: 'Blauwdruk met hoogte', line: 'Het huidige blauw, maar nu als maquette op de tekentafel met maatlijnen.',
-    pts: ['Witte muurtoppen, lichtblauwe zijkant, donkere schaduw', 'Tekenraster en maatstreepjes langs de rand', 'Herkenbaar: kleinste stap vanaf nu'],
-    tags: [['low', 'GPU laag'], ['low', 'sluit aan bij huidig']],
-    bg: '#0d2846', bg2: '#081a30', floor: '#14395f', gridLines: 'rgba(200,225,255,0.07)', top: '#eef5ff', side: '#7ea6d4', sideLo: '#5c84b4', w: 0.11, h: 0.3, cap: 'square',
-    shadow: ['rgba(2,10,22,0.55)', 0.16, 0.24, 0.18], path: '#ffd166', pathW: 0.12, start: '#06d6a0', goal: '#ef476f', tele: '#9ad7ff',
-    ter: [null, '#7a5230', '#2f7fd8', '#bfefff'], terA: [0, 0.45, 0.55, 0.4], border: null, ticks: true }
-];
-
-// ---------- tekenen ----------
-function hashRng(seed) { return ML.makeRng(seed); }
-function mkCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
-
-// Gangen-graaf voor varianten die geen muren tekenen (weave, gebogen gangen).
-// geo = { kind: 'pipes', W, H, cells: [{x,y,links:Set(dir), under:dir|null}] }
-
-class View {
-  constructor(canvas) { this.cv = canvas; this.g = canvas.getContext('2d'); this.end = null; this.layers = null; }
-  set(m, st, geo) { this.m = m; this.st = st; this.geo = geo; this.layers = null; }
-  size() {
-    const r = this.cv.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1);
-    const w = Math.max(10, Math.round(r.width * d)), h = Math.max(10, Math.round(r.height * d));
-    if (this.cv.width !== w || this.cv.height !== h) { this.cv.width = w; this.cv.height = h; this.layers = null; }
+// ---------- zwerm: mieren met geurspoor ----------
+class Colony {
+  constructor(m, seed) {
+    this.m = m; this.r = ML.makeRng(seed); this.n = m.cells.length;
+    this.ph = new Float32Array(this.n); this.seen = new Float32Array(this.n); this.heat = new Float32Array(this.n);
+    this.ants = []; this.acc = 0; this.hits = 0; this.best = 0; this.t = 0; this.N = 100;
   }
-  fit() {
-    const b = this.m.bounds, W = this.cv.width, H = this.cv.height, st = this.st;
-    const hh = st.current ? 0 : (st.h || 0) * OPT.depth, pad = Math.min(W, H) * 0.06;
-    const bw = b.maxx - b.minx, bh = b.maxy - b.miny + hh;
-    this.s = Math.min((W - 2 * pad) / bw, (H - 2 * pad) / bh);
-    this.ox = (W - bw * this.s) / 2 - b.minx * this.s;
-    this.oy = (H - bh * this.s) / 2 - b.miny * this.s + hh * this.s;
-    this.hp = hh * this.s;
+  step(dt) {
+    this.t += dt;
+    if (this.t > 75) { Object.assign(this, new Colony(this.m, this.r() + '')); return; } // na 75 s opnieuw: opkomst blijft zichtbaar
+    if (this.ants.length < this.N) { this.acc += dt * 30; while (this.acc >= 1 && this.ants.length < this.N) { this.acc--; this.ants.push(this.ant()); } }
+    const ev = Math.pow(0.9, dt), es = Math.pow(0.6, dt);
+    for (let i = 0; i < this.n; i++) { this.ph[i] *= ev; this.seen[i] *= es; }
+    for (const a of this.ants) { a.p += dt * a.v; while (a.p >= 1) { a.p -= 1; this.arrive(a); } }
   }
-  X(x) { return this.ox + x * this.s; }
-  Y(y) { return this.oy + y * this.s; }
-  poly(p, pts) { p.moveTo(this.X(pts[0][0]), this.Y(pts[0][1])); for (let i = 1; i < pts.length; i++) p.lineTo(this.X(pts[i][0]), this.Y(pts[i][1])); p.closePath(); }
-  cellPath(list) { const p = new Path2D(); for (const i of list) this.poly(p, this.m.cells[i].pts); return p; }
-  wallPath(jit) {
-    const p = new Path2D(), r = jit ? hashRng(jit) : null, J = jit ? this.s * 0.035 : 0;
-    for (const w of this.m.walls) {
-      if (w.open || w.stair) continue;
-      for (const q of w.segs) {
-        const x0 = this.X(q[0]), y0 = this.Y(q[1]), x1 = this.X(q[2]), y1 = this.Y(q[3]);
-        if (!r) { p.moveTo(x0, y0); p.lineTo(x1, y1); continue; }
-        const mx = (x0 + x1) / 2 + (r() - 0.5) * J * 2, my = (y0 + y1) / 2 + (r() - 0.5) * J * 2;
-        p.moveTo(x0 + (r() - 0.5) * J, y0 + (r() - 0.5) * J); p.quadraticCurveTo(mx, my, x1 + (r() - 0.5) * J, y1 + (r() - 0.5) * J);
+  ant() { const s = this.m.start; const a = { c: s, n: s, p: 0, v: 6 + this.r() * 3, mode: 0, path: [s], vis: new Set([s]), dep: 0 }; a.n = this.choose(a); return a; }
+  arrive(a) {
+    const m = this.m; a.c = a.n; this.heat[a.c]++;
+    if (a.mode === 0) {
+      this.seen[a.c] = Math.min(1, this.seen[a.c] + 0.35);
+      if (a.path[a.path.length - 1] !== a.c) a.path.push(a.c); a.vis.add(a.c);
+      if (a.c === m.goal) {
+        const L = a.path.length - 1; this.hits++; if (!this.best || L < this.best) this.best = L;
+        a.mode = 1; a.dep = Math.min(2, 24 / L); this.ph[a.c] += a.dep; a.path.pop(); a.n = a.path[a.path.length - 1]; return;
       }
+      a.n = this.choose(a);
+    } else {
+      this.ph[a.c] += a.dep;
+      if (a.c === m.start) { a.mode = 0; a.path = [m.start]; a.vis = new Set([m.start]); a.n = this.choose(a); return; }
+      a.path.pop(); a.n = a.path[a.path.length - 1];
     }
-    return p;
   }
-  // Vaste lagen (vloer, muren) één keer tekenen; per beeld alleen leven + bovenlaag.
-  build() {
-    const W = this.cv.width, H = this.cv.height, st = this.st, m = this.m;
-    this.fit();
-    const s = this.s, hp = this.hp;
-    const floor = mkCanvas(W, H), f = floor.getContext('2d');
-    // tafel/achtergrond
-    const gr = f.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.2, W / 2, H / 2, Math.max(W, H) * 0.75);
-    gr.addColorStop(0, st.bg); gr.addColorStop(1, st.bg2); f.fillStyle = gr; f.fillRect(0, 0, W, H);
-    if (st.gridLines) { f.strokeStyle = st.gridLines; f.lineWidth = 1; f.beginPath(); const k = s / 2; for (let x = (this.ox % k); x < W; x += k) { f.moveTo(x, 0); f.lineTo(x, H); } for (let y = (this.oy % k); y < H; y += k) { f.moveTo(0, y); f.lineTo(W, y); } f.stroke(); }
-    if (this.geo) this.buildPipes(f); else {
-      const all = this.cellPath(m.cells.map(c => c.i));
-      // grondplaat met dikte (maquette)
-      if (hp > 0 && st.border !== null && !st.ink) { f.save(); f.translate(0, hp * 0.35); f.fillStyle = st.border || st.sideLo; f.fill(all); f.strokeStyle = st.border || st.sideLo; f.lineWidth = s * 0.3; f.stroke(all); f.restore(); }
-      f.fillStyle = st.floor; f.fill(all); f.strokeStyle = st.floor; f.lineWidth = 1; f.stroke(all);
-      if (st.grain) this.grain(f, all, st.grain);
-      if (st.gridLines && st.id !== 'blauwdruk3d') { f.save(); f.clip(all); f.strokeStyle = st.gridLines; f.lineWidth = 1; f.stroke(this.cellPath(m.cells.map(c => c.i))); f.restore(); }
-      if (m.rooms) { const p = this.cellPath(m.rooms); f.fillStyle = st.ink ? 'rgba(90,60,30,0.10)' : shade(st.floor, -0.07); f.fill(p); f.strokeStyle = f.fillStyle; f.lineWidth = 1; f.stroke(p); }
-      // terrein
-      for (let t = 1; t <= 3; t++) {
-        const L = []; for (let i = 0; i < m.cells.length; i++) if (m.terrain[i] === t) L.push(i);
-        if (!L.length) continue;
-        const p = this.cellPath(L); f.globalAlpha = st.terA[t]; f.fillStyle = st.ter[t]; f.fill(p); f.strokeStyle = st.ter[t]; f.lineWidth = 1; f.stroke(p); f.globalAlpha = 1;
-        if (t === 1) this.mud(f, L, st);
-      }
+  // elke mier zoekt diepte-eerst met eigen geheugen; geur trekt, drukte (seen) duwt een beetje weg
+  choose(a) {
+    const opts = this.m.adj[a.c].filter(x => !a.vis.has(x));
+    if (!opts.length) { a.path.pop(); if (!a.path.length) { a.path = [this.m.start]; a.vis = new Set([this.m.start]); } return a.path[a.path.length - 1]; }
+    let tot = 0; const w = opts.map(x => { const v = Math.pow(0.12 + this.ph[x], 2.2) / (1 + this.seen[x] * 1.5); tot += v; return v; });
+    let r = this.r() * tot; for (let i = 0; i < opts.length; i++) { r -= w[i]; if (r <= 0) return opts[i]; } return opts[opts.length - 1];
+  }
+  pos(a) { const A = cen(this.m, a.c), B = cen(this.m, a.n); return [A[0] + (B[0] - A[0]) * a.p, A[1] + (B[1] - A[1]) * a.p, Math.atan2(B[1] - A[1], B[0] - A[0])]; }
+  max() { let mx = 0.0001; for (let i = 0; i < this.n; i++) if (this.ph[i] > mx) mx = this.ph[i]; return mx; }
+  info() { return `${this.ants.length} mieren · ${this.hits}× doel gehaald · kortste gevonden ${this.best || '–'} (beste ${this.m.fromStart.d[this.m.goal]})`; }
+}
+
+// geur per open gang: min van beide cellen
+function trailEdges(m, ph, mx, thr) {
+  const out = [];
+  for (const w of m.open) { const v = Math.min(ph[w.a], ph[w.b]) / mx; if (v > thr) out.push([w.a, w.b, Math.min(1, v)]); }
+  return out;
+}
+function strokeBuckets(g, r, m, E, k, colorOf, widthOf) {
+  for (let b = 0; b < k; b++) {
+    const lo = b / k, hi = (b + 1) / k, p = new Path2D();
+    let any = false;
+    for (const [a, c, v] of E) if (v > lo && v <= hi) { const A = cen(m, a), B = cen(m, c); p.moveTo(r.X(A[0]), r.Y(A[1])); p.lineTo(r.X(B[0]), r.Y(B[1])); any = true; }
+    if (!any) continue;
+    const mid = (lo + hi) / 2; g.strokeStyle = colorOf(mid); g.lineWidth = widthOf(mid); g.stroke(p);
+  }
+}
+const SWARM_LOOK = {
+  ants(g, r, m, C, now) {
+    const s = r.s, E = trailEdges(m, C.ph, C.max(), 0.04);
+    g.save(); g.lineCap = 'round';
+    strokeBuckets(g, r, m, E, 6, v => `rgba(176,104,40,${0.12 + v * 0.42})`, v => Math.max(1, s * (0.06 + v * 0.22)));
+    const body = new Path2D(), crumb = new Path2D(), legs = new Path2D(), u = s * 0.075;
+    for (const a of C.ants) {
+      const [x, y, ang] = C.pos(a), X = r.X(x) + Math.sin(a.v * 9 + a.c) * s * 0.06, Y = r.Y(y) + Math.cos(a.v * 7 + a.c) * s * 0.06, cx = Math.cos(ang), sy = Math.sin(ang);
+      for (const k of [-1.1, 0, 1.1]) body.moveTo(X + cx * k * u + u * 0.62, Y + sy * k * u), body.arc(X + cx * k * u, Y + sy * k * u, u * (k ? 0.62 : 0.48), 0, TAU);
+      const wig = Math.sin(now * 22 + a.v * 5) * 0.5;
+      for (const sd of [-1, 1]) { legs.moveTo(X, Y); legs.lineTo(X - sy * sd * u * 1.5 + cx * wig * u, Y + cx * sd * u * 1.5 + sy * wig * u); }
+      if (a.mode === 1) { const fx = X + cx * u * 2.2, fy = Y + sy * u * 2.2; crumb.moveTo(fx + u * 0.6, fy); crumb.arc(fx, fy, u * 0.6, 0, TAU); }
     }
-    const walls = mkCanvas(W, H), g = walls.getContext('2d');
-    if (!this.geo) this.buildWalls(g);
-    if (st.ticks) this.ticks(g);
-    this.layers = { floor, walls };
-  }
-  grain(f, clip, col) {
-    const r = hashRng('grain' + this.st.id), W = this.cv.width, H = this.cv.height;
-    f.save(); f.clip(clip); f.fillStyle = col;
-    const n = Math.round(W * H / 260);
-    for (let i = 0; i < n; i++) { const x = r() * W, y = r() * H, z = 0.6 + r() * 1.6; f.fillRect(x, y, z, z); }
-    f.restore();
-  }
-  mud(f, L, st) {
-    const r = hashRng('mud'), s = this.s; f.fillStyle = 'rgba(40,24,10,0.45)'; f.beginPath();
-    for (const i of L) { const c = this.m.cells[i].center; for (let k = 0; k < 4; k++) { const x = this.X(c[0] + (r() - 0.5) * 0.7), y = this.Y(c[1] + (r() - 0.5) * 0.7), rr = s * (0.03 + r() * 0.04); f.moveTo(x + rr, y); f.arc(x, y, rr, 0, TAU); } }
-    f.fill();
-  }
-  buildWalls(g) {
-    const st = this.st, s = this.s, hp = this.hp, lw = Math.max(1.2, s * st.w);
-    g.lineCap = st.cap || 'round'; g.lineJoin = st.cap === 'square' ? 'miter' : 'round';
-    if (st.ink) return; // inkt tekent per beeld (koken)
-    const P = this.wallPath();
-    // weerspiegeling (neon)
-    if (st.reflect) { g.save(); g.filter = `blur(${Math.max(1, s * 0.08)}px)`; g.strokeStyle = st.reflect; g.lineWidth = lw * 1.4; g.translate(0, hp * 0.5); g.stroke(P); g.restore(); }
-    // slagschaduw op de vloer
-    if (st.shadow) {
-      const [col, dx, dy, bl] = st.shadow, k = OPT.depth;
-      g.save(); g.shadowColor = col; g.shadowOffsetX = dx * s * k; g.shadowOffsetY = dy * s * k; g.shadowBlur = bl * s * Math.max(0.4, k);
-      g.strokeStyle = col; g.lineWidth = lw; g.stroke(P); g.restore();
-    }
-    // zijkant: stapelen
-    const steps = Math.ceil(hp);
-    for (let k = 0; k <= steps; k++) {
-      const t = steps ? k / steps : 1;
-      g.save(); g.translate(0, -k); g.strokeStyle = t < 0.25 ? st.sideLo : st.side; g.lineWidth = lw; g.stroke(P); g.restore();
-    }
-    // bovenkant
-    g.save(); g.translate(0, -hp);
-    if (st.glow) { g.shadowColor = st.top; g.shadowBlur = s * 0.45; }
-    g.strokeStyle = st.top; g.lineWidth = st.glow ? lw * 0.55 : lw; g.stroke(P);
-    if (st.glow) { g.shadowBlur = 0; g.strokeStyle = '#ffffff'; g.lineWidth = Math.max(1, lw * 0.18); g.stroke(P); }
-    if (st.leaves) this.leaves(g, P, lw);
+    g.strokeStyle = 'rgba(40,24,12,0.7)'; g.lineWidth = Math.max(0.6, s * 0.02); g.stroke(legs);
+    g.fillStyle = '#2a1a0e'; g.fill(body); g.fillStyle = '#5fae3a'; g.fill(crumb);
     g.restore();
-  }
-  // bladstructuur op de heg: knipmasker = bovenkant van de muur
-  leaves(g, P, lw) {
-    const st = this.st, r = hashRng('blad'), W = this.cv.width, H = this.cv.height;
-    const mask = mkCanvas(W, H), mg = mask.getContext('2d');
-    mg.translate(0, -this.hp); mg.lineCap = 'round'; mg.lineJoin = 'round'; mg.strokeStyle = '#000'; mg.lineWidth = lw; mg.stroke(P);
-    mg.setTransform(1, 0, 0, 1, 0, 0); mg.globalCompositeOperation = 'source-in';
-    const n = Math.round(W * H / 55), rr = Math.max(1.2, this.s * 0.05);
-    for (let i = 0; i < n; i++) { mg.fillStyle = st.leaves[i % 3]; const x = r() * W, y = r() * H; mg.beginPath(); mg.arc(x, y, rr * (0.6 + r()), 0, TAU); mg.fill(); }
-    g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 0.75; g.drawImage(mask, 0, 0); g.restore();
-  }
-  ticks(g) {
-    const b = this.m.bounds, s = this.s, x0 = this.X(b.minx), x1 = this.X(b.maxx), y0 = this.Y(b.miny) - this.hp - s * 0.35, yb = this.Y(b.maxy) + s * 0.4;
-    g.strokeStyle = 'rgba(220,235,255,0.5)'; g.fillStyle = 'rgba(220,235,255,0.6)'; g.lineWidth = 1;
-    g.font = `${Math.max(9, s * 0.32)}px ui-monospace, monospace`; g.textAlign = 'center';
-    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y0); g.moveTo(x0, yb); g.lineTo(x1, yb);
-    for (let x = b.minx; x <= b.maxx + 1e-6; x++) { const X = this.X(x), big = Math.round(x) % 5 === 0; g.moveTo(X, y0 - (big ? 5 : 2.5)); g.lineTo(X, y0 + (big ? 5 : 2.5)); if (big) g.fillText(String(Math.round(x - b.minx)), X, y0 - 7); }
-    g.stroke();
-  }
-
-  // ----- gangen (weave / gebogen) -----
-  buildPipes(f) {
-    const st = this.st, geo = this.geo, s = this.s, hp = this.hp;
-    // blok waar de gangen uit gesneden zijn
-    const x0 = this.X(0), y0 = this.Y(0), w = geo.W * s, h = geo.H * s;
-    f.fillStyle = st.ink ? st.floor : st.top; f.fillRect(x0 - s * 0.15, y0 - s * 0.15, w + s * 0.3, h + s * 0.3);
-    if (st.leaves) { /* blad bovenop het blok */ const r = hashRng('blok'); for (let i = 0; i < w * h / 40; i++) { f.fillStyle = st.leaves[i % 3]; f.globalAlpha = 0.6; f.beginPath(); f.arc(x0 + r() * w, y0 + r() * h, s * 0.05 * (0.6 + r()), 0, TAU); f.fill(); } f.globalAlpha = 1; }
-    const cw = s * (geo.cw || 0.56);
-    const drawNet = (skipUnder, onlyUnder, col, width, dy) => {
-      f.save(); f.translate(0, dy || 0); f.strokeStyle = col; f.lineWidth = width; f.lineCap = 'round'; f.lineJoin = 'round';
+  },
+  fireflies(g, r, m, C, now) {
+    const s = r.s, E = trailEdges(m, C.ph, C.max(), 0.05);
+    g.save(); g.fillStyle = 'rgba(12,22,40,0.55)'; g.fill(r.cellsPath(m.cells.map(c => c.i)));
+    g.globalCompositeOperation = 'lighter'; g.lineCap = 'round';
+    strokeBuckets(g, r, m, E, 6, v => `rgba(150,255,120,${0.05 + v * 0.22})`, v => Math.max(1, s * (0.15 + v * 0.35)));
+    const dot = new Path2D(), halo = new Path2D();
+    for (const a of C.ants) {
+      const [x, y] = C.pos(a), X = r.X(x) + Math.sin(now * 2 + a.v * 11) * s * 0.12, Y = r.Y(y) + Math.cos(now * 1.7 + a.v * 13) * s * 0.12;
+      const blink = 0.5 + 0.5 * Math.sin(now * (3 + a.v) + a.v * 17), rr = s * (0.05 + 0.04 * blink);
+      dot.moveTo(X + rr, Y); dot.arc(X, Y, rr, 0, TAU);
+      if (blink > 0.6 || a.mode === 1) { halo.moveTo(X + s * 0.22, Y); halo.arc(X, Y, s * 0.22, 0, TAU); }
+    }
+    g.fillStyle = 'rgba(190,255,120,0.16)'; g.fill(halo);
+    g.fillStyle = 'rgba(235,255,170,0.95)'; g.fill(dot);
+    g.restore();
+  },
+  river(g, r, m, C, now) {
+    const s = r.s, E = trailEdges(m, C.ph, C.max(), 0.03), D = m.fromGoal.d;
+    g.save(); g.lineCap = 'round';
+    // stroom: richting naar het doel, streepjes schuiven mee
+    for (const [lo, w, col] of [[0, 0.32, 'rgba(40,90,170,0.18)'], [0.25, 0.14, 'rgba(30,70,150,0.75)']]) {
       const p = new Path2D();
-      for (const c of geo.cells) this.pipeCell(p, c, skipUnder, onlyUnder);
-      f.stroke(p); f.restore();
-    };
-    const under = geo.cells.some(c => c.under != null);
-    if (under) { // onderdoorgang: donker, smaller
-      drawNet(false, true, st.ink ? st.hatch : st.sideLo, cw * 0.98);
-      drawNet(false, true, st.ink ? '#e9dcc0' : shade(st.floor, -0.28), cw * 0.78);
+      for (const [a, b, v] of E) {
+        if (v < lo) continue;
+        const [f, t] = D[a] > D[b] ? [a, b] : [b, a], A = cen(m, f), B = cen(m, t);
+        p.moveTo(r.X(A[0]), r.Y(A[1])); p.lineTo(r.X(B[0]), r.Y(B[1]));
+      }
+      g.strokeStyle = col; g.lineWidth = Math.max(1, s * w);
+      if (lo) { g.setLineDash([s * 0.22, s * 0.28]); g.lineDashOffset = -now * s * 1.6; }
+      g.stroke(p); g.setLineDash([]);
     }
-    if (st.ink) { drawNet(true, false, st.top, cw + s * 0.1); drawNet(true, false, st.floor, cw - s * 0.04); }
-    else {
-      drawNet(true, false, st.sideLo, cw + 2, 0);              // rand
-      drawNet(true, false, st.side, cw, 0);                     // binnenwand
-      drawNet(true, false, st.floor, cw * 0.86, hp * 0.55);     // vloer, iets naar beneden: binnenwand zichtbaar boven
+    const dot = new Path2D();
+    for (const a of C.ants) { const [x, y] = C.pos(a), X = r.X(x), Y = r.Y(y); dot.moveTo(X + s * 0.045, Y); dot.arc(X, Y, s * 0.045, 0, TAU); }
+    g.fillStyle = 'rgba(20,40,80,0.55)'; g.fill(dot);
+    g.restore();
+  },
+  castes(g, r, m, C, now) {
+    const s = r.s, n = m.cells.length, list = [];
+    for (let i = 0; i < n; i++) if (C.seen[i] > 0.04) list.push(i);
+    g.save();
+    for (let b = 0; b < 4; b++) { const L = list.filter(i => Math.min(3, Math.floor(C.seen[i] * 4)) === b); if (L.length) { g.globalAlpha = 0.1 + b * 0.07; g.fillStyle = '#3e7bfa'; g.fill(r.cellsPath(L)); } }
+    g.globalAlpha = 1; g.lineCap = 'round';
+    strokeBuckets(g, r, m, trailEdges(m, C.ph, C.max(), 0.05), 6, v => `rgba(232,120,30,${0.2 + v * 0.6})`, v => Math.max(1, s * (0.05 + v * 0.16)));
+    const sc = new Path2D(), ca = new Path2D();
+    for (const a of C.ants) {
+      const [x, y, ang] = C.pos(a), X = r.X(x), Y = r.Y(y), u = s * 0.09, p = a.mode ? ca : sc;
+      p.moveTo(X + Math.cos(ang) * u * 1.4, Y + Math.sin(ang) * u * 1.4);
+      p.lineTo(X + Math.cos(ang + 2.5) * u, Y + Math.sin(ang + 2.5) * u); p.lineTo(X + Math.cos(ang - 2.5) * u, Y + Math.sin(ang - 2.5) * u); p.closePath();
     }
-    // brug: schaduw op de onderdoorgang
-    if (under) for (const c of geo.cells) if (c.under != null) {
-      const X = this.X(c.x + 0.5), Y = this.Y(c.y + 0.5), hor = c.under === 0; // onder verticaal → brug horizontaal → schaduwranden horizontaal
-      f.save(); f.fillStyle = 'rgba(0,0,0,0.35)'; f.filter = `blur(${s * 0.06}px)`;
-      if (hor) { f.fillRect(X - s * 0.5, Y - cw / 2 - s * 0.02, s, s * 0.1); f.fillRect(X - s * 0.5, Y + cw / 2 - s * 0.06, s, s * 0.12); }
-      else { f.fillRect(X - cw / 2 - s * 0.02, Y - s * 0.5, s * 0.1, s); f.fillRect(X + cw / 2 - s * 0.06, Y - s * 0.5, s * 0.12, s); }
-      f.restore();
-    }
+    g.fillStyle = '#2f5fd0'; g.fill(sc); g.fillStyle = '#e8781e'; g.fill(ca);
+    g.restore();
+  },
+  heat(g, r, m, C, now) {
+    const s = r.s, n = m.cells.length, mx = C.max(), stops = ['#3b1f5c', '#a3245a', '#e8562a', '#f7b733', '#fff3b0'];
+    const col = v => stops[Math.min(4, Math.floor(v * 5))];
+    g.save();
+    const buckets = [[], [], [], [], []];
+    for (let i = 0; i < n; i++) { const v = C.ph[i] / mx; if (v > 0.03) buckets[Math.min(4, Math.floor(v * 5))].push(i); }
+    buckets.forEach((L, k) => { if (!L.length) return; g.globalAlpha = 0.35 + k * 0.12; g.fillStyle = stops[k]; g.fill(r.cellsPath(L)); });
+    g.globalAlpha = 1;
+    const dot = new Path2D();
+    for (const a of C.ants) { const [x, y] = C.pos(a), X = r.X(x), Y = r.Y(y); dot.moveTo(X + s * 0.05, Y); dot.arc(X, Y, s * 0.05, 0, TAU); }
+    g.fillStyle = 'rgba(255,255,255,0.9)'; g.fill(dot); g.strokeStyle = 'rgba(60,20,40,0.5)'; g.lineWidth = 1; g.stroke(dot);
+    g.restore(); void col;
   }
-  // dirs: 0 boven, 1 rechts, 2 onder, 3 links
-  pipeCell(p, c, skipUnder, onlyUnder) {
-    const s = this.s, cx = c.x + 0.5, cy = c.y + 0.5, D = [[0, -0.5], [0.5, 0], [0, 0.5], [-0.5, 0]];
-    const L = [...c.links].filter(d => onlyUnder ? (c.under === d || c.under === (d + 2) % 4) : !(skipUnder && c.under != null && (c.under === d || c.under === (d + 2) % 4)));
-    if (!L.length) return;
-    const M = d => [this.X(cx + D[d][0]), this.Y(cy + D[d][1])], C = [this.X(cx), this.Y(cy)];
-    if (this.geo.curve && L.length === 2 && (L[0] + 2) % 4 !== L[1]) { // bocht als kwartcirkel
-      const a = M(L[0]), b = M(L[1]); p.moveTo(a[0], a[1]); p.quadraticCurveTo(C[0], C[1], b[0], b[1]); return;
-    }
-    if (L.length === 1) { const a = M(L[0]); p.moveTo(a[0], a[1]); p.lineTo(C[0], C[1]); return; }
-    if (L.length === 2 && (L[0] + 2) % 4 === L[1]) { const a = M(L[0]), b = M(L[1]); p.moveTo(a[0], a[1]); p.lineTo(b[0], b[1]); return; }
-    for (const d of L) { const a = M(d); p.moveTo(a[0], a[1]); p.lineTo(C[0], C[1]); }
-  }
+};
 
-  // ----- per beeld -----
-  frame(now) {
-    if (!this.m) return;
-    this.size();
-    const st = this.st, g = this.g, W = this.cv.width, H = this.cv.height;
-    if (st.current) return this.frameCurrent(now);
-    if (!this.layers) this.build();
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    // eindscène: camera zoomt even uit
-    let z = 1, e = null;
-    if (this.end) { e = Math.max(0, (now - this.end) / 2.6); if (e >= 1) { this.end = null; this.endDone = true; e = null; } else z = 1 - 0.07 * Math.sin(Math.min(1, e * 1.25) * Math.PI); }
-    if (z !== 1) { g.fillStyle = st.bg2; g.fillRect(0, 0, W, H); g.translate(W / 2, H / 2); g.scale(z, z); g.translate(-W / 2, -H / 2); }
-    g.drawImage(this.layers.floor, 0, 0);
-    const life = OPT.life ? now : 0;
-    if (!this.geo) this.lifeFloor(g, life);
-    if (st.ink) this.inkWalls(g, life);
-    else g.drawImage(this.layers.walls, 0, 0);
-    this.items(g, life);
-    if (e !== null || this.endDone) this.route(g, e === null ? 1 : e, life);
-    if (st.scan && OPT.life) { const y = ((now * 0.12) % 1.3) * H; const gr = g.createLinearGradient(0, y - 40, 0, y); gr.addColorStop(0, 'rgba(125,249,255,0)'); gr.addColorStop(1, 'rgba(125,249,255,0.06)'); g.fillStyle = gr; g.fillRect(0, y - 40, W, 40); }
-    g.setTransform(1, 0, 0, 1, 0, 0);
-  }
-  frameCurrent(now) {
-    if (!this.r2) { this.r2 = new ML.Render2D(this.cv); this.r2.setPalette(ML.PALETTES.blauwdruk); }
-    const vs = {};
-    if (this.end || this.endDone) {
-      const e = this.end ? Math.max(0, Math.min(1, (now - this.end) / 1.6)) : 1;
-      if (this.end && e >= 1) { this.end = null; this.endDone = true; }
-      if (this.m.solution) { vs.path = this.m.solution; vs.pathT = e; }
-    }
-    this.r2.draw(this.m, vs, now);
-  }
-  cpos(i) { const c = this.m.cells[i].center; return [this.X(c[0]), this.Y(c[1]) - this.hp * 0.5]; }
-  lifeFloor(g, t) {
-    const m = this.m, s = this.s, st = this.st;
-    // water: golflijntjes die opschuiven
-    g.save(); g.lineWidth = Math.max(1, s * 0.045); g.lineCap = 'round';
-    g.strokeStyle = st.ink ? 'rgba(60,90,130,0.6)' : st.glow ? 'rgba(120,180,255,0.7)' : 'rgba(255,255,255,0.65)';
-    g.beginPath();
-    for (let i = 0; i < m.cells.length; i++) if (m.terrain[i] === 2) {
-      const [x, y] = this.cpos(i), u = s * 0.12;
-      for (let k = -1; k <= 1; k += 2) {
-        const yy = y + k * s * 0.15, ph = t * 2.2 + i * 0.7 + k;
-        g.moveTo(x - 2.4 * u, yy + Math.sin(ph) * u * 0.4);
-        for (let j = -2; j <= 2; j++) g.lineTo(x + j * u * 1.2, yy + Math.sin(ph + j * 1.3) * u * 0.4);
-      }
-    }
-    g.stroke(); g.restore();
-    // ijs: af en toe een glinster
-    for (let i = 0; i < m.cells.length; i++) if (m.terrain[i] === 3) {
-      const ph = (t * 0.55 + (i * 0.618) % 1) % 1; if (ph > 0.18) continue;
-      const k = Math.sin(ph / 0.18 * Math.PI), [x, y] = this.cpos(i), u = s * 0.2 * k, ox = s * ((i * 37 % 7) / 7 - 0.5) * 0.5;
-      g.save(); g.globalAlpha = k; g.strokeStyle = st.ink ? '#2a4a66' : '#ffffff'; g.lineWidth = Math.max(1, s * 0.04);
-      g.beginPath(); g.moveTo(x + ox - u, y); g.lineTo(x + ox + u, y); g.moveTo(x + ox, y - u); g.lineTo(x + ox, y + u); g.stroke(); g.restore();
-    }
-  }
-  inkWalls(g, t) {
-    const boil = Math.floor(t * 4) % 3, s = this.s;
-    if (!this.inkCache || this.inkCache.s !== s) this.inkCache = { s, p: [0, 1, 2].map(k => this.wallPath('inkt' + k)), q: [0, 1, 2].map(k => this.wallPath('inktb' + k)) };
-    const st = this.st, k = OPT.depth;
-    // arcering aan de schaduwkant (rechtsonder van elke muur)
-    if (k > 0) {
-      g.save();
-      const band = mkHatch(g, st.hatch, s);
-      g.strokeStyle = band; g.lineWidth = s * 0.26 * k; g.lineCap = 'butt'; g.translate(s * 0.12 * k, s * 0.13 * k); g.stroke(this.inkCache.q[boil]); g.restore();
-    }
-    g.save(); g.lineCap = 'round'; g.strokeStyle = st.top;
-    g.lineWidth = Math.max(1.2, s * st.w); g.stroke(this.inkCache.p[boil]);
-    g.globalAlpha = 0.5; g.lineWidth = Math.max(0.8, s * 0.03); g.stroke(this.inkCache.q[(boil + 1) % 3]); g.restore();
-  }
-  items(g, t) {
-    const m = this.m, s = this.s, st = this.st;
-    if (this.geo) { // gangen-varianten: alleen start/doel
-      const G = this.geo, sc = [this.X(G.start[0] + 0.5), this.Y(G.start[1] + 0.5) + this.hp * 0.55], gc = [this.X(G.goal[0] + 0.5), this.Y(G.goal[1] + 0.5) + this.hp * 0.55];
-      this.startMark(g, sc, t); this.goalMark(g, gc, t); return;
-    }
-    // teleporters: twee ringen die tegen elkaar in draaien
-    m.teleporters.forEach((tp, p) => {
-      for (const c of [tp.a, tp.b]) {
-        const [x, y] = this.cpos(c);
-        g.save(); g.strokeStyle = st.tele; g.lineWidth = Math.max(1.2, s * 0.06); g.lineCap = 'round';
-        if (st.glow) { g.shadowColor = st.tele; g.shadowBlur = s * 0.4; }
-        for (const [r, dir, n] of [[0.32, 1, 3], [0.18, -1, 2]]) {
-          const a0 = t * 1.3 * dir + p;
-          for (let k = 0; k < n; k++) { g.beginPath(); g.arc(x, y, s * r, a0 + k * TAU / n, a0 + k * TAU / n + TAU / n * 0.62); g.stroke(); }
-        }
-        g.restore();
-      }
-    });
-    // sleutels
-    m.keys.forEach(k => {
-      const [x, y] = this.cpos(k.cell), b = Math.sin(t * 2 + k.cell) * s * 0.04;
-      g.save(); g.translate(0, b); g.strokeStyle = ML.KEYCOL[k.color]; g.lineWidth = Math.max(1.5, s * 0.08); g.lineCap = 'round';
-      g.beginPath(); g.arc(x - s * 0.13, y, s * 0.11, 0, TAU); g.moveTo(x - s * 0.02, y); g.lineTo(x + s * 0.27, y); g.moveTo(x + s * 0.2, y); g.lineTo(x + s * 0.2, y + s * 0.1); g.stroke(); g.restore();
-    });
-    for (const wi of m.doors) { // deur: gekleurde balk op muurhoogte
-      const w = m.walls[wi]; g.save(); g.translate(0, -this.hp * 0.5); g.strokeStyle = ML.KEYCOL[ML.KEY_COLORS[w.door]]; g.lineWidth = Math.max(2, s * 0.2); g.lineCap = 'butt'; g.beginPath();
-      for (const q of w.segs) { g.moveTo(this.X(q[0]), this.Y(q[1])); g.lineTo(this.X(q[2]), this.Y(q[3])); } g.stroke(); g.restore();
-    }
-    if (m.ready) { this.startMark(g, this.cpos(m.start), t); this.goalMark(g, this.cpos(m.goal), t); }
-  }
-  startMark(g, [x, y], t) {
-    const s = this.s, st = this.st, k = 1 + Math.sin(t * 2.4) * 0.06;
-    g.save(); if (st.glow) { g.shadowColor = st.start; g.shadowBlur = s * 0.5; }
-    if (!st.ink && !st.glow) { g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x + s * 0.06, y + s * 0.1, s * 0.26, s * 0.18, 0, 0, TAU); g.fill(); }
-    g.fillStyle = st.start; g.beginPath(); g.arc(x, y, s * 0.26 * k, 0, TAU); g.fill();
-    if (!st.ink) { g.fillStyle = 'rgba(255,255,255,0.45)'; g.beginPath(); g.arc(x - s * 0.08, y - s * 0.08, s * 0.08, 0, TAU); g.fill(); }
-    g.restore();
-  }
-  goalMark(g, [x, y], t) {
-    const s = this.s, st = this.st, ph = (t * 0.6) % 1;
-    g.save(); g.strokeStyle = st.goal; g.fillStyle = st.goal; g.lineWidth = Math.max(1.5, s * 0.07);
-    if (st.glow) { g.shadowColor = st.goal; g.shadowBlur = s * 0.5; }
-    if (t) { g.globalAlpha = 1 - ph; g.beginPath(); g.arc(x, y, s * (0.3 + ph * 0.55), 0, TAU); g.stroke(); g.globalAlpha = 1; }
-    g.beginPath(); g.arc(x, y, s * 0.3, 0, TAU); g.stroke();
-    g.beginPath(); g.arc(x, y, s * 0.12, 0, TAU); g.fill();
-    g.restore();
-  }
-  // route licht in één golf op (start → doel), blijft daarna zacht branden
-  route(g, e, t) {
-    const sol = this.geo ? this.geo.route : this.m.solution; if (!sol || sol.length < 2) return;
-    const st = this.st, s = this.s, pts = this.geo ? sol.map(([x, y]) => [this.X(x + 0.5), this.Y(y + 0.5) + this.hp * 0.55]) : sol.map(i => this.cpos(i)), L = pts.length - 1;
-    const head = Math.min(1, e * 1.5) * L;
-    const jump = i => !this.geo && sol[i - 1] !== sol[i] && !ML.edge(this.m, sol[i - 1], sol[i]);
-    const seg = (a, b) => { g.beginPath(); g.moveTo(pts[a][0], pts[a][1]); const J = []; for (let i = a + 1; i <= b; i++) { if (jump(i)) { J.push(i); g.moveTo(pts[i][0], pts[i][1]); } else g.lineTo(pts[i][0], pts[i][1]); } g.stroke();
-      if (J.length) { g.save(); g.setLineDash([s * 0.15, s * 0.2]); g.lineWidth = Math.max(1, g.lineWidth * 0.4); g.beginPath(); for (const i of J) { g.moveTo(pts[i - 1][0], pts[i - 1][1]); g.lineTo(pts[i][0], pts[i][1]); } g.stroke(); g.restore(); } };
-    const upto = Math.floor(head);
-    g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
-    const w = Math.max(2, s * (st.pathW || 0.12));
-    if (st.lanterns) { // lantaarntjes per cel
-      for (let i = 0; i <= upto; i++) {
-        const d = head - i, glow = Math.max(0.35, 1 - d / 6), fl = 0.85 + 0.15 * Math.sin(t * 7 + i * 1.7);
-        const [x, y] = pts[i], r = s * (0.07 + 0.1 * glow) * fl;
-        const gr = g.createRadialGradient(x, y, 0, x, y, r * 4); gr.addColorStop(0, 'rgba(255,214,110,0.55)'); gr.addColorStop(1, 'rgba(255,214,110,0)');
-        g.fillStyle = gr; g.beginPath(); g.arc(x, y, r * 4, 0, TAU); g.fill();
-        g.fillStyle = st.path; g.beginPath(); g.arc(x, y, Math.max(2, s * 0.09), 0, TAU); g.fill();
-      }
-      g.restore(); return;
-    }
-    if (st.pathShadow) { g.save(); g.translate(s * 0.05, s * 0.08); g.strokeStyle = 'rgba(60,30,10,0.3)'; g.lineWidth = w; seg(0, upto); g.restore(); }
-    if (st.glow) { g.shadowColor = st.path; g.shadowBlur = s * 0.6; }
-    g.strokeStyle = st.path; g.lineWidth = w; if (st.pencil) { g.globalAlpha = 0.85; g.setLineDash([s * 0.5, s * 0.06]); }
-    seg(0, upto); g.setLineDash([]);
-    // golf: helle kop met staart
-    if (head < L + 3 && e < 1) {
-      const from = Math.max(0, upto - 6);
-      g.shadowColor = '#fff'; g.shadowBlur = s * 0.8; g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = w * 1.8;
-      if (upto > from) seg(from, upto);
-      const [hx, hy] = pts[Math.min(L, upto)], gr = g.createRadialGradient(hx, hy, 0, hx, hy, s * 1.1);
-      gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.beginPath(); g.arc(hx, hy, s * 1.1, 0, TAU); g.fill();
-    }
-    g.restore();
-  }
-}
-function mkHatch(g, col, s) {
-  const k = Math.max(4, Math.round(s * 0.14)), c = mkCanvas(k, k), x = c.getContext('2d');
-  x.strokeStyle = col; x.lineWidth = Math.max(0.8, s * 0.025); x.globalAlpha = 0.7;
-  x.beginPath(); x.moveTo(0, k); x.lineTo(k, 0); x.moveTo(-k / 2, k / 2); x.lineTo(k / 2, -k / 2); x.moveTo(k / 2, k * 1.5); x.lineTo(k * 1.5, k / 2); x.stroke();
-  return g.createPattern(c, 'repeat');
-}
-function shade(hex, f) {
-  const n = parseInt(hex.slice(1), 16), c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => Math.round(f < 0 ? v * (1 + f) : v + (255 - v) * f));
-  return `rgb(${c[0]},${c[1]},${c[2]})`;
-}
-
-// ---------- varianten op het vierkant ----------
-function pipesFromGrid(W, H, seed, weave) {
-  // diepte-eerst op een raster; met weave mag je onder een rechte gang door
-  const r = ML.makeRng(seed), cells = [], id = (x, y) => y * W + x, DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) cells.push({ x, y, links: new Set(), under: null, vis: false });
-  const inb = (x, y) => x >= 0 && y >= 0 && x < W && y < H;
-  const st = [cells[0]]; cells[0].vis = true; let bridges = 0;
+// ---------- loper (voetstappen + thema's) ----------
+function walkSeq(m, seed) { // diepte-eerst met terugkeren, tot het doel
+  const r = ML.makeRng(seed), vis = new Uint8Array(m.cells.length), st = [m.start], seq = [m.start]; vis[m.start] = 1;
   while (st.length) {
-    const c = st[st.length - 1], opts = [];
-    for (let d = 0; d < 4; d++) {
-      const nx = c.x + DX[d], ny = c.y + DY[d]; if (!inb(nx, ny)) continue;
-      const n = cells[id(nx, ny)];
-      if (!n.vis) opts.push([d, n, null]);
-      else if (weave && n.under == null && n.links.size === 2 && n.links.has((d + 1) % 4) && n.links.has((d + 3) % 4)) {
-        const fx = nx + DX[d], fy = ny + DY[d];
-        if (inb(fx, fy) && !cells[id(fx, fy)].vis) opts.push([d, cells[id(fx, fy)], n]);
+    const c = st[st.length - 1]; if (c === m.goal) break;
+    const o = m.adj[c].filter(x => !vis[x]);
+    if (o.length) { const x = o[Math.floor(r() * o.length)]; vis[x] = 1; st.push(x); seq.push(x); }
+    else { st.pop(); if (st.length) seq.push(st[st.length - 1]); }
+  }
+  return seq;
+}
+class Walker {
+  constructor(m, seed, v) {
+    this.m = m; this.seq = walkSeq(m, seed); this.v = v || 4.2; this.t = 0;
+    const n = m.cells.length; this.first = new Int32Array(n).fill(-1); this.rank = new Int32Array(n);
+    let k = 0; this.seq.forEach((c, i) => { if (this.first[c] < 0) { this.first[c] = i; this.rank[c] = k++; } });
+    this.back = this.seq.map((c, i) => i > 0 && this.first[c] < i); // stap i komt in een al bezochte cel = terug
+    this.order = new Int32Array(n);
+  }
+  step(dt) { this.t += dt; if (this.t * this.v > this.seq.length - 1 + 2.5 * this.v) this.t = 0; }
+  fpos() { return Math.min(this.seq.length - 1, this.t * this.v); }
+  pos(f) {
+    const L = this.seq.length - 1, k = Math.min(L, Math.floor(f)), p = f - k, A = cen(this.m, this.seq[k]), B = cen(this.m, this.seq[Math.min(L, k + 1)]);
+    return [A[0] + (B[0] - A[0]) * p, A[1] + (B[1] - A[1]) * p, Math.atan2(B[1] - A[1], B[0] - A[0]) || 0];
+  }
+  cell() { return this.seq[Math.floor(this.fpos())]; }
+  vsColor(vs) {
+    const k = Math.floor(this.fpos()); let cnt = 0;
+    for (let i = 0; i < this.order.length; i++) { const f = this.first[i]; this.order[i] = f >= 0 && f <= k ? this.rank[i] : -1; if (this.order[i] >= 0) cnt++; }
+    vs.order = this.order; vs.nOrder = Math.max(1, cnt);
+  }
+  // afdrukken: per stap twee (links/rechts), tijd = moment van zetten
+  prints(per, fade, fn) {
+    const f = this.fpos(), from = Math.max(0, Math.floor(f - fade * this.v) - 1);
+    for (let k = from; k < Math.min(this.seq.length - 1, Math.ceil(f)); k++) {
+      for (let j = 0; j < per; j++) {
+        const at = k + (j + 0.5) / per; if (at > f) break;
+        const age = (f - at) / this.v; if (age > fade) continue;
+        const [x, y, a] = this.pos(at); fn(x, y, a, (k * per + j) % 2 ? 1 : -1, age / fade, k, j);
       }
     }
-    if (!opts.length) { st.pop(); continue; }
-    const [d, n, mid] = opts[r() < 0.35 && opts.some(o => o[2]) ? opts.findIndex(o => o[2]) : r.int(opts.length)];
-    c.links.add(d); n.links.add((d + 2) % 4); n.vis = true;
-    if (mid) { mid.under = d % 2 ? 1 : 0; mid.links.add(d); mid.links.add((d + 2) % 4); bridges++; }
-    st.push(n);
   }
-  // route met BFS (brug = rechtdoor)
-  const prev = new Map(), q = [cells[0]], goal = cells[cells.length - 1]; prev.set(cells[0], null);
-  while (q.length) {
-    const c = q.shift(); if (c === goal) break;
-    for (const d of c.links) {
-      if (c.under != null && d % 2 === c.under) continue; // kruising: we kwamen bovenlangs, dus alleen de bovengang
-      let n = cells[id(c.x + DX[d], c.y + DY[d])];
-      if (n.under != null && n.under === d % 2) n = cells[id(n.x + DX[d], n.y + DY[d])]; // onder de brug door
-      if (!prev.has(n)) { prev.set(n, c); q.push(n); }
+}
+function drawShoe(g, X, Y, a, side, s, col) {
+  g.save(); g.translate(X, Y); g.rotate(a); g.translate(0, side * s * 0.11); g.fillStyle = col;
+  g.beginPath(); g.ellipse(s * 0.04, 0, s * 0.085, s * 0.045, side * 0.12, 0, TAU); g.fill();
+  g.beginPath(); g.ellipse(-s * 0.085, side * s * 0.004, s * 0.038, s * 0.036, 0, 0, TAU); g.fill();
+  g.restore();
+}
+function drawPaw(g, X, Y, a, side, s, col) {
+  g.save(); g.translate(X, Y); g.rotate(a); g.translate(0, side * s * 0.09); g.fillStyle = col;
+  g.beginPath(); g.ellipse(-s * 0.02, 0, s * 0.045, s * 0.055, 0, 0, TAU); g.fill();
+  for (const [dx, dy] of [[0.05, -0.055], [0.075, -0.018], [0.075, 0.022], [0.05, 0.058]]) { g.beginPath(); g.arc(dx * s, dy * s, s * 0.022, 0, TAU); g.fill(); }
+  g.restore();
+}
+const FOOT_LOOK = {
+  shoes(g, r, m, W) { const s = r.s; W.prints(2, 7, (x, y, a, sd, e) => { g.globalAlpha = (1 - e) * 0.8; drawShoe(g, r.X(x), r.Y(y), a, sd, s, '#5b4632'); }); g.globalAlpha = 1; },
+  paws(g, r, m, W) { const s = r.s; W.prints(2, 7, (x, y, a, sd, e) => { g.globalAlpha = (1 - e) * 0.85; drawPaw(g, r.X(x), r.Y(y), a, sd, s, '#4b3b2c'); }); g.globalAlpha = 1; },
+  deep(g, r, m, W) { // ingedrukt in zand/sneeuw: donkere deuk + lichte rand, wordt langzaam weer glad
+    const s = r.s;
+    W.prints(2, 10, (x, y, a, sd, e) => {
+      const X = r.X(x), Y = r.Y(y), k = 1 - e;
+      g.globalAlpha = k * 0.55; drawShoe(g, X + s * 0.018, Y + s * 0.022, a, sd, s, '#fffdf6');
+      g.globalAlpha = k * 0.5; drawShoe(g, X, Y, a, sd, s, '#8a7558');
+      g.globalAlpha = k * 0.35; drawShoe(g, X - s * 0.012, Y - s * 0.016, a, sd, s * 0.82, '#5e4c36');
+    });
+    g.globalAlpha = 1;
+  },
+  arrows(g, r, m, W) { // potloodpijltjes; terug = rood gestippeld (Trémaux-gevoel)
+    const s = r.s; g.save(); g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = Math.max(1.2, s * 0.05);
+    W.prints(1, 14, (x, y, a, sd, e, k) => {
+      const back = W.back[k + 1], X = r.X(x) + (back ? Math.sin(a) * s * 0.12 : 0), Y = r.Y(y) - (back ? Math.cos(a) * s * 0.12 : 0), u = s * 0.13;
+      g.globalAlpha = (1 - e) * 0.9; g.strokeStyle = back ? '#c8322f' : '#2f5d8a'; g.setLineDash(back ? [s * 0.04, s * 0.06] : []);
+      g.beginPath(); g.moveTo(X - Math.cos(a) * u * 1.3, Y - Math.sin(a) * u * 1.3); g.lineTo(X + Math.cos(a) * u, Y + Math.sin(a) * u);
+      g.moveTo(X + Math.cos(a + 2.5) * u, Y + Math.sin(a + 2.5) * u); g.lineTo(X + Math.cos(a) * u, Y + Math.sin(a) * u); g.lineTo(X + Math.cos(a - 2.5) * u, Y + Math.sin(a - 2.5) * u); g.stroke();
+    });
+    g.restore();
+  },
+  crumbs(g, r, m, W) { // broodkruimels die door vogeltjes worden opgepikt
+    const s = r.s, FADE = 11; g.save();
+    W.prints(1, FADE, (x, y, a, sd, e, k) => {
+      const eat = 0.45 + hash(k, 1) * 0.45, X = r.X(x), Y = r.Y(y);
+      if (e < eat) { g.fillStyle = '#b07a3a'; for (let q = 0; q < 4; q++) { g.beginPath(); g.arc(X + (hash(k, q + 3) - 0.5) * s * 0.28, Y + (hash(k, q + 9) - 0.5) * s * 0.28, s * (0.025 + hash(k, q) * 0.02), 0, TAU); g.fill(); } }
+      if (k % 2) return; // niet elke kruimel een vogel
+      const ft = (e - eat) * FADE; // s t.o.v. opeten
+      if (ft < -1.4 || ft > 1) return;
+      const dir = hash(k, 7) * TAU, fly = ft < -0.6 ? (-0.6 - ft) / 0.8 : ft > 0 ? ft : 0;
+      const bx = X + Math.cos(dir) * s * 2.2 * fly, by = Y + Math.sin(dir) * s * 2.2 * fly - s * 1.2 * fly;
+      const peck = fly === 0 ? Math.abs(Math.sin(ft * 16)) : 0;
+      drawBird(g, bx, by, s * 0.9, fly > 0 ? (ft > 0 ? dir : dir + Math.PI) : hash(k, 5) * TAU, fly > 0, ft * 30, peck, fly);
+    });
+    g.restore();
+  }
+};
+function drawBird(g, x, y, s, a, flying, flap, peck, shadowH) {
+  if (shadowH > 0) { g.fillStyle = 'rgba(0,0,0,0.15)'; g.beginPath(); g.ellipse(x, y + s * 1.2 * shadowH, s * 0.12, s * 0.06, 0, 0, TAU); g.fill(); }
+  g.save(); g.translate(x, y); const fx = Math.cos(a) >= 0 ? 1 : -1; g.scale(fx, 1);
+  g.fillStyle = '#6b4a2e'; g.beginPath(); g.ellipse(0, 0, s * 0.13, s * 0.085, -0.15, 0, TAU); g.fill();
+  g.fillStyle = '#e07a3c'; g.beginPath(); g.ellipse(s * 0.04, s * 0.03, s * 0.07, s * 0.05, 0, 0, TAU); g.fill();
+  g.fillStyle = '#6b4a2e'; g.beginPath(); g.moveTo(-s * 0.1, -s * 0.02); g.lineTo(-s * 0.22, -s * 0.06); g.lineTo(-s * 0.2, s * 0.03); g.fill();
+  const hy = -s * 0.07 + peck * s * 0.07, hx = s * 0.11 + peck * s * 0.02;
+  g.beginPath(); g.arc(hx, hy, s * 0.055, 0, TAU); g.fill();
+  g.fillStyle = '#e8b13a'; g.beginPath(); g.moveTo(hx + s * 0.05, hy - s * 0.01); g.lineTo(hx + s * 0.1, hy + s * 0.005); g.lineTo(hx + s * 0.05, hy + s * 0.02); g.fill();
+  g.fillStyle = '#111'; g.beginPath(); g.arc(hx + s * 0.02, hy - s * 0.012, s * 0.012, 0, TAU); g.fill();
+  if (flying) { const w = Math.sin(flap) * s * 0.18; g.fillStyle = '#4e3520'; g.beginPath(); g.moveTo(-s * 0.04, -s * 0.03); g.quadraticCurveTo(-s * 0.02, -s * 0.03 - w * 1.2, s * 0.06, -s * 0.03 - w); g.lineTo(s * 0.04, -s * 0.02); g.fill(); }
+  else { g.fillStyle = '#4e3520'; g.beginPath(); g.ellipse(-s * 0.02, -s * 0.01, s * 0.08, s * 0.04, -0.3, 0, TAU); g.fill(); }
+  g.restore();
+}
+
+// ---------- thema's ----------
+const base = ML.PALETTES.maquette;
+const THEME_PAL = {
+  tuin: Object.assign({}, base, { name: 'Tuinhaag', bg: '#6f8a4b', floor: '#ddd2b4', dark: '#bfb08c', wall: '#4f8a35', label: '#2d3d1f', cur: '#f0b43a', walk: '#e7a96b', visitA: '#e8dfc4', visitB: '#bcd69f', front: '#f0b43a', path: '#e09a2a', start: '#f4f0e0', goal: '#3d8fd0', accent: '#a0692a',
+    maq: { bg2: '#24391a', grain: 'rgba(90,70,40,0.2)', top: '#5f9e3f', side: '#2f5c22', sideLo: '#22451a', border: '#4a3a24', w: 0.3, h: 0.36, shadow: ['rgba(15,30,5,0.5)', 0.2, 0.3, 0.3], pathW: 0.09, ter: base.maq.ter, terA: base.maq.terA } }),
+  ijs: Object.assign({}, base, { name: 'IJspaleis', bg: '#cfe6f3', floor: '#eaf6fc', dark: '#cfe2ee', wall: '#ffffff', label: '#3d6a8c', cur: '#3e7bfa', walk: '#9ac8f0', visitA: '#dceef9', visitB: '#9fd3ea', front: '#7cc3ff', path: '#2f7fd8', start: '#2fae8f', goal: '#e5484d', accent: '#2f7fd8',
+    maq: { bg2: '#6d98bb', grain: 'rgba(120,170,210,0.08)', top: '#ffffff', side: 'rgba(150,200,236,0.92)', sideLo: 'rgba(112,170,216,0.92)', border: '#5d87a8', w: 0.16, h: 0.42, shadow: ['rgba(40,90,140,0.25)', 0.12, 0.2, 0.35], pathW: 0.09, ter: base.maq.ter, terA: base.maq.terA } }),
+  grot: Object.assign({}, base, { name: 'Grot met fakkels', bg: '#3a3029', floor: '#6b5c4d', dark: '#2b231d', wall: '#9c8b78', label: '#c9b79e', cur: '#ffb547', walk: '#a8784a', visitA: '#75634f', visitB: '#8a6f50', front: '#ffb547', path: '#ffb547', start: '#e9d8b4', goal: '#ffcf5c', accent: '#ffb547',
+    maq: { bg2: '#0e0b09', grain: 'rgba(0,0,0,0.14)', top: '#9c8b78', side: '#4a3e33', sideLo: '#352c24', border: '#241c16', w: 0.26, h: 0.42, shadow: ['rgba(0,0,0,0.55)', 0.18, 0.26, 0.3], pathW: 0.09, ter: base.maq.ter, terA: base.maq.terA } }),
+  water: Object.assign({}, base, { name: 'Onderwater', bg: '#1d6d7a', floor: '#cdbf96', dark: '#9c8f6a', wall: '#ff9a7a', label: '#0b3d4a', cur: '#ffe066', walk: '#7fd1c8', visitA: '#c4c9a0', visitB: '#86c9bd', front: '#ffe066', path: '#ffe066', start: '#ffffff', goal: '#ff5d8f', accent: '#ffe066',
+    maq: { bg2: '#062a35', grain: 'rgba(60,50,20,0.12)', top: '#ff9a7a', side: '#c45a44', sideLo: '#9a4234', border: '#0b3d4a', w: 0.24, h: 0.3, shadow: ['rgba(0,30,40,0.4)', 0.14, 0.22, 0.4], pathW: 0.09, ter: base.maq.ter, terA: base.maq.terA } })
+};
+// vaste punten langs muurtoppen (bladeren, glinsters, vogelplekken)
+function wallPoints(m, step, seed) {
+  const r = ML.makeRng(seed), pts = [];
+  for (const w of m.walls) if (!w.open && !w.stair) for (const q of w.segs) {
+    const L = Math.hypot(q[2] - q[0], q[3] - q[1]), n = Math.max(1, Math.round(L / step));
+    for (let i = 0; i <= n; i++) { const t = i / n; pts.push([q[0] + (q[2] - q[0]) * t, q[1] + (q[3] - q[1]) * t, r(), r(), r()]); }
+  }
+  return pts;
+}
+function cacheLayer(T, key, W, H, draw) {
+  if (T._cache && T._cache.key === key) return T._cache.c;
+  const c = document.createElement('canvas'); c.width = W; c.height = H; draw(c.getContext('2d')); T._cache = { key, c }; return c;
+}
+const keyOf = r => [r.cv.width, r.cv.height, r.s, r.ox, r.oy, MAZE.cells.length, OPT.seed].join();
+
+class GardenLife {
+  constructor(m) {
+    this.m = m; this.r = ML.makeRng('tuin' + OPT.seed); this.leaf = wallPoints(m, 0.11, 'blad');
+    const spots = wallPoints(m, 1, 'vogel'); this.spots = spots;
+    this.birds = Array.from({ length: 6 }, (_, i) => ({ at: spots[Math.floor(this.r() * spots.length)], to: null, t0: 0, next: 2 + this.r() * 6, hop: 0, dir: this.r() * TAU }));
+    this.flowers = m.cells.filter(() => this.r() < 0.18).map(c => [c.center[0] + (this.r() - 0.5) * 0.5, c.center[1] + (this.r() - 0.5) * 0.5, Math.floor(this.r() * 3)]);
+    this.t = 0;
+  }
+  step(dt) {
+    this.t += dt;
+    for (const b of this.birds) {
+      if (b.to && this.t - b.t0 > 1.3) { b.at = b.to; b.to = null; b.next = this.t + 4 + this.r() * 8; }
+      if (!b.to && this.t > b.next) { b.to = this.spots[Math.floor(this.r() * this.spots.length)]; b.t0 = this.t; b.dir = Math.atan2(b.to[1] - b.at[1], b.to[0] - b.at[0]); }
+      if (!b.to && this.r() < dt * 0.7) { b.hop = this.t; b.dir = this.r() < 0.5 ? 0 : Math.PI; }
     }
   }
-  const route = []; for (let c = goal; c; c = prev.get(c)) route.unshift([c.x, c.y]);
-  return { kind: 'pipes', W, H, cells, start: [0, 0], goal: [W - 1, H - 1], route, bridges };
-}
-// kruising: under = as van de onderdoorgang (0 verticaal, 1 horizontaal); de brug loopt dwars daarop
-
-function variantRooms(seed) {
-  const s = varSettings(seed), m = genOn(ML.makeMaze(s, 0.6), seed);
-  const r = ML.makeRng(seed + 'zalen'), W = s.size, H = Math.round(s.size * 0.6), room = new Int16Array(m.cells.length).fill(-1);
-  let id = 0;
-  for (let t = 0; t < 60 && id < 5; t++) {
-    const w = 2 + r.int(3), h = 2 + r.int(2), x = 1 + r.int(W - w - 1), y = 1 + r.int(H - h - 1);
-    let ok = true; for (const c of m.cells) if (c.grid.c >= x - 1 && c.grid.c < x + w + 1 && c.grid.r >= y - 1 && c.grid.r < y + h + 1 && room[c.i] >= 0) ok = false;
-    if (!ok) continue;
-    for (const c of m.cells) if (c.grid.c >= x && c.grid.c < x + w && c.grid.r >= y && c.grid.r < y + h) room[c.i] = id;
-    id++;
+  floor(g, r, now) {
+    const s = r.s, m = this.m;
+    g.drawImage(cacheLayer(this, 'f' + keyOf(r), r.cv.width, r.cv.height, f => {
+      for (const [x, y, k] of this.flowers) {
+        const X = r.X(x), Y = r.Y(y), col = ['#f2a7c3', '#ffffff', '#f7d046'][k];
+        f.fillStyle = col; for (let p = 0; p < 5; p++) { f.beginPath(); f.arc(X + Math.cos(p * TAU / 5) * s * 0.05, Y + Math.sin(p * TAU / 5) * s * 0.05, s * 0.035, 0, TAU); f.fill(); }
+        f.fillStyle = '#e08a2a'; f.beginPath(); f.arc(X, Y, s * 0.025, 0, TAU); f.fill();
+      }
+    }), 0, 0);
+    const gc = cen(m, m.goal), gx = r.X(gc[0]), gy = r.Y(gc[1]); // fontein
+    g.save(); g.fillStyle = 'rgba(80,150,210,0.55)'; g.beginPath(); g.arc(gx, gy, s * 0.38, 0, TAU); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = Math.max(1, s * 0.03);
+    for (let k = 0; k < 3; k++) { const ph = (now * 0.5 + k / 3) % 1; g.globalAlpha = 1 - ph; g.beginPath(); g.arc(gx, gy, s * (0.08 + ph * 0.3), 0, TAU); g.stroke(); }
+    g.restore();
   }
-  for (const w of m.walls) if (w.b !== null && room[w.a] >= 0 && room[w.a] === room[w.b]) w.open = true;
-  m.rooms = [...room.keys()].filter(i => room[i] >= 0);
-  return ML.finishMaze(m, s, 'backtracker');
-}
-function variantWidths(seed) {
-  const r = ML.makeRng(seed + 'breed'), sizes = [0.55, 1, 1, 1.7], xs = [0], ys = [0];
-  while (xs[xs.length - 1] < 17) xs.push(xs[xs.length - 1] + r.pick(sizes));
-  while (ys[ys.length - 1] < 10.5) ys.push(ys[ys.length - 1] + r.pick(sizes));
-  const polys = [];
-  for (let j = 0; j < ys.length - 1; j++) for (let i = 0; i < xs.length - 1; i++)
-    polys.push({ pts: [[xs[i], ys[j]], [xs[i + 1], ys[j]], [xs[i + 1], ys[j + 1]], [xs[i], ys[j + 1]]], center: [(xs[i] + xs[i + 1]) / 2, (ys[j] + ys[j + 1]) / 2], grid: { r: j, c: i } });
-  const m = genOn(ML.buildMaze(polys, 'square', { seed }), seed);
-  return ML.finishMaze(m, varSettings(seed), 'backtracker');
-}
-function variantUpsilon(seed) {
-  const W = 13, H = 8, a = 1 / (1 + Math.SQRT2), h = a / 2, polys = [];
-  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++)
-    polys.push({ pts: [[i - h, j - 0.5], [i + h, j - 0.5], [i + 0.5, j - h], [i + 0.5, j + h], [i + h, j + 0.5], [i - h, j + 0.5], [i - 0.5, j + h], [i - 0.5, j - h]], center: [i, j], grid: { r: j * 2, c: i * 2 } });
-  for (let j = 0; j < H - 1; j++) for (let i = 0; i < W - 1; i++)
-    polys.push({ pts: [[i + 0.5, j + h], [i + 1 - h, j + 0.5], [i + 0.5, j + 1 - h], [i + h, j + 0.5]], center: [i + 0.5, j + 0.5], grid: { r: j * 2 + 1, c: i * 2 + 1 } });
-  const m = genOn(ML.buildMaze(polys, 'upsilon', { seed }), seed);
-  return ML.finishMaze(m, varSettings(seed), 'backtracker');
-}
-function variantDiagonal(seed) {
-  const W = 34, H = 20, polys = [];
-  for (let y = 1; y < H; y++) for (let x = 1; x < W; x++) {
-    if ((x + y) % 2) continue;
-    const cx = x * 0.5, cy = y * 0.5;
-    polys.push({ pts: [[cx, cy - 0.5], [cx + 0.5, cy], [cx, cy + 0.5], [cx - 0.5, cy]], center: [cx, cy], grid: { r: y, c: x } });
+  top(g, r, now) {
+    const s = r.s, hp = r.hp;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.drawImage(cacheLayer(this, 't' + keyOf(r), r.cv.width, r.cv.height, f => {
+      const cols = ['#7dbd52', '#4d8a31', '#3b7026', '#8fcf5f'];
+      for (const [x, y, a, b, c] of this.leaf) { f.fillStyle = cols[Math.floor(a * 4)]; f.beginPath(); f.arc(r.X(x) + (b - 0.5) * s * 0.22, r.Y(y) - hp + (c - 0.5) * s * 0.2, s * (0.04 + a * 0.05), 0, TAU); f.fill(); }
+    }), 0, 0);
+    for (const b of this.birds) {
+      let x = b.at[0], y = b.at[1], h = 0, fl = false;
+      if (b.to) { const e = Math.min(1, (this.t - b.t0) / 1.3); x += (b.to[0] - x) * e; y += (b.to[1] - y) * e; h = Math.sin(e * Math.PI) * 1.4; fl = true; }
+      const hop = Math.max(0, 1 - (this.t - b.hop) / 0.25), hy = Math.sin(hop * Math.PI) * 0.12;
+      drawBird(g, r.X(x), r.Y(y) - hp - (h + hy) * s, s * 1.1, b.dir, fl, now * 26, fl ? 0 : Math.max(0, Math.sin(now * 3 + x * 7) - 0.8) * 5, 0);
+    }
   }
-  const m = genOn(ML.buildMaze(polys, 'diamond', { seed }), seed);
-  return ML.finishMaze(m, varSettings(seed), 'backtracker');
 }
-const pipeBounds = (W, H) => ({ minx: -0.2, miny: -0.2, maxx: W + 0.2, maxy: H + 0.2 });
+class IceLife {
+  constructor(m) {
+    this.m = m; this.r = ML.makeRng('ijs' + OPT.seed); this.tw = wallPoints(m, 0.7, 'glinster');
+    this.snow = Array.from({ length: 50 }, () => [this.r(), this.r(), 0.3 + this.r() * 0.7]);
+    this.puck = { c: m.start, run: null }; this.t = 0; this.wait = 0.5; this.trail = [];
+  }
+  slide() { // kies een richting, glij tot je ergens tegenaan botst
+    const m = this.m, c = this.puck.c, o = m.cells[c].nbrs.filter(nb => m.walls[nb.w].open);
+    if (!o.length) return;
+    const nb = o[Math.floor(this.r() * o.length)], ca = Math.cos(nb.ang), sa = Math.sin(nb.ang), run = [c, nb.c];
+    for (;;) {
+      const last = run[run.length - 1], nx = m.cells[last].nbrs.find(q => m.walls[q.w].open && Math.cos(q.ang) * ca + Math.sin(q.ang) * sa > 0.99);
+      if (!nx || run.length > 40) break; run.push(nx.c);
+    }
+    this.puck.run = { cells: run, t0: this.t, dur: Math.sqrt(run.length - 1) * 0.42 };
+  }
+  step(dt) {
+    this.t += dt;
+    const p = this.puck;
+    if (p.run && this.t - p.run.t0 >= p.run.dur) { p.c = p.run.cells[p.run.cells.length - 1]; p.run = null; this.wait = this.t + 0.5; }
+    if (!p.run && this.t > this.wait) this.slide();
+  }
+  puckPos() {
+    const p = this.puck; if (!p.run) return cen(this.m, p.c);
+    const e = Math.min(1, (this.t - p.run.t0) / p.run.dur), k = 1 - Math.pow(1 - e, 2), A = cen(this.m, p.run.cells[0]), B = cen(this.m, p.run.cells[p.run.cells.length - 1]);
+    return [A[0] + (B[0] - A[0]) * k, A[1] + (B[1] - A[1]) * k];
+  }
+  floor(g, r, now) {
+    const s = r.s, W = r.cv.width;
+    g.save(); g.clip(r.cellsPath(this.m.cells.map(c => c.i)));
+    const x0 = ((now * 0.08) % 1.6 - 0.3) * W, gr = g.createLinearGradient(x0, 0, x0 + W * 0.25, W * 0.12);
+    gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, W, r.cv.height); g.restore();
+    const [px, py] = this.puckPos(), X = r.X(px), Y = r.Y(py);
+    this.trail.push([X, Y, now]); while (this.trail.length && now - this.trail[0][2] > 0.6) this.trail.shift();
+    g.save(); g.lineCap = 'round';
+    for (let i = 1; i < this.trail.length; i++) { const a = this.trail[i - 1], b = this.trail[i], e = 1 - (now - b[2]) / 0.6; g.strokeStyle = `rgba(90,160,230,${e * 0.45})`; g.lineWidth = s * 0.3 * e; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+    g.fillStyle = 'rgba(30,60,100,0.25)'; g.beginPath(); g.ellipse(X + s * 0.05, Y + s * 0.07, s * 0.24, s * 0.16, 0, 0, TAU); g.fill();
+    const pg = g.createRadialGradient(X - s * 0.08, Y - s * 0.08, 0, X, Y, s * 0.24); pg.addColorStop(0, '#ffffff'); pg.addColorStop(0.5, '#7fc0f5'); pg.addColorStop(1, '#2f6fb8');
+    g.fillStyle = pg; g.beginPath(); g.arc(X, Y, s * 0.24, 0, TAU); g.fill();
+    g.restore();
+  }
+  top(g, r, now) {
+    const s = r.s, hp = r.hp, W = r.cv.width, H = r.cv.height;
+    g.setTransform(1, 0, 0, 1, 0, 0); g.save(); g.strokeStyle = '#fff'; g.lineCap = 'round';
+    for (const [x, y, a, b] of this.tw) {
+      const ph = (now * 0.4 + a * 7) % 1; if (ph > 0.15) continue;
+      const k = Math.sin(ph / 0.15 * Math.PI), X = r.X(x), Y = r.Y(y) - hp, u = s * 0.18 * k;
+      g.globalAlpha = k; g.lineWidth = Math.max(1, s * 0.03); g.beginPath(); g.moveTo(X - u, Y); g.lineTo(X + u, Y); g.moveTo(X, Y - u); g.lineTo(X, Y + u); g.stroke(); void b;
+    }
+    g.fillStyle = '#ffffff';
+    for (const f of this.snow) {
+      const y = ((f[1] + now * 0.03 * f[2]) % 1) * H, x = (f[0] * W + Math.sin(now * 0.8 + f[0] * 20) * 14);
+      g.globalAlpha = 0.5 + f[2] * 0.4; g.beginPath(); g.arc(x, y, 1 + f[2] * 2.2, 0, TAU); g.fill();
+    }
+    g.restore();
+  }
+}
+class CaveLife {
+  constructor(m) {
+    this.m = m; this.r = ML.makeRng('grot' + OPT.seed); this.W = new Walker(m, 'grot' + OPT.seed, 2.6);
+    const ends = m.cells.filter(c => m.adj[c.i].length === 1 && c.i !== m.start).map(c => c.i);
+    this.torches = ends.filter(() => this.r() < 0.35).slice(0, 9).concat([m.goal]);
+    this.seen = new Uint8Array(m.cells.length); this.dark = null;
+  }
+  step(dt) { const before = this.W.t; this.W.step(dt); if (this.W.t < before) this.seen.fill(0); this.seen[this.W.cell()] = 1; }
+  top(g, r, now) {
+    const s = r.s, hp = r.hp, W = r.cv.width, H = r.cv.height, m = this.m;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    if (!this.dark || this.dark.width !== W || this.dark.height !== H) { this.dark = document.createElement('canvas'); this.dark.width = W; this.dark.height = H; }
+    const d = this.dark.getContext('2d'); d.globalCompositeOperation = 'source-over'; d.clearRect(0, 0, W, H); d.fillStyle = 'rgba(8,5,3,0.96)'; d.fillRect(0, 0, W, H);
+    d.globalCompositeOperation = 'destination-out';
+    const seen = []; for (let i = 0; i < this.seen.length; i++) if (this.seen[i]) seen.push(i);
+    if (seen.length) { d.globalAlpha = 0.35; d.fillStyle = '#000'; d.fill(r.cellsPath(seen)); d.globalAlpha = 1; } // onthouden gangen: schemer
+    const [wx, wy] = this.W.pos(this.W.fpos()), lights = this.torches.map((c, i) => [r.X(cen(m, c)[0]), r.Y(cen(m, c)[1]), 1.7, i]).concat([[r.X(wx), r.Y(wy), 2.7, 99]]);
+    for (const [X, Y, R0, i] of lights) {
+      const R = s * R0 * (1 + 0.05 * Math.sin(now * 11 + i * 3) + 0.04 * Math.sin(now * 17 + i)), gr = d.createRadialGradient(X, Y - hp * 0.3, 0, X, Y - hp * 0.3, R);
+      gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.55, 'rgba(0,0,0,0.75)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); d.fillStyle = gr; d.fillRect(X - R, Y - hp * 0.3 - R, 2 * R, 2 * R);
+    }
+    g.drawImage(this.dark, 0, 0);
+    g.save(); g.globalCompositeOperation = 'lighter';
+    for (const [X, Y, R0, i] of lights) { const R = s * R0 * 0.8, gr = g.createRadialGradient(X, Y, 0, X, Y, R); gr.addColorStop(0, 'rgba(255,140,50,0.28)'); gr.addColorStop(1, 'rgba(255,140,50,0)'); g.fillStyle = gr; g.fillRect(X - R, Y - R, 2 * R, 2 * R); void i; }
+    g.restore();
+    for (const [X, Y, R0, i] of lights) { // vlammetjes
+      const f = 1 + 0.15 * Math.sin(now * 19 + i * 5), y0 = Y - hp * 0.5;
+      if (i !== 99) { g.strokeStyle = '#3a2614'; g.lineWidth = Math.max(1.5, s * 0.06); g.beginPath(); g.moveTo(X, Y); g.lineTo(X, y0); g.stroke(); }
+      g.fillStyle = '#ff7a1a'; g.beginPath(); g.ellipse(X, y0 - s * 0.08 * f, s * 0.07, s * 0.13 * f, Math.sin(now * 7 + i) * 0.15, 0, TAU); g.fill();
+      g.fillStyle = '#ffe28a'; g.beginPath(); g.ellipse(X, y0 - s * 0.05 * f, s * 0.035, s * 0.07 * f, 0, 0, TAU); g.fill();
+      if (i === 99) r.head((X - r.ox) / s, (Y - r.oy) / s, '#e9d8b4', 0.18);
+    }
+  }
+}
+class WaterLife {
+  constructor(m) {
+    this.m = m; this.r = ML.makeRng('water' + OPT.seed); this.W = new Walker(m, 'water' + OPT.seed, 2.4);
+    this.vents = m.cells.filter(() => this.r() < 0.05).map(c => c.i).slice(0, 6);
+    this.fish = Array.from({ length: 3 }, (_, k) => ({ ph: this.r() * TAU, sp: 0.05 + this.r() * 0.04, col: ['#ffd23f', '#5bc0eb', '#ff8c42'][k], n: 5 + k }));
+    this.tex = this.causticTex();
+  }
+  causticTex() {
+    const c = document.createElement('canvas'); c.width = c.height = 256; const f = c.getContext('2d'), r = ML.makeRng('kaust');
+    f.strokeStyle = 'rgba(255,255,255,0.9)'; f.lineWidth = 2;
+    for (let i = 0; i < 90; i++) { const x = r() * 256, y = r() * 256, rr = 8 + r() * 26; for (const dx of [-256, 0, 256]) for (const dy of [-256, 0, 256]) { f.beginPath(); f.ellipse(x + dx, y + dy, rr, rr * (0.5 + r() * 0.5), r() * 3, 0, TAU); f.stroke(); } }
+    return c;
+  }
+  step(dt) { this.W.step(dt); }
+  floor(g, r, now) {
+    const W = r.cv.width, H = r.cv.height;
+    g.save(); g.clip(r.cellsPath(this.m.cells.map(c => c.i))); g.globalCompositeOperation = 'lighter';
+    const sc = Math.max(1, r.s / 18);
+    for (const [vx, vy, a] of [[14, 6, 0.07], [-9, 11, 0.05]]) {
+      g.globalAlpha = a; const pat = g.createPattern(this.tex, 'repeat'), ox = (now * vx) % 256, oy = (now * vy) % 256;
+      g.setTransform(sc, 0, 0, sc, ox, oy); g.fillStyle = pat; g.fillRect(-ox / sc - 256, -oy / sc - 256, W / sc + 512, H / sc + 512);
+    }
+    g.restore();
+  }
+  top(g, r, now) {
+    const s = r.s, hp = r.hp, W = r.cv.width, H = r.cv.height, m = this.m;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    const [wx, wy] = this.W.pos(this.W.fpos()); r.head(wx, wy - hp * 0.5 / s, '#ffffff', 0.18);
+    g.save(); g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = Math.max(1, s * 0.03);
+    this.vents.forEach((c, k) => {
+      const C = cen(m, c);
+      for (let j = 0; j < 4; j++) { const ph = (now * 0.35 + j / 4 + k * 0.13) % 1, X = r.X(C[0]) + Math.sin(now * 3 + j * 2 + k) * s * 0.1, Y = r.Y(C[1]) - ph * s * 2.4; g.globalAlpha = 1 - ph; g.beginPath(); g.arc(X, Y, s * (0.04 + ph * 0.05), 0, TAU); g.stroke(); }
+    });
+    g.globalAlpha = 1;
+    for (const f of this.fish) {
+      const t = now * f.sp + f.ph;
+      for (let i = 0; i < f.n; i++) {
+        const tt = t - i * 0.012, x = W * (0.5 + 0.42 * Math.sin(tt * 2.1 + i * 0.4)), y = H * (0.5 + 0.38 * Math.sin(tt * 3.3 + f.ph)) + Math.sin(i * 2.3) * s * 0.4;
+        const dx = Math.cos(tt * 2.1 + i * 0.4) * 2.1 * W * 0.42, dy = Math.cos(tt * 3.3 + f.ph) * 3.3 * H * 0.38, a = Math.atan2(dy, dx), u = s * 0.16;
+        g.fillStyle = 'rgba(0,30,40,0.18)'; g.beginPath(); g.ellipse(x + s * 0.3, y + s * 0.7, u, u * 0.45, a, 0, TAU); g.fill();
+        g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = f.col;
+        g.beginPath(); g.ellipse(0, 0, u, u * 0.45, 0, 0, TAU); g.fill();
+        const wag = Math.sin(now * 12 + i) * u * 0.25; g.beginPath(); g.moveTo(-u * 0.8, 0); g.lineTo(-u * 1.5, -u * 0.45 + wag); g.lineTo(-u * 1.5, u * 0.45 + wag); g.fill();
+        g.fillStyle = '#102030'; g.beginPath(); g.arc(u * 0.5, -u * 0.08, u * 0.1, 0, TAU); g.fill(); g.restore();
+      }
+    }
+    const tint = g.createLinearGradient(0, 0, 0, H); tint.addColorStop(0, 'rgba(20,120,150,0.12)'); tint.addColorStop(1, 'rgba(5,40,70,0.3)');
+    g.fillStyle = tint; g.fillRect(0, 0, W, H);
+    g.restore();
+  }
+}
 
-const VARIANTS = [
-  { id: 'klassiek', name: 'Klassiek', current: true, line: 'Het vierkante raster zoals het nu is.', pts: ['Ter vergelijking'], tags: [], make: s => ML.buildFull(varSettings(s), 'backtracker', 0.6) },
-  { id: 'zalen', name: 'Kamers & zalen', line: 'Een paar open zalen tussen de gangen; zoekers waaieren uit, de rechterhand verdwaalt.',
-    pts: ['Zalen = binnenmuren van een blok weghalen (lussen vanzelf)', 'Leuk met hendels: deur naar de zaal', 'In 3D: hogere plafonds voor zalen'], tags: [['low', 'model: geen wijziging'], ['low', '± 1 uur']], make: variantRooms },
-  { id: 'breed', name: 'Brede + smalle gangen', line: 'Kolommen en rijen met wisselende breedte: lanen, steegjes en pleintjes.',
-    pts: ['Gewoon een vierkant raster met ongelijke maten', 'Alle makers en oplossers werken direct', 'Smalle steegjes lezen als "kortere weg"'], tags: [['low', 'model: alleen nieuwe vorm'], ['mid', 'Eller/Sidewinder: terugval']], make: variantWidths },
-  { id: 'weave', name: 'Weave (bruggen)', line: 'Gangen kruisen elkaar: de ene loopt over een brug, de andere eronderdoor.',
-    pts: ['Getekend als uitgesneden gangen, brug met schaduw', 'Nieuw randtype "brug" (zoals trap: twee cellen overslaan)', 'Speler: bovenlangs of onderdoor kiezen'], tags: [['warn', 'model: nieuw randtype'], ['mid', 'oplossers: door brug-rand ok'], ['mid', '± halve dag']],
-    make: s => { const G = pipesFromGrid(17, 10, s, true); return { geo: G, m: { bounds: pipeBounds(17, 10) } }; } },
-  { id: 'upsilon', name: 'Upsilon (8 + 4)', line: 'Achthoeken met kleine ruitjes ertussen: soms 8, soms 4 kanten.',
-    pts: ['Schuine doorgangen via de ruitjes', 'Werkt meteen op de bestaande graaf', 'Ruitjes = handige plek voor sleutels/teleporters'], tags: [['low', 'model: alleen nieuwe vorm'], ['low', '± 1 uur']], make: variantUpsilon },
-  { id: 'schuin', name: 'Diagonaal (45°)', line: 'Het raster een kwartslag gedraaid: alle gangen lopen schuin.',
-    pts: ['Ruitvormige cellen, rand met kartels', 'Voelt verrassend anders bij zelf spelen (pijltjes schuin)', 'Toetsen: Q/E/Z/C of muis'], tags: [['low', 'model: alleen nieuwe vorm'], ['mid', 'besturing aanpassen']], make: variantDiagonal },
-  { id: 'gebogen', name: 'Gebogen gangen', line: 'Zelfde vierkante doolhof, maar de gangen zijn buizen met ronde bochten.',
-    pts: ['Alleen tekenen: model blijft vierkant', 'Leest als waterleiding of knikkerbaan', 'Kan ook als schakelaar "bochten" in elke stijl'], tags: [['low', 'model: geen wijziging'], ['low', 'alleen weergave']],
-    make: s => { const G = pipesFromGrid(17, 10, s, false); G.curve = true; return { geo: G, m: { bounds: pipeBounds(17, 10) } }; } }
-];
+// ---------- opties per sectie ----------
+const SECTIONS = {
+  s1: { host: 'g1', multi: false, opts: [
+    { id: 'huidig', name: 'Huidig', current: true, line: 'Eén zoeker (breedte-eerst) kleurt de cellen in volgorde.', pts: ['Ter vergelijking', 'Eén golf, geen zwerm'], tags: [] },
+    { id: 'mieren', name: 'Mieren', look: 'ants', line: 'Echte mieren: lijfje in drie delen, trippelende pootjes, bruin geurspoor dat dikker wordt.', pts: ['Terug naar huis met een groen kruimeltje', 'Spoor = dikte + kleur per gang (6 lagen)', 'Past bij de maquette: beestjes op tafel'], tags: [['low', 'GPU laag (2 Path2D)'], ['low', 'eigen karakter']] },
+    { id: 'vuurvliegjes', name: 'Vuurvliegjes', look: 'fireflies', line: 'Het doolhof in de schemering; gloeiende stipjes zweven, het spoor licht groen op.', pts: ['Vloer verdonkert tijdens de zwerm', 'Knipperen per zoeker, terugkeerders gloeien', 'Mooiste "stroom" om naar te kijken'], tags: [['mid', 'GPU midden (optellend licht)'], ['warn', 'wijkt af van maquette-licht']] },
+    { id: 'rivier', name: 'Inktrivier', look: 'river', line: 'Het geurspoor wordt een stroom inkt die naar het doel loopt; de mieren zijn stofjes erin.', pts: ['Streepjes schuiven in looprichting naar het doel', 'Laat de gevonden route als rivier zien', 'Rustig, weinig gekriebel'], tags: [['low', 'GPU laag'], ['mid', 'mieren minder zichtbaar']] },
+    { id: 'kasten', name: 'Verkenners & dragers', look: 'castes', line: 'Blauwe verkenners waaieren uit, oranje dragers lopen de route terug. Laat zien hoe het werkt.', pts: ['Blauwe waas = waar verkend is (verdampt snel)', 'Oranje lijn = geurspoor van dragers', 'Pijltjes in looprichting'], tags: [['low', 'GPU laag'], ['low', 'leerzaam']] },
+    { id: 'warmte', name: 'Warmtegloed', look: 'heat', line: 'Geur als warmtekaart: koud paars naar witgeel; mieren als witte stipjes.', pts: ['Zelfde kleuren als de latere hittekaart (punt 7)', 'Goed te lezen op klein formaat', 'Cellen vullen, geen lijnen'], tags: [['low', 'GPU laag'], ['mid', 'minder "beestjes"-gevoel']] }
+  ] },
+  s2: { host: 'g2', multi: false, opts: [
+    { id: 'huidig', name: 'Huidig', current: true, line: 'Bezochte cellen kleuren in volgorde, loper als kop.', pts: ['Ter vergelijking'], tags: [] },
+    { id: 'schoenen', name: 'Schoenzooltjes', look: 'shoes', line: 'Links-rechts afdrukjes in looprichting die na ~7 s vervagen.', pts: ['Zool + hak, licht naar binnen gedraaid', 'Terugkeren = dubbel spoor, vanzelf leesbaar', 'In elke stijl te kleuren'], tags: [['low', 'GPU laag'], ['low', 'klein werk']] },
+    { id: 'pootjes', name: 'Pootjes', look: 'paws', line: 'Kattenpootjes: kussen met vier teentjes.', pts: ['Speelser dan schoenen', 'Kan per oplosser een ander dier (A* = vos, DFS = muis)', 'Zelfde vervaging'], tags: [['low', 'GPU laag'], ['mid', 'dieren per oplosser = extra']] },
+    { id: 'diep', name: 'Diepe sporen', look: 'deep', line: 'Ingedrukt in zand of sneeuw: donkere deuk met lichte rand, wordt langzaam weer glad.', pts: ['Voelt als maquette met echte diepte', 'Vervaagt trager (10 s)', 'Sterk op ijs/sneeuw en tuin-grind'], tags: [['low', 'GPU laag'], ['low', 'past bij thema\'s']] },
+    { id: 'pijlen', name: 'Potloodpijltjes', look: 'arrows', line: 'Blauwe pijltjes vooruit, rode stippelpijltjes terug, zoals je met potlood zou markeren.', pts: ['Ziet meteen waar de loper terug moest', 'Blijft langer staan (14 s)', 'Werkt ook goed in Lab-vergelijking'], tags: [['low', 'GPU laag'], ['low', 'leerzaam']] },
+    { id: 'kruimels', name: 'Broodkruimels', look: 'crumbs', line: 'De loper strooit kruimels; vogeltjes vliegen in, pikken ze op en vliegen weg.', pts: ['Spoor verdwijnt door de vogels, niet door vervagen', 'Veel leven, sprookjesachtig', 'Vogel-tekening te hergebruiken in tuinthema'], tags: [['mid', 'GPU midden'], ['mid', 'drukker beeld']] }
+  ] },
+  s3: { host: 'g3', multi: true, opts: [
+    { id: 'huidig', name: 'Maquette (huidig)', current: true, line: 'De kartonnen maquette met rustig leven.', pts: ['Ter vergelijking'], tags: [] },
+    { id: 'tuin', name: 'Tuinhaag + vogeltjes', theme: 'tuin', line: 'Dikke heggen op grindpaden, bloemetjes, vogeltjes die op de haag huppen en wegvliegen; fontein als doel.', pts: ['Bladeren 1× in cache getekend', 'Vogels: huppen, pikken, oversteken met schaduw', 'Fontein met kringen'], tags: [['low', 'GPU laag'], ['low', 'eigen karakter']] },
+    { id: 'ijs', name: 'IJspaleis (glijden)', theme: 'ijs', line: 'Doorschijnende ijsmuren, glinsters, sneeuw; de puck glijdt door tot hij ergens tegenaan botst.', pts: ['Lichtstreep schuift over de vloer', 'Glijden kan ook een speelregel worden bij zelf spelen', 'Glinsters op de muurtoppen'], tags: [['low', 'GPU laag'], ['mid', 'glijden als spelregel = extra']] },
+    { id: 'grot', name: 'Grot met fakkels', theme: 'grot', line: 'Alles donker behalve rond fakkels en de loper; waar je al was blijft schemerig.', pts: ['Flakkerend licht, vlammetjes', 'Geheugen: bezochte gangen blijven half zichtbaar', 'Spannend bij zelf spelen'], tags: [['mid', 'GPU midden (donkerlaag per beeld)'], ['mid', 'Lab minder leesbaar']] },
+    { id: 'water', name: 'Onderwater', theme: 'water', line: 'Koraalmuren op zandbodem, bewegend lichtspel, belletjes en scholen visjes boven het doolhof.', pts: ['Lichtspel = 1 textuur, 2× verschoven', 'Visjes met schaduw op de bodem', 'Blauwe waas van boven naar onder'], tags: [['mid', 'GPU midden (2 patroonlagen)'], ['low', 'eigen karakter']] }
+  ] }
+};
+
+// ---------- tegel: echte Render2D + sim ----------
+class Tile {
+  constructor(cv, sec, opt) { this.cv = cv; this.r = new ML.Render2D(cv); this.sec = sec; this.opt = opt; this.reset(); }
+  reset() {
+    const m = MAZE, o = this.opt, seed = OPT.seed;
+    this.t = 0; this.last = null; this.sim = null; this.r.setPalette(o.theme ? THEME_PAL[o.theme] : ML.PALETTES.maquette); this.r._floor = this.r._walls = null;
+    if (this.sec === 's1') this.sim = o.current ? { t: 0, step(dt) { this.t += dt; } } : new Colony(m, 'zwerm' + seed);
+    else if (this.sec === 's2') this.sim = new Walker(m, 'loper' + seed);
+    else this.sim = o.theme === 'tuin' ? new GardenLife(m) : o.theme === 'ijs' ? new IceLife(m) : o.theme === 'grot' ? new CaveLife(m) : o.theme === 'water' ? new WaterLife(m) : new Walker(m, 'water' + seed, 2.4);
+  }
+  size() {
+    const b = this.cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1), w = Math.max(10, Math.round(b.width * d)), h = Math.max(10, Math.round(b.height * d));
+    if (this.cv.width !== w || this.cv.height !== h) { this.cv.width = w; this.cv.height = h; }
+  }
+  vs() {
+    const m = MAZE, o = this.opt, S = this.sim, vs = { life: true };
+    if (this.sec === 's1') {
+      if (o.current) { // breedte-eerst golf, daarna route
+        const q = m.fromStart.q, n = q.length, k = Math.floor((S.t * 22) % (n + 70)), ord = new Int32Array(m.cells.length).fill(-1);
+        for (let i = 0; i < Math.min(k, n); i++) ord[q[i]] = i;
+        vs.order = ord; vs.nOrder = Math.max(1, Math.min(k, n)); if (k >= n) { vs.path = m.solution; vs.pathT = Math.min(1, (k - n) / 25); }
+      } else vs.floorFx = (g, r, now) => { SWARM_LOOK[o.look](g, r, m, S, now); return true; };
+    } else if (this.sec === 's2') {
+      if (o.current || OPT.under) S.vsColor(vs);
+      if (o.current) vs.cur = S.cell();
+      else vs.floorFx = (g, r) => { FOOT_LOOK[o.look](g, r, m, S); return true; };
+      vs.topFx = (g, r) => { const [x, y] = S.pos(S.fpos()); r.head(x, y, r.pal.start, 0.2); return true; };
+    } else {
+      if (S.floor) vs.floorFx = (g, r, now) => { S.floor(g, r, now); return true; };
+      if (S.top) vs.topFx = (g, r, now) => { S.top(g, r, now); return true; };
+      if (S instanceof Walker) vs.topFx = (g, r) => { const [x, y] = S.pos(S.fpos()); r.head(x, y, r.pal.start, 0.2); return true; };    }
+    return vs;
+  }
+  frame(now) {
+    this.size();
+    const dt = this.last == null ? 0 : Math.min(0.1, now - this.last) * OPT.speed; this.last = now;
+    this.t += dt; this.sim.step(dt);
+    this.r.draw(MAZE, this.vs(), this.t);
+  }
+}
 
 // ---------- kaarten ----------
-const views = [];
-function tagsHtml(t) { return t.map(([k, v]) => `<span class="tag ${k}">${v}</span>`).join(''); }
-function card(host, o, i, kind) {
+const tiles = [];
+const tagsHtml = t => t.map(([k, v]) => `<span class="tag ${k}">${v}</span>`).join('');
+function card(sec, o, i) {
   const el = document.createElement('div'); el.className = 'card';
-  el.innerHTML = `<canvas class="tile"></canvas><div class="body"><h3><span class="num">${i}</span>${o.name}</h3><p>${o.line}</p><ul>${o.pts.map(p => `<li>${p}</li>`).join('')}</ul><div class="stats"></div><div class="tags">${tagsHtml(o.tags)}</div><div class="foot">${o.current && kind === 'var' ? '' : `<button class="pick">Kies deze</button>`}<button class="end">Eindscène</button></div></div>`;
-  host.appendChild(el);
-  const v = new View(el.querySelector('canvas')); v.kind = kind; v.opt = o; v.el = el; views.push(v);
-  el.querySelector('canvas').onclick = () => openBig(v);
-  el.querySelector('.end').onclick = () => { v.end = performance.now() / 1000; v.endDone = false; };
-  const pb = el.querySelector('.pick');
-  if (pb) pb.onclick = () => {
-    if (kind === 'style') { PICK.style = PICK.style === o.id ? null : o.id; refreshVariants(); }
-    else PICK.vars.has(o.id) ? PICK.vars.delete(o.id) : PICK.vars.add(o.id);
+  el.innerHTML = `<canvas class="tile"></canvas><div class="body"><h3><span class="num">${i}</span>${o.name}</h3><p>${o.line}</p><ul>${o.pts.map(p => `<li>${p}</li>`).join('')}</ul><div class="stats"></div><div class="tags">${tagsHtml(o.tags)}</div><div class="foot"><button class="pick">Kies deze</button></div></div>`;
+  document.getElementById(SECTIONS[sec].host).appendChild(el);
+  const t = new Tile(el.querySelector('canvas'), sec, o); t.el = el; tiles.push(t);
+  el.querySelector('canvas').onclick = () => openBig(t);
+  el.querySelector('.pick').onclick = () => {
+    if (SECTIONS[sec].multi) PICK[sec].has(o.id) ? PICK[sec].delete(o.id) : PICK[sec].add(o.id);
+    else PICK[sec] = PICK[sec] === o.id ? null : o.id;
     marks();
   };
-  return v;
 }
+const isPicked = t => SECTIONS[t.sec].multi ? PICK[t.sec].has(t.opt.id) : PICK[t.sec] === t.opt.id;
+const nameOf = (sec, id) => SECTIONS[sec].opts.find(o => o.id === id).name;
 function marks() {
-  for (const v of views) {
-    const on = v.kind === 'style' ? PICK.style === v.opt.id : PICK.vars.has(v.opt.id);
-    v.el.classList.toggle('picked', on); const b = v.el.querySelector('.pick'); if (b) { b.classList.toggle('on', on); b.textContent = on ? 'Gekozen' : 'Kies deze'; }
-  }
-  const st = STYLES.find(s => s.id === PICK.style), vars = VARIANTS.filter(v => PICK.vars.has(v.id)).map(v => v.name);
-  const depth = { 0: 'plat', 0.6: 'laag', 1: 'normaal', 1.6: 'hoog' }[OPT.depth];
-  document.getElementById('barTxt').innerHTML = `Stijl: <b>${st ? st.name : '—'}</b>${st && !st.current ? ` (muurhoogte ${depth}, rustig leven ${OPT.life ? 'aan' : 'uit'})` : ''} · Varianten: <b>${vars.length ? vars.join(', ') : '—'}</b>`;
+  for (const t of tiles) { const on = isPicked(t), b = t.el.querySelector('.pick'); t.el.classList.toggle('picked', on); b.classList.toggle('on', on); b.textContent = on ? 'Gekozen' : 'Kies deze'; }
+  const th = [...PICK.s3].map(id => nameOf('s3', id));
+  document.getElementById('barTxt').innerHTML = `Zwerm: <b>${PICK.s1 ? nameOf('s1', PICK.s1) : '—'}</b> · Voetstappen: <b>${PICK.s2 ? nameOf('s2', PICK.s2) : '—'}</b>${PICK.s2 && PICK.s2 !== 'huidig' ? ` (kleur eronder ${OPT.under ? 'aan' : 'uit'})` : ''} · Thema's: <b>${th.length ? th.join(', ') : '—'}</b>`;
 }
-const varStyle = () => { const s = STYLES.find(x => x.id === PICK.style); return s && !s.current ? s : STYLES[1]; };
-function statsOf(m) { if (!m.cells) return ''; const t = ML.mazeStats(m); return `${t.cells} cellen · ${t.deadEnds} doodlopers · ${t.junctions} kruisingen · route ${t.route}`; }
+newMaze();
+for (const sec of ['s1', 's2', 's3']) SECTIONS[sec].opts.forEach((o, i) => card(sec, o, i));
+marks();
 
-function refreshStyles() {
-  const m = styleMaze();
-  for (const v of views) if (v.kind === 'style') { v.set(m, v.opt, null); v.endDone = false; v.el.querySelector('.stats').textContent = statsOf(m); }
-}
-const varCache = {};
-function refreshVariants() {
-  const st = varStyle();
-  for (const v of views) if (v.kind === 'var') {
-    const key = v.opt.id + OPT.seed;
-    const r = varCache[key] || (varCache[key] = v.opt.make(OPT.seed + v.opt.id));
-    if (r.geo) { v.set(r.m, st, r.geo); v.el.querySelector('.stats').textContent = `${r.geo.W * r.geo.H} cellen · ${r.geo.bridges || 0} bruggen · route ${r.geo.route.length - 1}`; }
-    else { v.set(r, st, null); v.el.querySelector('.stats').textContent = statsOf(r); }
-  }
-}
-
-STYLES.forEach((o, i) => card(document.getElementById('styleGrid'), o, i, 'style'));
-VARIANTS.forEach((o, i) => card(document.getElementById('varGrid'), o, i, 'var'));
-refreshStyles(); refreshVariants(); marks();
-
-// ---------- bediening ----------
 function seg(id, fn) {
   const el = document.getElementById(id);
   el.onclick = e => { const b = e.target.closest('button'); if (!b) return; el.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); fn(b.dataset.v); marks(); };
 }
-seg('optGrid', v => { OPT.grid = v; refreshStyles(); });
-seg('optDepth', v => { OPT.depth = +v; for (const x of views) x.layers = null; big.a && (big.a.layers = null, big.b.layers = null); });
-seg('optLife', v => { OPT.life = v === '1'; });
-document.getElementById('reseed').onclick = () => { OPT.seed = ML.randomSeed(); refreshStyles(); refreshVariants(); };
-document.getElementById('endAll').onclick = () => { const t = performance.now() / 1000; for (const v of views) if (v.kind === 'style') { v.end = t; v.endDone = false; } };
+const resetAll = () => { for (const t of tiles) t.reset(); if (big.on) { big.a.reset(); big.b.reset(); } };
+seg('optSpeed', v => { OPT.speed = +v; });
+seg('optUnder', v => { OPT.under = v === '1'; });
+document.getElementById('reseed').onclick = () => { OPT.seed = ML.randomSeed(); newMaze(); resetAll(); };
+document.getElementById('restart').onclick = resetAll;
 document.getElementById('copy').onclick = () => {
   const txt = document.getElementById('barTxt').textContent;
   (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).catch(() => { const t = document.createElement('textarea'); t.value = txt; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); });
   const b = document.getElementById('copy'); b.textContent = 'Gekopieerd'; setTimeout(() => b.textContent = 'Kopieer', 1200);
 };
 
-// groot bekijken: links Huidig, rechts de gekozen kaart, schuif ertussen
+// groot bekijken
 const big = { a: null, b: null, on: false };
-function openBig(v) {
-  big.a = new View(document.getElementById('bigA')); big.b = new View(document.getElementById('bigB'));
-  if (v.kind === 'style') { big.a.set(v.m, STYLES[0], null); big.b.set(v.m, v.st, null); }
-  else { const base = views.find(x => x.kind === 'var' && x.opt.current); big.a.set(base.m, base.st, base.geo); big.b.set(v.m, v.st, v.geo); }
-  document.getElementById('knifeR').textContent = v.opt.name; document.getElementById('bigName').textContent = v.opt.name;
-  document.querySelector('#knife .l').textContent = v.kind === 'style' ? 'Huidig' : 'Klassiek';
+function openBig(t) {
+  const o0 = SECTIONS[t.sec].opts[0];
+  big.a = new Tile(document.getElementById('bigA'), t.sec, o0); big.b = new Tile(document.getElementById('bigB'), t.sec, t.opt);
+  document.getElementById('knifeR').textContent = t.opt.name; document.getElementById('bigName').textContent = t.opt.name;
+  document.querySelector('#knife .l').textContent = o0.name;
   big.on = true; document.getElementById('big').classList.add('on'); knife();
 }
-function knife() {
-  const p = +document.getElementById('slider').value;
-  document.getElementById('bigB').style.clipPath = `inset(0 0 0 ${p}%)`;
-  document.getElementById('knife').style.left = p + '%';
-}
+function knife() { const p = +document.getElementById('slider').value; document.getElementById('bigB').style.clipPath = `inset(0 0 0 ${p}%)`; document.getElementById('knife').style.left = p + '%'; }
 document.getElementById('slider').oninput = knife;
 const closeBig = () => { big.on = false; document.getElementById('big').classList.remove('on'); };
 document.getElementById('bigClose').onclick = closeBig;
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBig(); });
-document.getElementById('bigEnd').onclick = () => { const t = performance.now() / 1000; big.a.end = t; big.b.end = t; big.a.endDone = big.b.endDone = false; };
 
-// ---------- lus: alleen zichtbare kaarten, ~30 beelden/s als er leven is ----------
+// lus: alleen zichtbare tegels, ~30 beelden/s
 const visible = new Set();
 const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? visible.add(e.target) : visible.delete(e.target)));
-for (const v of views) io.observe(v.cv);
-let last = 0;
+for (const t of tiles) io.observe(t.cv);
+let last = 0, statT = 0;
 function loop(ms) {
   requestAnimationFrame(loop);
-  const now = ms / 1000, anyEnd = views.some(v => v.end) || (big.on && (big.a.end || big.b.end));
-  if (!anyEnd && OPT.life && now - last < 1 / 30) return;
-  if (!anyEnd && !OPT.life && now - last < 0.25) return;
-  last = now;
+  const now = ms / 1000; if (now - last < 1 / 30) return; last = now;
   if (big.on) { big.a.frame(now); big.b.frame(now); return; }
-  for (const v of views) if (visible.has(v.cv)) v.frame(now);
+  for (const t of tiles) if (visible.has(t.cv)) t.frame(now); else t.last = null;
+  if (now - statT > 0.5) { statT = now; for (const t of tiles) if (t.sim instanceof Colony) t.el.querySelector('.stats').textContent = t.sim.info(); }
 }
 requestAnimationFrame(loop);
-addEventListener('resize', () => { for (const v of views) v.layers = null; });
 </script>
 </body>
 </html>

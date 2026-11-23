@@ -1,6 +1,6 @@
 // Doolhof-makers. Elk is een generator die stap voor stap muren opent en events geeft:
 // { carve: wallIdx, build: wallIdx (muur erbij), all: true (alle cellen in doolhof), add: cellIdx, add2, cur: cellIdx, walk: [cells], walkFrom }
-(function (ML) {
+(window.MLDEF = window.MLDEF || []).push(function (ML) { // MLDEF: ook in de Web Worker (evo.js Pool)
   'use strict';
 
   function* growingTree(m, rng, opts) {
@@ -231,6 +231,91 @@
     }
   }
 
+  // Doolhof van doolhoven (lappendeken): het veld wordt in blokken verdeeld; elk blok krijgt een eigen
+  // klein doolhof met een eigen karakter (diepte-eerst, Prim-achtig of gemengd). Daarna verbinden losse
+  // deuren de blokken tot één groot doolhof (Kruskal over de blokken) → blijft perfect. Werkt op elk raster.
+  function* patchwork(m, rng) {
+    const C = m.cells, n = C.length, b = m.bounds;
+    const cs = Math.sqrt(Math.max(1e-6, (b.maxx - b.minx) * (b.maxy - b.miny)) / n) || 1;
+    const B = cs * Math.max(4, Math.min(9, Math.round(Math.sqrt(n) / 4)));
+    const blk = new Int32Array(n), keys = new Map();
+    for (const c of C) {
+      const k = Math.floor((c.center[0] - b.minx) / B) + ',' + Math.floor((c.center[1] - b.miny) / B);
+      if (!keys.has(k)) keys.set(k, keys.size);
+      blk[c.i] = keys.get(k);
+    }
+    const N = keys.size, byBlk = Array.from({ length: N }, () => []), style = new Float32Array(N);
+    for (let i = 0; i < n; i++) byBlk[blk[i]].push(i);
+    m.blocks = blk; m.blockN = N; m.blockStyle = style;
+    const inn = new Uint8Array(n);
+    for (const k of rng.shuffle([...Array(N).keys()])) {
+      const mix = style[k] = rng.pick([1, 1, 0, 0.5]);
+      for (const s0 of rng.shuffle(byBlk[k].slice())) {
+        if (inn[s0]) continue;
+        inn[s0] = 1; const list = [s0];
+        yield { add: s0, cur: s0 };
+        while (list.length) {
+          const idx = rng() < mix ? list.length - 1 : rng.int(list.length), c = list[idx];
+          const o = C[c].nbrs.filter(nb => !inn[nb.c] && blk[nb.c] === k);
+          if (!o.length) { list.splice(idx, 1); continue; }
+          const p = rng.pick(o);
+          m.walls[p.w].open = true; inn[p.c] = 1; list.push(p.c);
+          yield { carve: p.w, add: p.c, cur: p.c };
+        }
+      }
+    }
+    // stukken (componenten) zoeken en met deuren aan elkaar knopen
+    const comp = new Int32Array(n).fill(-1);
+    let nc = 0;
+    for (let i = 0; i < n; i++) {
+      if (comp[i] >= 0) continue;
+      const q = [i]; comp[i] = nc;
+      for (let h = 0; h < q.length; h++) for (const nb of C[q[h]].nbrs) if (comp[nb.c] < 0 && m.walls[nb.w].open) { comp[nb.c] = nc; q.push(nb.c); }
+      nc++;
+    }
+    const par = Int32Array.from({ length: nc }, (_, i) => i), find = x => { while (par[x] !== x) x = par[x] = par[par[x]]; return x; };
+    const cand = rng.shuffle(m.walls.filter(w => w.b !== null && !w.open && comp[w.a] !== comp[w.b]));
+    for (const w of cand) {
+      const x = find(comp[w.a]), y = find(comp[w.b]);
+      if (x === y) continue;
+      par[x] = y; w.open = true;
+      yield { carve: w.i, cur: w.b };
+    }
+  }
+
+  // Spiegel: linkerhelft diepte-eerst, rechterhelft = spiegelbeeld. Even breedte: één deur in het midden;
+  // oneven: middenkolom wordt een rechte gang met links en rechts dezelfde deur. Blijft perfect.
+  function* mirror(m, rng) {
+    const W = m.sq.w, H = m.sq.h, np = m.np, C = m.cells, half = Math.floor(W / 2);
+    const wb = (a, b) => { const nb = C[a].nbrs.find(x => x.c === b); return nb ? nb.w : -1; };
+    const open = (a, b) => { const w = wb(a, b); if (w >= 0) m.walls[w].open = true; return w; };
+    for (let l = 0; l < m.levels; l++) {
+      const id = (r, c) => l * np + r * W + c, rc = i => [Math.floor((i - l * np) / W), (i - l * np) % W];
+      const mir = i => { const [r, c] = rc(i); return id(r, W - 1 - c); };
+      const inn = new Uint8Array(np), s0 = id(rng.int(H), rng.int(Math.max(1, half)));
+      if (half < 1) continue;
+      inn[s0 - l * np] = 1;
+      const st = [s0];
+      yield { add: s0, add2: mir(s0), cur: s0 };
+      while (st.length) {
+        const c = st[st.length - 1];
+        const o = C[c].nbrs.filter(nb => { if (nb.c < l * np || nb.c >= (l + 1) * np) return false; const [, cc] = rc(nb.c); return cc < half && !inn[nb.c - l * np]; });
+        if (!o.length) { st.pop(); continue; }
+        const p = rng.pick(o);
+        m.walls[p.w].open = true; inn[p.c - l * np] = 1; st.push(p.c);
+        const w2 = open(mir(c), mir(p.c));
+        yield { carve: p.w, add: p.c, add2: mir(p.c), cur: p.c };
+        if (w2 >= 0) yield { carve: w2, cur: mir(p.c) };
+      }
+      const r = rng.int(H);
+      if (W % 2) {
+        for (let y = 0; y + 1 < H; y++) { const w = open(id(y, half), id(y + 1, half)); yield { carve: w, add: id(y, half), add2: id(y + 1, half), cur: id(y + 1, half) }; }
+        yield { carve: open(id(r, half - 1), id(r, half)), cur: id(r, half) };
+        yield { carve: open(id(r, half), id(r, half + 1)), cur: id(r, half + 1) };
+      } else yield { carve: open(id(r, half - 1), id(r, half)), cur: id(r, half) };
+    }
+  }
+
   ML.GENERATORS = [
     { id: 'backtracker', name: 'Diepte-eerst', desc: 'lange kronkelgangen', fn: (m, r) => growingTree(m, r, { mix: 1 }) },
     { id: 'growing', name: 'Groeiende boom', desc: 'kronkel instelbaar', fn: growingTree },
@@ -241,6 +326,8 @@
     { id: 'huntkill', name: 'Jagen & doden', desc: 'gangen + zoeken naar gaten', fn: huntKill },
     { id: 'eller', name: 'Eller', desc: 'rij voor rij (alleen vierkant)', fn: gridOnly(eller), grid: true },
     { id: 'sidewinder', name: 'Sidewinder', desc: 'open bovenrij (alleen vierkant)', fn: gridOnly(sidewinder), grid: true },
-    { id: 'division', name: 'Opdelen', desc: 'muren in een lege zaal (alleen vierkant)', fn: gridOnly(division), grid: true }
+    { id: 'division', name: 'Opdelen', desc: 'muren in een lege zaal (alleen vierkant)', fn: gridOnly(division), grid: true },
+    { id: 'patchwork', name: 'Doolhof van doolhoven', desc: 'blokken met elk een eigen karakter, deuren ertussen', fn: patchwork },
+    { id: 'mirror', name: 'Spiegel', desc: 'symmetrisch (alleen vierkant)', fn: gridOnly(mirror), grid: true }
   ];
-})(window.ML = window.ML || {});
+}); MLDEF[MLDEF.length - 1](window.ML = window.ML || {});

@@ -17,6 +17,8 @@
         shadow: ['rgba(70,48,20,0.36)', 0.2, 0.26, 0.3], pathW: 0.09, ter: [null, '#a07a52', '#5aa0d8', '#dceef5'], terA: [0, 0.55, 0.75, 0.8] } },
     blauwdruk: { name: 'Blauwdruk', bg: '#0f2c4c', floor: '#143a63', dark: '#0b2240', wall: '#e9f2ff', cur: '#ffd166', walk: '#ff8fab', visitA: '#1f5f8b', visitB: '#7fc8e8', front: '#ffd166', path: '#ffd166', start: '#06d6a0', goal: '#ef476f', accent: '#ffd166' },
     neon: { name: 'Neon', bg: '#07060d', floor: '#0e0c1a', dark: '#07060d', wall: '#7df9ff', cur: '#ffffff', walk: '#ff4fd8', visitA: '#3a0ca3', visitB: '#f72585', front: '#ffffff', path: '#fffb7d', start: '#39ff14', goal: '#ff3864', accent: '#fffb7d', glow: true },
+    aurora: { name: 'Aurora (nacht)', bg: '#05101a', floor: '#0a1824', dark: '#050c14', wall: '#9fffe0', cur: '#ffffff', walk: '#c58bff', visitA: '#0d4f5c', visitB: '#8a4dff', front: '#e6fffa', path: '#ffe08a', start: '#5dffb0', goal: '#ff7ab8', accent: '#9fffe0', glow: true, aurora: true },
+    zon: { name: 'Zonsondergang', bg: '#2b1638', floor: '#3a1d45', dark: '#22102c', wall: '#ffd9a8', cur: '#fff4e0', walk: '#ff8a65', visitA: '#6b2d5c', visitB: '#ff9e5e', front: '#ffe3b3', path: '#fff1c1', start: '#7cf0c8', goal: '#ff5d73', accent: '#ffd9a8', glow: true, sunset: true },
     papier: { name: 'Papier', bg: '#e9dfc8', floor: '#f7f0df', dark: '#dccfb2', wall: '#2b2118', cur: '#c0392b', walk: '#d98e73', visitA: '#efe0b0', visitB: '#94d2bd', front: '#ee9b00', path: '#c0392b', start: '#2a9d8f', goal: '#c0392b', accent: '#9b2226' }
   };
 
@@ -26,6 +28,7 @@
   ML.ANIM = { RIP: 0.6, TAIL: 0.45, WALL: 0.42, CLOCK: 0.7, HEAD: 0.12 };
   const A = ML.ANIM;
   const END = 2.6; // eindscène in seconden
+  const PATH_FADE_AT = 1.8, PATH_FADE = 1.8, PATH_FADE_TO = 0.28; // oplossing vervaagt na de eindgolf
   const shade = (hex, f) => { const c = hex2rgb(hex).map(v => Math.round(f < 0 ? v * (1 + f) : v + (255 - v) * f)); return `rgb(${c[0]},${c[1]},${c[2]})`; };
   const mkCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 
@@ -45,7 +48,7 @@
       return this._grad;
     }
     fit(m) {
-      const cv = this.cv, b = m.bounds, M = this.pal.maq, hh = M ? M.h : 0;
+      const cv = this.cv, b = m.bounds, M = this.pal.maq, hh = M && !this.noWalls ? M.h : 0;
       const pad = Math.max(10, Math.min(cv.width, cv.height) * (M ? 0.05 : 0.04)) + (m.levels > 1 ? 14 : 0);
       const bw = b.maxx - b.minx || 1, bh = (b.maxy - b.miny || 1) + hh;
       this.s = Math.max(0.1, Math.min((cv.width - 2 * pad) / bw, (cv.height - 2 * pad) / bh));
@@ -83,7 +86,7 @@
     }
     // Muren: slagschaduw, zijkant (gestapeld per px), bovenkant. Vast doolhof → cache; tijdens bouwen goedkoop en direct.
     maqWalls(g, m, anim, live) {
-      const cv = this.cv, M = this.pal.maq, s = this.s, hp = this.hp, lw = Math.max(1.2, s * M.w);
+      const cv = this.cv, M = this.pal.maq, s = this.s, hp = this.hp * (live && this.rise != null ? this.rise : 1), lw = Math.max(1.2, s * M.w);
       const key = [cv.width, cv.height, s, this.ox, this.oy].join();
       if (!live && this._walls && this._walls.m === m && this._walls.key === key && this._walls.pal === this.pal) { g.drawImage(this._walls.c, 0, 0); return; }
       let t = g, c = null;
@@ -179,7 +182,7 @@
       R.forEach((r, k) => {
         const q = Q[k % Q.length], ox = q[0] * off, oy = q[1] * off, px = c => this.X(C[c].center[0] + ox * 0.6), py = c => this.Y(C[c].center[1] + oy * 0.6);
         g.globalAlpha = r.done && r.path ? 0.35 : 0.6; g.fillStyle = r.col; g.beginPath();
-        for (const i of r.list) { const x = this.X(C[i].center[0] + ox), y = this.Y(C[i].center[1] + oy); g.moveTo(x + rad, y); g.arc(x, y, rad, 0, TAU); }
+        if (!this.hideList) for (const i of r.list) { const x = this.X(C[i].center[0] + ox), y = this.Y(C[i].center[1] + oy); g.moveTo(x + rad, y); g.arc(x, y, rad, 0, TAU); }
         g.fill(); g.globalAlpha = 1;
         if (!r.done) { // staart
           busy = true;
@@ -286,6 +289,15 @@
       const st = this.stateOf(m, vs, now), hp = this.hp, life = M && vs.life ? now : 0;
       let busy = false;
 
+      // camera (Kijken: inzoomen op het doel / nieuw doolhof groeit uit het midden). cam = { x, y, z, px, py }
+      if (vs.cam && !this.noWalls) {
+        const c = vs.cam, fx = c.x == null ? cv.width / 2 : this.X(c.x), fy = c.y == null ? cv.height / 2 : this.Y(c.y);
+        g.translate(c.px == null ? cv.width / 2 : c.px, c.py == null ? cv.height / 2 : c.py); g.scale(c.z, c.z); g.translate(-fx, -fy);
+      }
+      // maquette-bouw: bij geanimeerd bouwen klappen alle muren eerst omhoog (pop-upboek)
+      this.rise = null;
+      if (M && vs.riseT != null) { const e = (now - vs.riseT) / 0.9; if (e < 1) { this.rise = Math.max(0, FX.spring(Math.max(0, e))); busy = true; } }
+
       // eindscène: camera zoomt even uit, route licht op in één golf
       let endE = null;
       if (vs.endT != null) {
@@ -313,7 +325,7 @@
       }
 
       // bezochte cellen: kleur naar volgorde; verse cellen ploppen op als rimpel
-      if (vs.order && vs.nOrder > 0) {
+      if (vs.order && vs.nOrder > 0 && !vs.noVisit) {
         const grad = this.grad(), gr = this._gradRGB, buckets = Array.from({ length: BUCKETS }, () => []);
         const vt = vs.vt, side = vs.side, cut = now - A.RIP;
         const bucketOf = i => { let b = Math.min(BUCKETS - 1, Math.floor(vs.order[i] / vs.nOrder * BUCKETS)); if (side && side[i]) b = BUCKETS - 1 - b; return b; };
@@ -379,6 +391,11 @@
         }
       }
 
+      // eigen vloerlaag (zwerm, voetstappen, thema-leven): onder de muren
+      if (vs.theme) busy = vs.theme.floor(g, this, now) || busy;
+      if (vs.floorFx) busy = vs.floorFx(g, this, now) || busy;
+      if (ML.V2) busy = ML.V2.layers('floor', g, this, m, vs, now) || busy;
+
       // doodlopers dichten: gevulde cellen
       if (vs.dead) {
         const d = [];
@@ -399,15 +416,32 @@
       // muren (+ veer-animatie bij openen/sluiten tijdens bouwen)
       const anim = vs.wallAnim;
       g.lineCap = 'round'; g.lineJoin = 'round';
-      if (M) { this.maqWalls(g, m, anim, !!vs.inMaze); g.save(); g.translate(0, -hp); }
-      else {
+      if (M) {
+        if (!this.noWalls) this.maqWalls(g, m, anim, !!vs.inMaze);
+        if (anim && anim.size && !this.noWalls) { // maquette: muur klapt neer (openen) of klapt veerkrachtig omhoog (bouwen)
+          const lw2 = Math.max(1.2, s * M.w), H0 = hp * (this.rise != null ? this.rise : 1);
+          g.save(); g.lineCap = 'square'; g.lineWidth = lw2;
+          for (const [wi, a] of anim) {
+            const x = (now - a.t0) / A.WALL;
+            if (x >= 1 || x < 0) continue;
+            busy = true;
+            const f = FX.spring(x), h = Math.max(0, H0 * (a.dir < 0 ? 1 - FX.easeOut(x) : f)), p = new Path2D();
+            this.segPath(p, W[wi]);
+            for (let k = 0; k < h; k += Math.max(1, hp / 6)) { g.save(); g.translate(0, -k); g.strokeStyle = M.side; g.stroke(p); g.restore(); }
+            g.save(); g.translate(0, -h); g.strokeStyle = M.top; g.stroke(p); g.restore();
+          }
+          g.restore();
+        }
+        g.save(); g.translate(0, -hp);
+      }
+      else if (!this.noWalls) {
         g.strokeStyle = P.wall; g.lineWidth = lw;
         g.beginPath();
         for (const w of W) if (!w.open && !w.stair && !(anim && anim.has(w.i))) this.segPath(g, w);
         g.stroke();
       }
-      if (anim && anim.size) {
-        g.strokeStyle = M ? M.top : P.wall;
+      if (anim && anim.size && !M && !this.noWalls) {
+        g.strokeStyle = P.wall;
         for (const [wi, a] of anim) {
           const x = (now - a.t0) / A.WALL;
           if (x >= 1 || x < 0) continue;
@@ -558,8 +592,14 @@
       if (vs.path && vs.path.length > 1) {
         const path = vs.path, L = path.length - 1, fpos = Math.min(L, (vs.pathT == null ? 1 : vs.pathT) * L);
         const upto = Math.floor(fpos), frac = fpos - upto, jumps = [];
-        g.strokeStyle = P.path; g.lineWidth = Math.max(2, s * (M ? M.pathW : 0.22)); g.globalAlpha = vs.player != null ? (M ? 0.8 : 0.55) : 1;
-        if (P.glow) { g.shadowColor = P.path; g.shadowBlur = Math.min(24, s * 0.7); }
+        // na de eindgolf vervaagt de oplossing rustig naar een zachte schaduw (niet bij zelf spelen)
+        let pk = 1;
+        if (vs.endT != null && vs.player == null) {
+          const e = (now - vs.endT - PATH_FADE_AT) / PATH_FADE;
+          if (e > 0) { pk = 1 - (1 - PATH_FADE_TO) * FX.easeInOut(Math.min(1, e)); if (e < 1) busy = true; }
+        }
+        g.strokeStyle = P.path; g.lineWidth = Math.max(2, s * (M ? M.pathW : 0.22)); g.globalAlpha = (vs.player != null ? (M ? 0.8 : 0.55) : 1) * pk;
+        if (P.glow) { g.shadowColor = P.path; g.shadowBlur = Math.min(24, s * 0.7) * pk; }
         if (M) { g.shadowColor = 'rgba(60,30,10,0.3)'; g.shadowOffsetX = s * 0.05; g.shadowOffsetY = s * 0.08; } // rode draad met eigen schaduwtje
         g.beginPath();
         for (let i = 0; i <= upto; i++) {
@@ -594,7 +634,9 @@
         }
       }
 
+      this.headPos = headPos || (vs.cur != null && vs.cur >= 0 && C[vs.cur] ? C[vs.cur].center : null);
       // race: per deelnemer eigen hoekje in de cel (speldjes), eigen spoor, kop en route
+      this.hideList = !!vs.noVisit;
       if (vs.race) busy = this.drawRace(g, m, vs.race, now, lw) || busy;
 
       // komeet-staart van de zoeker
@@ -631,6 +673,14 @@
 
       // deeltjes
       if (vs.fx && vs.fx.length) { FX.draw(g, vs.fx, x => this.X(x), y => this.Y(y), s); busy = true; }
+      // eigen bovenlaag (thema-leven, licht/donker); maquette: staat op halve muurhoogte
+      if (vs.theme) busy = vs.theme.top(g, this, now) || busy;
+      if (vs.topFx) busy = vs.topFx(g, this, now) || busy;
+      if (ML.V2) {
+        busy = ML.V2.layers('top', g, this, m, vs, now) || busy;
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        if (!this.noWalls) busy = ML.V2.layers('screen', g, this, m, vs, now) || busy;
+      }
       return busy;
     }
   };

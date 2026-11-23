@@ -1,7 +1,7 @@
 // Doolhof-model: algemene graaf van cellen (vloer) en muren.
 // Elk element heeft id + type + asset-naam: koppelpunt voor 3D-modellen later.
 // Coördinaten: 1 eenheid = celbreedte. 2D: x rechts, y omlaag. 3D: x→x, y→z, level→hoogte.
-(function (ML) {
+(window.MLDEF = window.MLDEF || []).push(function (ML) { // MLDEF: ook in de Web Worker (evo.js Pool)
   'use strict';
   const SQ3 = Math.sqrt(3);
   const TAU = Math.PI * 2;
@@ -336,10 +336,28 @@
     });
   };
 
+  // Leeg raster hangt niet van het zaadje af (behalve trappen/brede gangen) → sjabloon bewaren en klonen (Evolutie bouwt er honderden per seconde)
+  const tplCache = new Map();
+  function cloneMaze(t) {
+    const n = t.cells.length;
+    return Object.assign({}, t, {
+      cells: t.cells.map(c => Object.assign({}, c, { nbrs: c.nbrs.slice() })),
+      walls: t.walls.map(w => Object.assign({}, w)), bounds: Object.assign({}, t.bounds),
+      keys: [], keyAt: new Int8Array(n).fill(-1), doors: [], oneways: [], teleporters: [], telePartner: new Int32Array(n).fill(-1),
+      terrain: new Uint8Array(n), cost: new Float32Array(n).fill(1), switches: [], switchAt: new Int8Array(n).fill(-1), swDoors: [], timed: []
+    });
+  }
   ML.makeMaze = function (s, aspect) {
     const size = s.size | 0, torus = !!s.torus && s.grid === 'square';
     const L = Math.max(1, Math.min(4, (s.levels | 0) || 1));
     aspect = s.aspect || aspect || 0.66;
+    if (L > 1 || s.variant === 'wide') return makeMaze0(s, aspect, size, torus, L);
+    const key = [s.grid, size, torus ? 1 : 0, s.shape, s.shape === 'text' ? s.text : '', aspect].join('|');
+    let t = tplCache.get(key);
+    if (!t) { t = makeMaze0(s, aspect, size, torus, L); if (tplCache.size > 24) tplCache.clear(); tplCache.set(key, t); }
+    return cloneMaze(t);
+  };
+  function makeMaze0(s, aspect, size, torus, L) {
     let polys, sq = null, tor = null;
     if (s.grid === 'polar') polys = ML.TOPO.polar(Math.max(3, Math.round(size / 2)));
     else {
@@ -359,7 +377,7 @@
     }
     polys = ML.largestComponent(polys);
     return ML.buildMaze(polys, s.grid, { levels: L, torus: tor, sq, seed: s.seed });
-  };
+  }
 
   // Open doorgang tussen twee cellen (of null).
   ML.edge = function (m, a, b) {
@@ -444,4 +462,4 @@
       solution: m.solution ? m.solution.map(i => C[i].id) : null
     };
   };
-})(window.ML = window.ML || {});
+}); MLDEF[MLDEF.length - 1](window.ML = window.ML || {});

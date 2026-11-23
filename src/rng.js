@@ -1,5 +1,5 @@
 // Zaad-gebaseerde random: zelfde zaadje = zelfde doolhof.
-(function (ML) {
+(window.MLDEF = window.MLDEF || []).push(function (ML) { // MLDEF: ook in de Web Worker (evo.js Pool)
   'use strict';
   function hashStr(s) {
     let h = 1779033703 ^ s.length;
@@ -29,4 +29,4 @@
     return f;
   };
   ML.randomSeed = () => Math.random().toString(36).slice(2, 8);
-})(window.ML = window.ML || {});
+}); MLDEF[MLDEF.length - 1](window.ML = window.ML || {});
