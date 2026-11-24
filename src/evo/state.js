@@ -22,8 +22,8 @@
     msg: '', msgT: 0, seen: new Set(), page: 'algos', sel: null, libQ: '', libFolder: '', libSort: 'score',
     task: null, bench: null, mut: null, duel: null, hunt: null, xp: null, treeSel: null };
   // toneel: panelen + lopers in doolhoven
-  const mkView = name => ({ name, panes: [], runs: null, mazes: [], show: null, phase: 'idle', running: true, firstT: null, endT: 0, t0: 0, forced: null, salt: 0, heatSel: null, champId: null, aspect: 0 });
-  const V = mkView('evo'), T = mkView('task');
+  const mkView = () => ({ panes: [], runs: null, mazes: [], show: null, phase: 'idle', running: true, firstT: null, endT: 0, t0: 0, forced: null, salt: 0, heatSel: null, champId: null, aspect: 0 });
+  const V = mkView(), T = mkView();
 
   const opts = () => ({ grid: A.S.evoGrid, size: A.S.evoSize, braid: A.S.evoBraid, puzzle: A.S.evoPuzzle, makers: A.S.evoMakers });
   const rng = () => ML.makeRng(E.base + '|ga|' + E.gen);
@@ -117,15 +117,15 @@
 
   // ---- alle algoritmes (klassiekers + bibliotheek + kampioen) ----
   // ---- één scoretaal: Score 0–100 (100 = elke keer de kortste route); testbaan = 12 vaste doolhoven × 2 ----
-  // zekerheid: gepaard per testdoolhof (zelfde regel als het mutantenlab: ≥3 doolhoven en verschil ≥ 2× de standaardfout)
-  function sureOf(as, bs) {
+  // zekerheid: gepaard per doolhof, ≥3 doolhoven en verschil ≥ 2× de standaardfout. Testbaan: per = 0–1 (scale 100); mutantenlab: al 0–100 (scale 1)
+  function sureOf(as, bs, scale = 100) {
     const n = Math.min(as ? as.length : 0, bs ? bs.length : 0); if (!n) return { k: 'base', icon: '', txt: '' };
-    const d = []; for (let i = 0; i < n; i++) d.push((as[i] - bs[i]) * 100);
+    const d = []; for (let i = 0; i < n; i++) d.push((as[i] - bs[i]) * scale);
     const m = d.reduce((a, b) => a + b, 0) / n;
     if (Math.abs(m) < 0.05) return { k: 'eq', icon: '🟰', txt: 'even goed' };
     const sd = n > 1 ? Math.sqrt(d.reduce((a, b) => a + (b - m) ** 2, 0) / (n - 1)) : Infinity, se = sd / Math.sqrt(n);
     const sure = n >= 3 && (se === 0 || Math.abs(m) >= 2 * se);
-    if (m > 0) return sure ? { k: 'yes', icon: '✅', txt: 'zeker beter' } : { k: 'maybe', icon: '🤔', txt: 'misschien beter' };
+    if (m > 0) return sure ? { k: 'yes', icon: '✅', txt: 'zeker beter' } : { k: 'maybe', icon: '🤔', txt: n < 3 ? 'misschien beter (nog te weinig doolhoven)' : 'misschien beter' };
     return sure ? { k: 'no', icon: '❌', txt: 'zeker slechter' } : { k: 'maybe', icon: '🤔', txt: 'misschien slechter' };
   }
   const signed = v => v > 0 ? `<em class="up">+${v}</em>` : v < 0 ? `<em class="down">${v}</em>` : '<em>±0</em>';

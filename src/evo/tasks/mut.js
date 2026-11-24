@@ -2,7 +2,7 @@
 (function (ML) {
   'use strict';
   const U = ML.EvoUI._;
-  const { $, A, E, EV, T, TAU, esc, fresh, note, opts, pick, r1 } = U;
+  const { $, A, E, EV, T, TAU, esc, fresh, note, opts, pick, r1, scoreBox, sureOf } = U;
   let duelNow, goalHtml, openTask, saveVersion, setStep, startShow, taskIn, taskOut;
   U.link(() => ({ duelNow, goalHtml, openTask, saveVersion, setStep, startShow, taskIn, taskOut } = U));
 
@@ -16,11 +16,11 @@
 
   function mutMake() {
     const M = E.mut; if (!M) return;
-    const r = ML.makeRng(M.src.name + '|mut|' + Math.random()), G = EV().GENES, f = MUT_STR[M.str] || 0.12;
+    const Ev = EV(), r = ML.makeRng(M.src.name + '|mut|' + Math.random()), G = Ev.GENES, f = MUT_STR[M.str] || 0.12;
     const list = [{ id: 'mut-0', name: M.src.name + (M.auto && M.hist.length ? ' (huidige)' : ' (origineel)'), genes: M.src.genes.slice(), col: '#ffffff', base: true }];
     for (let k = 1; k <= M.n; k++) {
       let genes;
-      do { genes = M.src.genes.map((v, i) => r() < 0.5 ? Math.max(Math.min(G[i].lo, v), Math.min(Math.max(G[i].hi, v), v + Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(TAU * r()) * (G[i].hi - G[i].lo) * f)) : v); } while (genes.join() === M.src.genes.join()); // bereik rekt mee als de bron erbuiten ligt (Kompas: fresh 8)
+      do { genes = M.src.genes.map((v, i) => r() < 0.5 ? Ev.clamp(v + Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(TAU * r()) * (G[i].hi - G[i].lo) * f, i, v) : v); } while (genes.join() === M.src.genes.join()); // bereik rekt mee als de bron erbuiten ligt (Kompas: fresh 8)
       list.push({ id: `mut-${k}`, name: `${M.src.name} m${k}`, genes: genes.map(v => Math.round(v * 100) / 100), col: `hsl(${Math.round(k * 360 / M.n)},85%,62%)` });
     }
     M.list = list; M.sc = list.map(() => []); M.round = 0; M.target = +M.rounds; M.extended = false; M.res = null; M.lead = []; M.pick = 0; M.saved = null; M.saveName = null; M.saveNote = null;
@@ -56,15 +56,6 @@
     return M.list.map((a, k) => { const s = M.sc[k], avg = s.length ? s.reduce((x, y) => x + y, 0) / s.length : 0; return { a, k, s, avg }; })
       .sort((x, y) => y.avg - x.avg);
   }
-  // hoe zeker is "beter dan het origineel"? gepaard per doolhof
-  function mutSure(x, base) {
-    const n = x.s.length, d = x.s.map((v, i) => v - base.s[i]), m = d.reduce((a, b) => a + b, 0) / Math.max(1, n);
-    if (x === base || x.a.base) return { k: 'base', icon: '', txt: '' };
-    if (m <= 0) return { k: 'no', icon: '❌', txt: 'niet beter dan het origineel' };
-    const sd = n > 1 ? Math.sqrt(d.reduce((a, b) => a + (b - m) ** 2, 0) / (n - 1)) : Infinity, se = sd / Math.sqrt(n);
-    if (n >= 3 && (se === 0 || m >= 2 * se)) return { k: 'yes', icon: '✅', txt: 'zeker beter: wint op bijna elk doolhof' };
-    return { k: 'maybe', icon: '🤔', txt: n < 3 ? 'nog onzeker: te weinig doolhoven' : 'nog onzeker: wisselt per doolhof, kan geluk zijn' };
-  }
   function mutDone() {
     const M = E.mut; if (!M || !M.list) return;
     const run = T.runs[0], Ev = EV();
@@ -81,7 +72,7 @@
   function mutFinish() {
     const M = E.mut, Ev = EV();
     const st = mutStand(), base = st.find(x => x.a.base);
-    M.res = st.map(x => ({ ...x, avg: r1(x.avg), t: Ev.testScore(x.a.genes).score, sure: mutSure(x, base) }));
+    M.res = st.map(x => ({ ...x, avg: r1(x.avg), t: Ev.testScore(x.a.genes).score, sure: x.a.base ? sureOf() : sureOf(x.s, base.s, 1) }));
     const w = M.res[0], bAvg = base.avg;
     if (M.auto && M.busy && w.sure.k === 'maybe' && !M.extended) { // twijfel → eerst langer meten
       M.extended = true; M.target += 5; taskOut(); mutRound(); return;
@@ -165,10 +156,12 @@
       const w = M.res[0], base = M.res.find(x => x.a.base), d = r1(w.avg - base.avg), s = w.sure;
       const evolved = M.src.genes.join() !== M.orig0.join();
       if (w.a.base) html += evolved
-        ? `<div class="mut-win"><span class="md">🔁</span><div><b>Doorkweken klaar</b><span>Geen zekere winst meer. Beste gevonden: <b>${esc(M.src.name)}</b>, testbaan ${base.t} (start ${EV().testScore(M.orig0).score}).</span></div></div>`
+        ? `<div class="mut-win"><span class="md">🔁</span><div><b>Doorkweken klaar</b><span>Geen zekere winst meer. Beste gevonden: <b>${esc(M.src.name)}</b>.</span></div></div>`
         : `<div class="mut-win lose"><b>Geen mutant was beter</b><span>Het origineel won met score ${base.avg} over ${played} doolhoven. Probeer opnieuw: de sterkte is al aangepast.</span></div>`;
       else html += `<div class="mut-win ${s.k}"><span class="md">${s.k === 'yes' ? '🏆' : '🤔'}</span><div><b>${esc(w.a.name)}</b><span>score <b>${w.avg}</b> over <b>${played}</b> verschillende doolhoven · origineel ${base.avg} <em class="up">+${d}</em></span><span class="sure">${s.icon} ${esc(s.txt)}</span></div>
         ${s.k === 'maybe' ? '<button class="btn primary" data-ev="mut-more">+5 doolhoven</button>' : ''}</div>`;
+      const wg = !w.a.base ? w.a.genes : evolved ? M.src.genes : null; // winnaar op de testbaan, zelfde scorevak als elders
+      if (wg) html += scoreBox(EV().testScore(wg), null, { name: 'origineel', t: EV().testScore(M.orig0) });
       if (M.strNote) html += `<p class="hint">${M.strNote}</p>`;
       html += `<p class="hint">Score = gemiddelde van R1…R${played}, 0–100 (100 = elke keer de kortste route). Groen = beter dan het origineel op dat doolhof. Testbaan = 12 vaste doolhoven, zelfde maat, ter controle. Klik een rij om die te bewaren. Het doolhof laat de winnaar nog eens rustig lopen.</p>` + mutTable(M.res, true);
       html += autoHtml() + mutSaveBox();
@@ -234,5 +227,5 @@
       duelNow([{ id: 'mut-orig', name: M.root, genes: M.orig0 }, { id: M.saved ? M.saved.id : 'mut-best', name: M.saved ? M.saved.name : x.a.name, genes: x.a.genes }]);
     },
   });
-  Object.assign(U, { MUT_STR, STR_ORDER, MUT_PRESET, AUTO_MAX, mutMake, mutRound, mutRate, mutCheck, mutStand, mutSure, mutDone, mutFinish, canSave, mutIn, mutTable, autoHtml, mutOut, mutSaveBox, mutSave });
+  Object.assign(U, { MUT_STR, STR_ORDER, MUT_PRESET, AUTO_MAX, mutMake, mutRound, mutRate, mutCheck, mutStand, mutDone, mutFinish, canSave, mutIn, mutTable, autoHtml, mutOut, mutSaveBox, mutSave });
 })(window.ML = window.ML || {});

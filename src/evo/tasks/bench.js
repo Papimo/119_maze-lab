@@ -24,10 +24,9 @@
   function benchOut() {
     const B = E.bench; if (!B) return '';
     const t = EV().testScore(B.genes), o = EV().testScore(B.src.genes), d = Math.round((t.score - o.score) * 10) / 10;
-    const sign = signed;
     const w = T.runs && T.runs[0] && T.runs[0].ws[0];
     return `${scoreBox(t, null, d || t.per.join() !== o.per.join() ? { name: 'origineel (' + o.score + ')', t: o } : null)}
-      <div class="cats">${EV().TEST_CATS.map(c => `<span>${esc(c.name)} <b>${t.cats[c.k]}</b> ${sign(Math.round((t.cats[c.k] - o.cats[c.k]) * 10) / 10)}</span>`).join('')}</div>
+      <div class="cats">${EV().TEST_CATS.map(c => `<span>${esc(c.name)} <b>${t.cats[c.k]}</b> ${signed(Math.round((t.cats[c.k] - o.cats[c.k]) * 10) / 10)}</span>`).join('')}</div>
       <p class="hint">Proefrit: ${!w ? '—' : w.reached ? `gehaald in ${w.steps} stappen (kortste ${T.runs[0].mz.ctx.opt})` : w.done ? 'niet gehaald binnen de limiet' : 'bezig…'}</p>
       <div class="btns"><button class="btn" data-ev="bench-duel">Vergelijk met origineel (duel)</button></div>`;
   }

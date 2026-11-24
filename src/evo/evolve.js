@@ -24,7 +24,7 @@
     if (prev && tb.score < EV().testScore(prev.genes).score + 0.5) return; // pas bij ≥ 0,5 winst (anders loopt de bibliotheek vol)
     const a = addAlgo({ name: c.name, genes: c.genes, born: c.born, parents: c.parents || [], parent: prev ? prev.id : null, ver: prev ? (prev.ver || 1) + 1 : 1,
       folder: 'Auto-bewaard', tags: ['auto'], note: `Automatisch bewaard: score ${tb.score} op de testbaan, generatie ${c.gen}.` });
-    if (a) { E.autoA = { id: a.id, name: a.name, s: tb.score }; E.autoN = (E.autoN || 0) + 1; note(`💾 Nieuwe kampioen ${a.name} (${tb.score}) automatisch bewaard.`); if (E.page === 'algos') { algoGrid(); algoDetail(); } }
+    if (a) { E.autoA = { id: a.id, name: a.name, s: tb.score }; note(`💾 Nieuwe kampioen ${a.name} (${tb.score}) automatisch bewaard.`); if (E.page === 'algos') { algoGrid(); algoDetail(); } }
   }
   const stall = () => E.gen - Math.max(E.champ ? E.champ.gen + 1 : 0, E.stopFrom || 0); // generaties zonder nieuw record
   function autoInfo() {
