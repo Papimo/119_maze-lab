@@ -116,6 +116,110 @@ button.pick.on { background: rgba(106, 212, 138, 0.16); border-color: var(--pick
 #fbig .fview { cursor: default; border-radius: 8px; }
 #fbig .ctl { display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 14px; flex-wrap: wrap; justify-content: center; max-width: 1280px; }
 #fbig .ctl .cap { color: var(--text); flex: 1 1 420px; }
+
+/* 5 · Scores (mock-ups in de echte app-kleuren) */
+.sgrid { display: flex; flex-direction: column; gap: 22px; }
+.scard { background: var(--card); border: 1px solid var(--line); border-radius: 14px; display: grid; grid-template-columns: minmax(0, 1fr) 290px; overflow: hidden; }
+.scard.picked { border-color: var(--pick); box-shadow: 0 0 0 2px rgba(106, 212, 138, 0.35); }
+@media (max-width: 1100px) { .scard { grid-template-columns: 1fr; } }
+.scard .side { padding: 14px 16px 15px; display: flex; flex-direction: column; gap: 8px; border-left: 1px solid var(--line); }
+.scard h3 { margin: 0; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+.scard h3 .num { font: 600 12px/1 ui-monospace, monospace; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+.scard p { margin: 0; color: var(--muted); font-size: 14px; }
+.scard ul { margin: 0; padding-left: 18px; font-size: 14px; } .scard ul li { margin: 2px 0; }
+.scard .foot { display: flex; gap: 8px; margin-top: auto; padding-top: 6px; flex-wrap: wrap; }
+.smock { overflow-x: auto; background: #0d1117; }
+#sbig { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.9); display: none; z-index: 60; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px; }
+#sbig.on { display: flex; }
+#sbig .stage { position: relative; width: 1000px; max-width: 100%; overflow: auto; border-radius: 8px; background: #0d1117; }
+#sbig .lay { width: 1000px; } #sbig .lay.top { position: absolute; left: 0; top: 0; }
+#sbig .knife { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 8px #000; pointer-events: none; z-index: 3; }
+#sbig .knife span { position: absolute; top: 6px; font: 600 12px system-ui; background: rgba(0,0,0,.7); color: #fff; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+#sbig .knife .l { right: 8px; } #sbig .knife .r { left: 8px; }
+#sbig .ctl { display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 14px; flex-wrap: wrap; justify-content: center; }
+#sbig input[type=range] { width: min(60vw, 520px); }
+
+.sapp { --bg: #0d1117; --panel: #151b23; --line: #263040; --text: #dbe4ee; --muted: #8b98a8; --accent: #ffd166; --field: #0f141b; --blue: #4cc9f0;
+  width: 1000px; padding: 16px; display: grid; grid-template-columns: 380px 1fr; gap: 16px; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.sapp .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.sapp .pn { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; position: relative; }
+.sapp .lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 6px; display: flex; align-items: center; gap: 6px; }
+.sapp .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sapp .acard { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.sapp .ac-top { display: flex; align-items: center; gap: 6px; font-size: 13px; } .sapp .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+.sapp .ac-sub { color: var(--muted); font-size: 11px; }
+/* huidig */
+.sapp .ac-sc { display: flex; align-items: center; gap: 8px; }
+.sapp .ac-sc > b { font-size: 24px; color: var(--blue); font-variant-numeric: tabular-nums; line-height: 1; }
+.sapp .ac-sc span { font-size: 11px; color: var(--muted); line-height: 1.35; }
+.sapp .classic .ac-sc > b { color: var(--text); }
+.sapp .evo-score { display: flex; gap: 10px; align-items: center; }
+.sapp .evo-score > b { font-size: 30px; line-height: 1; color: var(--blue); font-variant-numeric: tabular-nums; }
+.sapp .evo-score > span { font-size: 11px; color: var(--muted); line-height: 1.3; }
+.sapp em { font-style: normal; font-weight: 700; } .sapp .up { color: #80ed99; } .sapp .down { color: #ff6b6b; }
+.sapp .sure { display: inline-block; font-size: 10.5px; padding: 0 6px; border-radius: 9px; border: 1px solid var(--line); white-space: nowrap; color: var(--muted); }
+.sapp .sure.yes { color: #80ed99; border-color: #80ed9966; } .sapp .sure.maybe { color: #ffd166; border-color: #ffd16666; }
+.sapp .erow { display: grid; grid-template-columns: 18px 12px 1fr auto; grid-template-areas: "p s n c" "p s b b"; gap: 1px 6px; align-items: center; padding: 5px 6px; border-radius: 7px; font-size: 12px; }
+.sapp .erow.live { box-shadow: inset 0 0 0 1px var(--accent); }
+.sapp .erow .pos { grid-area: p; color: var(--muted); text-align: right; } .sapp .erow .sw { grid-area: s; }
+.sapp .erow .nm { grid-area: n; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .sapp .erow.classic .nm { font-weight: 400; }
+.sapp .erow .sc { grid-area: c; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--blue); }
+.sapp .erow .bar { grid-area: b; height: 4px; border-radius: 2px; background: var(--field); overflow: hidden; }
+.sapp .erow .bar i { display: block; height: 100%; background: var(--blue); opacity: .7; } .sapp .erow.classic .bar i { background: var(--muted); }
+.sapp .erow .mt { grid-area: b; min-width: 0; }
+.sapp table.duel { border-collapse: collapse; font-size: 12px; width: 100%; font-variant-numeric: tabular-nums; }
+.sapp .duel th, .sapp .duel td { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+.sapp .duel thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
+.sapp .duel th small, .sapp .duel td small { display: block; font-weight: 400; color: var(--muted); font-size: 10px; }
+.sapp .duel td.worse { color: #ff6b6b; font-weight: 700; }
+.sapp .duel td.acts button { background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 0 5px; font-size: 11px; }
+.sapp .hint { color: var(--muted); font-size: 11.5px; margin: 0 0 6px; }
+/* ⓘ */
+.sapp details.inf { display: inline-block; position: relative; text-transform: none; letter-spacing: 0; }
+.sapp details.inf summary { list-style: none; cursor: pointer; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--muted); color: var(--muted); font: 600 10.5px/14px Georgia, serif; text-align: center; font-style: italic; }
+.sapp details.inf summary::-webkit-details-marker { display: none; }
+.sapp details.inf[open] summary { background: var(--accent); color: #1a1405; border-color: var(--accent); }
+.sapp details.inf > div { position: absolute; z-index: 5; left: -8px; top: 22px; width: 280px; background: #1d2530; border: 1px solid #3a4658; border-radius: 9px; padding: 9px 11px; font-size: 12px; line-height: 1.45; color: var(--text); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+.sapp details.inf > div b { color: var(--accent); } .sapp details.inf > div p { margin: 5px 0 0; color: var(--muted); }
+/* gedeeld nieuw */
+.sapp .num { font-variant-numeric: tabular-nums; font-weight: 800; line-height: 1; }
+.sapp .of { color: var(--muted); font-size: .45em; font-weight: 600; margin-left: 2px; }
+.sapp .word { font-weight: 700; font-size: 12px; white-space: nowrap; }
+.sapp .pill { display: inline-block; font-weight: 700; font-size: 11px; padding: 1px 8px; border-radius: 99px; white-space: nowrap; }
+.sapp .cmp { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+.sapp .hv { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 11.5px; color: var(--muted); }
+.sapp .hv .num { font-size: 18px; }
+.sapp .sbig { display: flex; align-items: center; gap: 12px; }
+/* 1 thermometer */
+.m1 { position: relative; height: 8px; border-radius: 99px; background: #1c2430; margin: 4px 0; }
+.m1 > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; background: linear-gradient(90deg, #ff6b6b 0%, #ff9f5a 25%, #ffd166 50%, #a7e06b 72%, #4fd18b 100%); }
+.m1 > u { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #dbe4ee; opacity: .55; border-radius: 1px; }
+.m1.sm { height: 5px; margin: 2px 0; } .m1.sm > u { top: -2px; bottom: -2px; width: 1.5px; }
+.tk { position: relative; height: 14px; font-size: 10px; color: var(--muted); }
+.tk span { position: absolute; transform: translateX(-50%); white-space: nowrap; } .tk span.r { transform: translateX(-100%); } .tk span.l { transform: none; }
+/* 2 treden */
+.m2 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; position: relative; margin: 4px 0; }
+.m2 > i { height: 10px; border-radius: 3px; background: #1c2430; position: relative; overflow: hidden; }
+.m2 > i > b { position: absolute; left: 0; top: 0; bottom: 0; }
+.m2 > u { position: absolute; top: -5px; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid #dbe4ee; transform: translateX(-4px); opacity: .8; }
+.m2.sm { gap: 2px; } .m2.sm > i { height: 6px; border-radius: 2px; }
+.m2w { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; font-size: 9.5px; color: #5d6a7c; text-align: center; }
+.m2w b { font-weight: 700; }
+/* 3 kleurgetal */
+.m3 { position: relative; height: 3px; background: #1c2430; border-radius: 2px; margin: 5px 0 3px; }
+.m3 > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; }
+.m3 > u { position: absolute; top: -3px; bottom: -3px; width: 1px; background: #8b98a8; }
+/* 4 wijzer */
+.m4 { display: block; }
+/* 5 ladder */
+.m5 { position: relative; height: 34px; margin: 2px 4px 0; }
+.m5 .ln { position: absolute; left: 0; right: 0; top: 16px; height: 2px; background: linear-gradient(90deg, #ff6b6b, #ffd166 50%, #4fd18b); opacity: .45; border-radius: 1px; }
+.m5 .dt { position: absolute; top: 13px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: #8b98a8; border: 1px solid #0d1117; }
+.m5 .me { position: absolute; top: 9px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; border: 2px solid #0d1117; box-shadow: 0 0 0 2px currentColor; transition: left .2s; }
+.m5 .lb { position: absolute; font-size: 9.5px; color: var(--muted); white-space: nowrap; transform: translateX(-50%); }
+.m5 .lb.up { top: 0; } .m5 .lb.dn { top: 23px; }
+.m5.sm { height: 12px; margin: 2px 2px 0; } .m5.sm .ln { top: 5px; } .m5.sm .dt { top: 3px; width: 6px; height: 6px; margin-left: -3px; } .m5.sm .me { top: 1px; width: 10px; height: 10px; margin-left: -5px; border-width: 1.5px; box-shadow: 0 0 0 1.5px currentColor; }
+.sapp .where { font-size: 11.5px; color: var(--text); }
 </style>
 </head>
 <body>
@@ -123,7 +227,7 @@ button.pick.on { background: rgba(106, 212, 138, 0.16); border-color: var(--pick
   <header class="page">
     <h1>Maze Lab · kijkplezier</h1>
     <p>Alles draait live in de echte tekencode van de app (<code>src/render2d.js</code>, maquette-stijl) op een echt doolhof met een paar lussen. Klik een beeld om het groot te bekijken met een schuif tussen Huidig en die optie. Kies onderaan en plak de tekst in de chat. Eerdere keuzes (stijl, varianten): <a href="v03-stijl-varianten.html">v0.3-ontwerp</a>.</p>
-    <nav class="toc"><a href="#s1">1 · Zwerm</a><a href="#s2">2 · Voetstappen</a><a href="#s3">3 · Thema's met leven</a><a href="#s4">4 · Workflow Evolutie</a></nav>
+    <nav class="toc"><a href="#s1">1 · Zwerm</a><a href="#s2">2 · Voetstappen</a><a href="#s3">3 · Thema's met leven</a><a href="#s4">4 · Workflow Evolutie</a><a href="#s5">5 · Scores</a></nav>
   </header>
   <div class="row">
     <button id="reseed">Ander doolhof</button>
@@ -149,8 +253,16 @@ button.pick.on { background: rgba(106, 212, 138, 0.16); border-color: var(--pick
   <p class="lead">Alleen opbouw en volgorde: welk scherm wanneer, welke stap, wat je ziet tijdens en na een actie. Stijl blijft zoals hij is (de wireframes zijn bewust kaal). Elk voorstel is klikbaar: knoppen met ▸ gaan naar het volgende scherm, of kies een stap rechts. Groot bekijken = ware grootte (1280×800), pijltjestoetsen bladeren. Mengen mag (bv. tabs + tijdlijn). In alle richtingen behalve 0 krijgt het mutantenlab een stopregel (“stop zodra 3 binnen zijn of na 10 s, kansloze afkappen”) en een zichtbare “wacht op…”.</p>
   <div class="row"><span class="label">Opmerking bij je keuze</span><input id="flowNote" placeholder="bv. tabs, maar mutanten als tijdlijnkaart" style="flex:1;min-width:240px;font:inherit;font-size:14px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card2);color:var(--text)"></div>
   <div class="fgrid" id="g4"></div>
+
+  <h2 class="sec" id="s5">5 · Scores duidelijker</h2>
+  <p class="lead">Elke optie doet alle vijf gekozen dingen tegelijk: meter 0–100, woordoordeel (verdwaalt · zwak · redelijk · goed · bijna perfect), ijkpunten Dwaler en Kompas, de doolhof-zoeker toont <b>Moeilijkheid</b> (hoger = moeilijker) en een ⓘ met uitleg. Ware grootte, echte app-kleuren; klik de ⓘ's. De kampioen in de ranglijst groeit en zakt om de meters in beweging te zien. Mengen mag (zeg het in de opmerking).</p>
+  <div class="row"><span class="label">Zware testbaan</span><div class="seg" id="optHeavy"><button data-v="same" class="on">Zelfde oordeel (eerlijk, alles laag)</button><button data-v="rel">Oordeel t.o.v. Kompas</button></div>
+    <span class="label">Beweging</span><div class="seg" id="optLive"><button data-v="1" class="on">Aan</button><button data-v="0">Uit</button></div></div>
+  <div class="row"><span class="label">Opmerking bij je keuze</span><input id="scoreNote" placeholder="bv. thermometer, maar getal gekleurd zoals Kleurgetal" style="flex:1;min-width:240px;font:inherit;font-size:14px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card2);color:var(--text)"></div>
+  <div class="sgrid" id="g5"></div>
 </div>
 
+<div id="sbig"><div class="stage"></div><div class="ctl"><span>Huidig</span><input type="range" id="sSlider" min="0" max="100" value="50"><span id="sName"></span><button id="sClose">Sluiten (Esc)</button></div></div>
 <div id="big">
   <div class="stage"><canvas id="bigA"></canvas><canvas id="bigB"></canvas><div class="knife" id="knife"><span class="l">Huidig</span><span class="r" id="knifeR"></span></div></div>
   <div class="ctl"><span>Huidig</span><input type="range" id="slider" min="0" max="100" value="50"><span id="bigName"></span><button id="bigClose">Sluiten (Esc)</button></div>
@@ -746,6 +858,7 @@ const nameOf = (sec, id) => SECTIONS[sec].opts.find(o => o.id === id).name;
 function marks() {
   for (const t of tiles) { const on = isPicked(t), b = t.el.querySelector('.pick'); t.el.classList.toggle('picked', on); b.classList.toggle('on', on); b.textContent = on ? 'Gekozen' : 'Kies deze'; }
   const th = [...PICK.s3].map(id => nameOf('s3', id));
+  if (window.scoreTxt && window.scoreTxt()) { document.getElementById('barTxt').innerHTML = window.scoreTxt(); return; }
   document.getElementById('barTxt').innerHTML = `Zwerm: <b>${PICK.s1 ? nameOf('s1', PICK.s1) : '—'}</b> · Voetstappen: <b>${PICK.s2 ? nameOf('s2', PICK.s2) : '—'}</b>${PICK.s2 && PICK.s2 !== 'huidig' ? ` (kleur eronder ${OPT.under ? 'aan' : 'uit'})` : ''} · Thema's: <b>${th.length ? th.join(', ') : '—'}</b>` + (window.flowTxt ? window.flowTxt() : '');
 }
 newMaze();
@@ -1053,6 +1166,178 @@ document.getElementById('fClose').onclick = () => fb.classList.remove('on');
 addEventListener('resize', () => fb.classList.contains('on') && sizeBig());
 document.addEventListener('keydown', e => { if (!fb.classList.contains('on')) return; if (e.key === 'Escape') fb.classList.remove('on'); if (e.key === 'ArrowRight') moveF(1); if (e.key === 'ArrowLeft') moveF(-1); });
 markF();
+})();
+</script>
+<script>
+// ---- 5 · Scores: elke optie combineert meter + woordoordeel + ijkpunten + moeilijkheid (zoeker) + ⓘ ----
+(() => {
+const SOPT = { heavy: 'same', live: true };
+const f1 = v => (Math.round(v * 10) / 10).toFixed(1).replace('.0', '').replace('.', ',');
+const BANDS = [{ max: 20, w: 'verdwaalt', c: '#ff6b6b' }, { max: 40, w: 'zwak', c: '#ff9f5a' }, { max: 60, w: 'redelijk', c: '#ffd166' }, { max: 80, w: 'goed', c: '#a7e06b' }, { max: 101, w: 'bijna perfect', c: '#4fd18b' }];
+const HB = [{ max: 20, w: 'makkelijk', c: '#8a96b8' }, { max: 40, w: 'te doen', c: '#9a86d6' }, { max: 60, w: 'pittig', c: '#b072e6' }, { max: 80, w: 'lastig', c: '#d05cdc' }, { max: 101, w: 'heel lastig', c: '#f04fc0' }];
+// echte klassiekers (testbaan uit tests/same.ref.json; zwaar: Dwaler/Kompas echt, rest bij benadering)
+const CL = [['Dwaler', 1.4, 0.6], ['Rechterhand', 24.7, 2.1], ['Linkerhand', 29.3, 2.6], ['Trémaux', 31.6, 6.3], ['Diepte-eerst', 33, 8.9], ['Doodlopers dichten', 33, 7.4], ['Kompas', 53.7, 15.6]];
+const K = { t: 53.7, h: 15.6 }, D = { t: 1.4, h: 0.6 };
+// banden: zwaar 'rel' = geschaald zodat zwaar-Kompas op dezelfde plek valt als op de testbaan
+const bv = (s, h) => h && SOPT.heavy === 'rel' ? Math.min(100, s * K.t / K.h) : s;
+const band = (s, h) => BANDS.find(b => bv(s, h) < b.max);
+const hband = d => HB.find(b => d < b.max);
+const anc = h => [{ s: h ? D.h : D.t, n: 'Dwaler' }, { s: h ? K.h : K.t, n: 'Kompas' }];
+const kom = h => h ? K.h : K.t;
+function where(s, h) {
+  const k = kom(h), others = CL.slice(1, 6).map(c => h ? c[2] : c[1]), top = Math.max(...others);
+  if (s >= 99.5) return 'perfect: altijd de kortste route';
+  if (s > k + 0.05) return `boven Kompas (beste klassieker) · nog ${f1(100 - s)} tot perfect`;
+  if (s > top) return `tussen de klassiekers en Kompas · ${f1(k - s)} onder Kompas`;
+  if (s > (h ? D.h : D.t) + 0.5) return 'bij de gewone klassiekers (hand, Trémaux, diepte-eerst)';
+  return 'zo goed als Dwaler: willekeurig rondlopen';
+}
+const INF = {
+  t: `<b>Score 0–100, hoger = beter.</b> 100 = elke keer de kortste route. Testbaan = 12 vaste doolhoven, elk 2×; iedereen loopt dezelfde, dus scores zijn eerlijk te vergelijken.<p>Ijkpunten: Dwaler (willekeurig) ${f1(D.t)} · Kompas (beste klassieker) ${f1(K.t)}.</p>`,
+  h: () => `<b>Zwaar = zelfde maat, veel moeilijker doolhoven.</b> 8 grote doolhoven met lussen en puzzels; ook Kompas haalt hier maar ${f1(K.h)}.<p>${SOPT.heavy === 'rel' ? 'Het woordoordeel is hier geschaald: zwaar-Kompas krijgt hetzelfde oordeel als op de testbaan.' : 'Zelfde woordoordeel als de testbaan, dus bijna alles is hier “verdwaalt”.'}</p>`,
+  d: `<b>Moeilijkheid = 100 − score op dit doolhof.</b> Hoger = moeilijker doolhof = beter gevonden. Paars, zodat je het niet verwart met een algoritme-score.<p>“voor Kompas”: hoe moeilijk hetzelfde doolhof is voor de beste klassieker.</p>`
+};
+const info = k => `<details class="inf"><summary>i</summary><div>${typeof INF[k] === 'function' ? INF[k]() : INF[k]}</div></details>`;
+
+// ---- meters per optie ----
+const M = {
+  thermo(s, h, sm) {
+    const fill = s > 0.2 ? `<i style="width:${s}%;background-size:${10000 / s}% 100%"></i>` : '';
+    return `<div class="m1${sm ? ' sm' : ''}">${fill}${anc(h).map(a => `<u style="left:${a.s}%" title="${a.n} ${f1(a.s)}"></u>`).join('')}</div>`;
+  },
+  steps(s, h, sm) {
+    const v = bv(s, h), seg = BANDS.map((b, i) => { const lo = i * 20, p = Math.max(0, Math.min(1, (v - lo) / 20)); return `<i>${p ? `<b style="width:${p * 100}%;background:${band(s, h).c}"></b>` : ''}</i>`; }).join('');
+    return `<div class="m2${sm ? ' sm' : ''}">${seg}${sm ? '' : `<u style="left:${bv(kom(h), h)}%" title="Kompas"></u>`}</div>`;
+  },
+  color(s, h) { const b = band(s, h); return `<div class="m3"><i style="width:${s}%;background:${b.c}"></i>${anc(h).map(a => `<u style="left:${a.s}%"></u>`).join('')}</div>`; },
+  gauge(s, h, sz) {
+    sz = sz || 120; const r = sz * 0.4, cx = sz / 2, cy = sz * 0.48, w = sz * 0.09, P = v => { const a = Math.PI * (1 - v / 100); return [cx + r * Math.cos(a), cy - r * Math.sin(a)]; };
+    const arc = (a, b, c) => { const p = P(a), q = P(b); return `<path d="M${p[0]} ${p[1]} A${r} ${r} 0 0 1 ${q[0]} ${q[1]}" stroke="${c}" stroke-width="${w}" fill="none" opacity="${a < bv(s, h) ? 1 : 0.22}"/>`; };
+    const n = P(bv(s, h)), kp = P(bv(kom(h), h)), ka = Math.PI * (1 - bv(kom(h), h) / 100);
+    const k0 = [cx + (r + w * 0.8) * Math.cos(ka), cy - (r + w * 0.8) * Math.sin(ka)];
+    return `<svg class="m4" width="${sz}" height="${sz * 0.56}" viewBox="0 0 ${sz} ${sz * 0.56}">${BANDS.map((b, i) => arc(i * 20 + 0.6, i * 20 + 19.4, b.c)).join('')}
+      <line x1="${kp[0]}" y1="${kp[1]}" x2="${k0[0]}" y2="${k0[1]}" stroke="#dbe4ee" stroke-width="1.5"><title>Kompas</title></line>
+      <line x1="${cx}" y1="${cy}" x2="${n[0]}" y2="${n[1]}" stroke="#dbe4ee" stroke-width="${Math.max(1.5, sz / 50)}" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="${sz / 28}" fill="#dbe4ee"/></svg>`;
+  },
+  ladder(s, h, sm, me) {
+    const dots = CL.map(c => `<i class="dt" style="left:${h ? c[2] : c[1]}%" title="${c[0]}"></i>`).join('');
+    const lbl = sm ? '' : `<span class="lb dn" style="left:${Math.max(3, h ? D.h : D.t)}%">Dwaler</span><span class="lb up" style="left:${h ? 6 : 30}%">5 klassiekers</span><span class="lb dn" style="left:${kom(h)}%">Kompas</span><span class="lb dn" style="left:97%">perfect</span>`;
+    return `<div class="m5${sm ? ' sm' : ''}"><i class="ln"></i>${dots}${lbl}<i class="me" style="left:${s}%;color:${band(s, h).c};background:${band(s, h).c}" title="${me || ''} ${f1(s)}"></i></div>`;
+  }
+};
+const tickRow = h => `<div class="tk">${anc(h).map((a, i) => `<span class="${i === 0 ? 'l' : ''}" style="left:${a.s}%">${a.n} ${f1(a.s)}</span>`).join('')}<span class="r" style="left:100%">100 = perfect</span></div>`;
+
+// ---- voorbeelddata ----
+const SW = { mine: '#c77dff', mol: '#4cc9f0', live: '#ffd166', k: '#8b98a8' };
+function data(t) {
+  const ph = SOPT.live ? (1 - Math.cos(t / 1600)) / 2 : 0.8;   // kampioen groeit en zakt rustig
+  const live = 24 + ph * 48;
+  return {
+    sel: { name: 'Slinger v3', t: 61.2, h: 18.4, solved: 24, of: 24, d: 7.5 },
+    cards: [{ name: 'Slinger v3', sw: SW.mine, t: 61.2, h: 18.4, s: '24/24', sub: 'eigen · map Snel' }, { name: 'Kompas', sw: SW.k, t: 53.7, h: 15.6, s: '24/24', sub: 'klassiek', classic: 1 }],
+    rows: [{ name: 'Slinger v3', sw: SW.mine, t: 61.2 }, { name: 'Kampioen gen 412', sw: SW.live, t: live, live: 1 }, { name: 'Kompas', sw: SW.k, t: 53.7, classic: 1 }, { name: 'Mol', sw: SW.mol, t: 47.9 }, { name: 'Trémaux', sw: SW.k, t: 31.6, classic: 1 }, { name: 'Dwaler', sw: SW.k, t: 1.4, classic: 1 }].sort((a, b) => b.t - a.t),
+    hunt: [{ n: 'Ringen 14 · sleutel', m: 'groei · kortste 61', sc: 12.3, cb: 31.0 }, { n: 'Torus · tijddeuren', m: 'kruskal · kortste 88', sc: 3.1, cb: 9.8 }, { n: 'Zeshoek · lussen', m: 'prim · kortste 44', sc: 44.0, cb: 40.2 }, { n: 'Driehoek · kamers', m: 'eller · kortste 52', sc: 67.5, cb: 58.1 }]
+  };
+}
+
+// ---- weergaven: box (scorevak), card, row, hunt-cel ----
+const V = {};
+V.huidig = {
+  box: a => `<div class="evo-score"><b>${f1(a.t)}</b><span>Score · testbaan<br>${a.solved}/${a.of} gehaald<br><em class="up">+${f1(a.d)}</em> t.o.v. Kompas <span class="sure yes">✅ zeker beter</span></span><b style="color:#4cc9f0">${f1(a.h)}</b><span>Score<br>zwaar</span></div>`,
+  card: c => `<div class="acard${c.classic ? ' classic' : ''}"><div class="ac-top"><i class="sw" style="background:${c.sw}"></i><b>${c.name}</b></div><div class="ac-sc"><b>${f1(c.t)}</b><span>score · ${c.s}<br>zwaar ${f1(c.h)}</span></div><small class="ac-sub">${c.sub}</small></div>`,
+  row: (r, i) => `<div class="erow${r.classic ? ' classic' : ''}${r.live ? ' live' : ''}"><span class="pos">${i + 1}</span><i class="sw" style="background:${r.sw}"></i><span class="nm">${r.name}</span><span class="sc">${f1(r.t)}</span><div class="bar"><i style="width:${r.t}%"></i></div></div>`,
+  huntHead: () => `<p class="hint">4 doolhoven gevonden. Score = gemiddelde van 3 runs (0–100); lager = moeilijker. Rood = slechter dan de beste klassieker.</p><table class="duel"><thead><tr><th>Doolhof</th><th>Score</th><th>Klassiek</th><th></th></tr></thead><tbody>`,
+  hunt: f => `<tr><th>${f.n}<small>${f.m}</small></th><td class="${f.sc < f.cb ? 'worse' : ''}">${f1(f.sc)}</td><td>${f1(f.cb)}<small>Kompas</small></td><td class="acts"><button>▶</button> <button>vs</button></td></tr>`,
+  noInfo: true
+};
+// gedeelde opbouw voor de nieuwe opties; elke optie kiest meter + getalstijl
+function mk(o) {
+  const numHtml = (s, h, size) => { const b = band(s, h); return `<span class="num" style="font-size:${size}px;color:${o.colorNum ? b.c : '#dbe4ee'}">${f1(s)}<span class="of">/100</span></span>`; };
+  const wordHtml = (s, h) => { const b = band(s, h); return o.pill ? `<span class="pill" style="background:${b.c}22;color:${b.c};border:1px solid ${b.c}66">${b.w}</span>` : `<span class="word" style="color:${b.c}">${b.w}</span>`; };
+  const meter = (s, h, sm, nm) => o.meter === 'gauge' ? M.gauge(s, h, sm ? 46 : 120) : M[o.meter](s, h, sm, nm);
+  const hmeter = d => { const b = hband(d);
+    if (o.meter === 'gauge') return `<span style="display:inline-block;width:46px;height:5px;border-radius:3px;background:#1c2430;vertical-align:middle"><i style="display:block;height:100%;width:${d}%;background:${b.c};border-radius:3px"></i></span>`;
+    if (o.meter === 'steps') return `<div class="m2 sm" style="width:90px">${HB.map((x, i) => `<i>${d > i * 20 ? `<b style="width:${Math.min(1, (d - i * 20) / 20) * 100}%;background:${b.c}"></b>` : ''}</i>`).join('')}</div>`;
+    return `<div class="m3" style="width:90px;height:4px"><i style="width:${d}%;background:${b.c}"></i></div>`; };
+  return {
+    box: a => `${o.meter === 'gauge' ? `<div class="sbig">${M.gauge(a.t, false, 120)}<div>${numHtml(a.t, false, 34)}<div style="margin-top:4px">${wordHtml(a.t, false)}</div></div></div>`
+        : `<div class="sbig">${numHtml(a.t, false, 34)}${wordHtml(a.t, false)}</div>${meter(a.t, false, false, a.name)}${o.meter === 'ladder' ? '' : tickRow(false)}`}
+      ${o.meter === 'ladder' || o.where ? `<div class="where">${where(a.t, false)}</div>` : ''}
+      <div class="cmp">${a.solved}/${a.of} gehaald · <em class="up">+${f1(a.d)}</em> t.o.v. Kompas <span class="sure yes">✅ zeker beter</span></div>
+      <div class="hv"><span>Zwaar ${info('h')}</span>${numHtml(a.h, true, 18)}${wordHtml(a.h, true)}<span style="flex:1;min-width:60px">${o.meter === 'gauge' ? M.gauge(a.h, true, 46) : meter(a.h, true, true)}</span></div>`,
+    card: c => `<div class="acard${c.classic ? ' classic' : ''}"><div class="ac-top"><i class="sw" style="background:${c.sw}"></i><b>${c.name}</b></div>
+      ${o.meter === 'gauge' ? `<div style="display:flex;align-items:center;gap:6px">${M.gauge(c.t, false, 58)}<div>${numHtml(c.t, false, 22)}<div>${wordHtml(c.t, false)}</div></div></div>` : `<div style="display:flex;align-items:baseline;gap:7px;flex-wrap:wrap">${numHtml(c.t, false, 22)}${wordHtml(c.t, false)}</div>${meter(c.t, false, true, c.name)}`}
+      <small class="ac-sub">${c.s} gehaald · zwaar ${f1(c.h)} <span style="color:${band(c.h, true).c}">${band(c.h, true).w}</span> · ${c.sub}</small></div>`,
+    row: (r, i) => { const b = band(r.t, false); return `<div class="erow${r.classic ? ' classic' : ''}${r.live ? ' live' : ''}"><span class="pos">${i + 1}</span><i class="sw" style="background:${r.sw}"></i><span class="nm">${r.name}</span><span class="sc" style="color:${o.colorNum ? b.c : '#dbe4ee'}">${f1(r.t)} <small style="font-weight:600;color:${b.c};font-size:10.5px">${b.w}</small></span><div class="mt">${o.meter === 'gauge' ? `<div style="height:4px;border-radius:2px;background:#1c2430"><i style="display:block;height:100%;width:${r.t}%;background:${b.c};border-radius:2px"></i></div>` : meter(r.t, false, true, r.name)}</div></div>`; },
+    huntHead: () => `<p class="hint">4 doolhoven gevonden voor <b style="color:#dbe4ee">Slinger v3</b> (gemiddelde van 3 runs). <b style="color:#d05cdc">Hoger = moeilijker doolhof.</b> Rood = moeilijker voor Slinger dan voor Kompas (een zwakke plek).</p><table class="duel"><thead><tr><th>Doolhof</th><th>Moeilijkheid ${info('d')}</th><th>voor Kompas</th><th></th></tr></thead><tbody>`,
+    hunt: f => { const d = 100 - f.sc, dk = 100 - f.cb, b = hband(d), worse = d > dk; return `<tr><th>${f.n}<small>${f.m}</small></th><td><span class="num" style="font-size:15px;color:${worse ? '#ff6b6b' : b.c}">${f1(d)}</span> <small style="display:inline;color:${b.c};font-weight:700">${b.w}</small>${hmeter(d)}</td><td>${f1(dk)}<small>${hband(dk).w}</small></td><td class="acts"><button>▶</button> <button>vs</button></td></tr>`; }
+  };
+}
+V.thermo = mk({ meter: 'thermo', colorNum: false });
+V.steps = mk({ meter: 'steps', colorNum: false, pill: true });
+V.color = mk({ meter: 'color', colorNum: true, pill: true });
+V.gauge = mk({ meter: 'gauge', colorNum: false, where: true });
+V.ladder = mk({ meter: 'ladder', colorNum: true });
+
+function mock(id, t) {
+  const v = V[id], d = data(t), ii = k => v.noInfo ? '' : info(k);
+  return `<div class="sapp"><div class="col">
+    <div class="pn"><div class="lbl">Scorevak (detail) ${ii('t')}</div>${v.box(d.sel)}</div>
+    <div><div class="lbl">Kaarten (Algoritmes)</div><div class="cards">${d.cards.map(v.card).join('')}</div></div>
+  </div><div class="col">
+    <div class="pn"><div class="lbl">Ranglijst (Evolueren) ${ii('t')}</div><div data-live>${d.rows.map(v.row).join('')}</div></div>
+    <div class="pn"><div class="lbl">Doolhof-zoeker</div>${v.huntHead()}${d.hunt.map(v.hunt).join('')}</tbody></table></div>
+  </div></div>`;
+}
+const liveRows = (id, t) => data(t).rows.map(V[id].row).join('');
+
+const SOPTS = [
+  { id: 'huidig', name: 'Huidig', line: 'Zoals het nu is: blauw getal, geen schaal, zoeker zegt “lager = moeilijker”.', pts: ['Wat is goed? Alleen te raden via de hover-titel', 'Zwaar staat los, zonder uitleg dat het veel lager ligt'], tags: [] },
+  { id: 'thermo', name: 'Thermometer', line: 'Balk rood → groen tot het getal, streepjes voor Dwaler en Kompas, woord ernaast.', pts: ['Ijkpunten met naam onder het grote scorevak', 'Klein: zelfde balk, alleen streepjes', 'Getal blijft neutraal wit; kleur zit in balk + woord'], tags: [['low', 'weinig werk'], ['low', '1 helper']] },
+  { id: 'steps', name: 'Vijf treden', line: 'Vijf vakjes = de vijf oordelen; je ziet in welke trede je staat. Woord als label.', pts: ['Banden zijn letterlijk zichtbaar (0–20, 20–40 …)', 'Driehoekje boven = Kompas', 'Grof: 47 en 53 lijken op elkaar (zelfde trede)'], tags: [['low', 'weinig werk'], ['mid', 'minder precies']] },
+  { id: 'color', name: 'Kleurgetal', line: 'Het getal zelf krijgt de bandkleur + label; dunne lijn eronder met ijkstreepjes.', pts: ['Kleinste verandering t.o.v. nu, past overal', 'Kleur alleen is niet genoeg voor kleurenblinden → label blijft', 'Blauw = “eigen algoritme” verdwijnt (kleur = oordeel)'], tags: [['low', 'weinig werk'], ['warn', 'blauw weg']] },
+  { id: 'gauge', name: 'Wijzer', line: 'Halve snelheidsmeter met vijf gekleurde stukken, naald en Kompas-streepje.', pts: ['Direct leesbaar, voelt als een meetinstrument', 'Groot in scorevak/kaart; ranglijst houdt een balkje', 'Zin eronder: waar sta je t.o.v. de klassiekers'], tags: [['mid', 'meer ruimte'], ['mid', 'SVG']] },
+  { id: 'ladder', name: 'Ladder met namen', line: 'Eén lijn met alle klassiekers als stipjes; jij bent de grote stip. “Boven Kompas”.', pts: ['Vergelijking zit in het beeld, niet in een los getal', 'Zin: “boven Kompas · nog 38,8 tot perfect”', 'Druk met namen; klein = alleen stipjes'], tags: [['mid', 'meer werk'], ['low', 'zegt het meest']] }
+];
+let PS = null;
+const scards = [];
+const g = document.getElementById('g5');
+SOPTS.forEach((o, i) => {
+  const el = document.createElement('div'); el.className = 'scard';
+  el.innerHTML = `<div class="smock"></div><div class="side"><h3><span class="num">${i}</span>${o.name}</h3><p>${o.line}</p><ul>${o.pts.map(p => `<li>${p}</li>`).join('')}</ul><div class="tags">${o.tags.map(t => `<span class="tag ${t[0]}">${t[1]}</span>`).join('')}</div><div class="foot"><button class="pick">Kies deze</button>${i ? '<button class="big">Groot: huidig ↔ dit</button>' : ''}</div></div>`;
+  g.appendChild(el); scards.push({ o, el });
+  el.querySelector('.pick').onclick = () => { PS = PS === o.id ? null : o.id; smarks(); };
+  const bb = el.querySelector('.big'); if (bb) bb.onclick = () => openS(o);
+});
+function paintAll() { const t = performance.now(); for (const c of scards) c.el.querySelector('.smock').innerHTML = mock(c.o.id, t); }
+function smarks() {
+  for (const c of scards) { const on = PS === c.o.id, b = c.el.querySelector('.pick'); c.el.classList.toggle('picked', on); b.classList.toggle('on', on); b.textContent = on ? 'Gekozen' : 'Kies deze'; }
+  if (typeof marks === 'function') marks();
+}
+window.scoreTxt = () => { if (!PS) return ''; const extra = (document.getElementById('scoreNote') || {}).value || '';
+  return `Scores: <b>${SOPTS.find(o => o.id === PS).name}</b> · zwaar: <b>${SOPT.heavy === 'rel' ? 'oordeel t.o.v. Kompas' : 'zelfde oordeel'}</b>${extra.trim() ? ` (${extra.trim().replace(/</g, '&lt;')})` : ''}`; };
+document.getElementById('scoreNote').oninput = () => typeof marks === 'function' && marks();
+const segS = (id, fn) => { const el = document.getElementById(id); el.onclick = e => { const b = e.target.closest('button'); if (!b) return; el.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); fn(b.dataset.v); paintAll(); if (sb.on) paintBig(); smarks(); }; };
+segS('optHeavy', v => SOPT.heavy = v);
+segS('optLive', v => SOPT.live = v === '1');
+paintAll(); smarks();
+
+// in beweging: alleen de ranglijst ververst (open ⓘ blijft open)
+setInterval(() => { if (!SOPT.live) return; const t = performance.now();
+  for (const c of scards) { const el = c.el.querySelector('[data-live]'); if (el) el.innerHTML = liveRows(c.o.id, t); }
+  if (sb.on) sbEl.querySelectorAll('.lay').forEach(l => { const el = l.querySelector('[data-live]'); if (el) el.innerHTML = liveRows(l.dataset.id, t); });
+}, 120);
+
+// groot: huidig ↔ optie met schuif
+const sbEl = document.getElementById('sbig'), sb = { on: false, o: null };
+function paintBig() { const t = performance.now(), st = sbEl.querySelector('.stage');
+  st.innerHTML = `<div class="lay" data-id="huidig">${mock('huidig', t)}</div><div class="lay top" data-id="${sb.o.id}">${mock(sb.o.id, t)}</div><div class="knife"><span class="l">Huidig</span><span class="r">${sb.o.name}</span></div>`; clipS(); }
+function clipS() { const v = +document.getElementById('sSlider').value, st = sbEl.querySelector('.stage');
+  st.querySelector('.top').style.clipPath = `inset(0 0 0 ${v}%)`; st.querySelector('.knife').style.left = v + '%'; }
+function openS(o) { sb.on = true; sb.o = o; sbEl.classList.add('on'); document.getElementById('sName').textContent = o.name; paintBig(); }
+document.getElementById('sSlider').oninput = clipS;
+document.getElementById('sClose').onclick = () => { sb.on = false; sbEl.classList.remove('on'); };
+document.addEventListener('keydown', e => { if (sb.on && e.key === 'Escape') { sb.on = false; sbEl.classList.remove('on'); } });
 })();
 </script>
 </body>
