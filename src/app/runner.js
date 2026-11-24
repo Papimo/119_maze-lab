@@ -2,7 +2,7 @@
 (function (ML) {
   'use strict';
   const A = ML.App;
-  const { S } = A;
+  const { S, KEYS } = A;
 
   const AN = ML.ANIM;
   const SWARMY = () => S.compare === 'swarm' || S.compare === 'ants';
@@ -75,7 +75,7 @@
   }
 
   // Kijkcijfers: race-winnaars per dag (localStorage mazelab.races = { ymd: { solverId: winst } }).
-  const RACES = 'mazelab.races';
+  const RACES = KEYS.races;
   const racesLoad = () => { try { return JSON.parse(localStorage.getItem(RACES) || '{}'); } catch (e) { return {}; } };
   function raceWin(id) {
     const all = racesLoad(), d = ML.Daily.ymd(), day = all[d] = all[d] || {};

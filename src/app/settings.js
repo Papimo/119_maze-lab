@@ -4,7 +4,18 @@
   const A = ML.App = {};
   const $ = s => document.querySelector(s);
 
-  const STORE = 'mazelab.settings';
+  // Alle localStorage-sleutels van Maze Lab op één plek (eigenaar-bestand erachter). Nieuwe sleutel → hier bijzetten.
+  const KEYS = ML.STORE_KEYS = {
+    settings: 'mazelab.settings', // S (dit bestand)
+    races: 'mazelab.races',       // kijkcijfers race (app/runner.js)
+    daily: 'mazelab.daily',       // dagrecords (play.js)
+    calib: 'mazelab.calib',       // ijking moeilijkheid (score.js)
+    algos: 'mazelab.algos',       // bibliotheek eigen algoritmes (evo.js; hist[].v = ENGINE_V-stempel via Ev.stampHist, bij openen Evolutie)
+    fame: 'mazelab.fame',         // eregalerij (evo.js)
+    evo: 'mazelab.evo',           // evolutie-toestand (evoui)
+    tour: 'mazelab.tour'          // rondleiding gezien (evoui)
+  };
+  const STORE = KEYS.settings;
   const S = {
     mode: 'evo', grid: 'square', shape: 'rect', text: 'MAZE', size: 24, levels: 1, torus: false,
     gen: 'backtracker', mix: 75, braid: 0, seed: ML.randomSeed(),
@@ -23,10 +34,15 @@
   try { Object.assign(S, JSON.parse(localStorage.getItem(STORE) || '{}')); } catch (e) { /* geen opslag */ }
   if (S.mode === 'watch') S.mode = 'build';
   if (/#dna=/.test(location.hash)) S.mode = 'evo'; // gedeelde link → Evolutie (evoui openShared zet hem in de bibliotheek)
-  if ((S.evoV | 0) < 2) { S.mode = 'evo'; S.evoMazes = 1; S.evoMazeMode = S.evoSame ? 'fixed' : 'new'; S.evoV = 2; } // Evolutie 2 = startscherm, 1 groot paneel
-  if (S.styleV !== 1) { S.palette = 'maquette'; S.styleV = 1; } // maquette = nieuwe standaardstijl
+  // Migraties: [versieveld, nieuwste versie, ophogen]. Draait als S[veld] < versie; daarna S[veld] = versie.
+  // Nieuwe migratie → regel toevoegen (of versie ophogen + stap erbij), standaard in S op de nieuwste versie zetten.
+  const MIGRATIONS = [
+    ['evoV', 2, S => { S.mode = 'evo'; S.evoMazes = 1; S.evoMazeMode = S.evoSame ? 'fixed' : 'new'; }], // Evolutie 2 = startscherm, 1 groot paneel
+    ['styleV', 1, S => { S.palette = 'maquette'; }] // maquette = nieuwe standaardstijl
+  ];
+  MIGRATIONS.forEach(([k, v, up]) => { if ((S[k] | 0) < v) { up(S); S[k] = v; } });
   ML.V2.S = S;
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) { /* geen opslag */ } };
 
-  Object.assign(A, { $, S, save, STORE });
+  Object.assign(A, { $, S, save, STORE, KEYS, MIGRATIONS });
 })(window.ML = window.ML || {});
