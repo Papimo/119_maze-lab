@@ -11,7 +11,7 @@
 - Rasters/silhouetten/graaf/verdiepingen/torus/trappen/JSON-export → `src/model.js` (`ML.TOPO.*`, `makeMaze`, `buildMaze`, `edge`, `toJSON`, `ML.ASSETS`, `ML.TERRAIN`, `ML.Heap`)
 - Makers → `src/generators.js` (`ML.GENERATORS`; `gridOnly` = Eller/Sidewinder/Opdelen, alleen `m.sq`, anders terugval)
 - Lussen, start/doel, terrein, sleutels/hendels/tijddeuren/eenrichting/teleporters, zoekprobleem → `src/puzzle.js` (`placeTerrain`, `placePuzzle`, `makeProblem` (enc/dec/succ/moves/h), `solvePath` = Dijkstra, `canSolve`, `finishMaze`, `buildFull`)
-- Oplossers → `src/solvers.js` (`ML.SOLVERS`, lopers via `P.moves`)
+- Oplossers → `src/solvers.js` (`ML.SOLVERS`, lopers via `P.moves`); 8 nieuwe (v2.5) in `src/solvers2.js`: junction, beam, collision, micromouse, frontier, vision, physarum (CG), qlearn. Oplosser-beeld = `m.viz` { heat/heat2, tubes, paths, rays, dots, fog, walls, arrows, chart, label, noVisit } → render2d `vizOf/vizFloor/vizTop/vizScreen`; runner zet `v.viz = e.viz`. Verkenners/knooppunten/botsing/slijmzwam alleen bij `P.simple` (anders terugval, desc zegt het)
 - Moeilijkheid → `src/score.js` (`ML.difficultyParts`, `ML.difficulty`, `ML.calibrate` = ridge naar `PRIOR` op records `mazelab.daily`, cache + weging in localStorage `mazelab.calib`; vanaf 3 dagen; app `recalibrate`, `#calib-text`)
 - Deeltjes/curves → `src/fx.js` (`ML.FX`); tijden in `ML.ANIM` (render2d)
 - Tekenen + paletten → `src/render2d.js` (`ML.Render2D.draw` → true = blijft bewegen, `stateOf`, `cellAt`). Maquette = palet met `maq`: `floorLayer`/`maqWalls` (cache; tijdens bouwen `live` = goedkoop direct), `lifeFloor`, `endWave`; na de muren `translate(0,-hp/2)` voor alles erboven
@@ -44,11 +44,13 @@
 - Workers bouwen doolhoven: zes bibliotheken (rng, model, generators, puzzle, swarm, evo) registreren zich in `window.MLDEF`; `Pool.ensure` plakt ze in de Blob-worker → `Pool.evaluateSpecs` (alleen zaadjes heen, per doolhof 1 worker); terugval `Pool.evaluate` (rijen) / hoofddraad
 - Mutantenlab-stopregel → evoui `mutCheck` (in `stepView` voor T): klaar zodra `M.need` binnen of `M.maxT` s voorbij; kansloos (> 2× stappen eerste) afkappen (`w.cut`, `run.cut`); voortgang in `mutOut`. Tempo taak = `S.evoTaskSpeed`, evolutie = `S.evoSpeed` (beide max 133 ≈ 21 000 st/s, `rate`)
 - Turbo-snelheid: model.js `tplCache`/`cloneMaze` (leeg raster per grid/size/aspect hergebruikt; niet bij verdiepingen/breed); evo.js Walker: stapel = `stk`/`sl` (Int32Array, `get st()` voor oud gebruik), `LG` = log-tabel, hand-gen via hoekverschil `ctx.an` (geen atan2), n=1 zonder exp; `Pool.evaluateSpecs(…, x)`: `x.next` = volgende generatie alvast bouwen in dezelfde worker (`pre`), `x.test` = testbaan verdeeld over alle jobs (`testPart`/`testCombine`/`testPut`). evoui: `advance(quiet, later)` → `E.pend` + `record()` / `flushPend()`
+- Evolutie 6 (engine 4, evo.js): genen `turn` (Draaiteller, Pledge) + `sight` (Zichtveld, `Walker.gain`, `gRay`), `upGenes` 9/11→13; `nextGen` o.mutKind gauss/cauchy/self (`ge.sig`, `SIG0`), o.select fitness/novelty/mix + `o.archive` (`novelty`, `ge.bh` = 5 getallen, `ge.nov`); evaluate/evaluateSpecs `x.bh`, `x.lamarck = k` → `x.lamInfo` {better, cost} (`lamarck`, `lamarckAsync`, `LAMARCK_COST`); deelcode MLDNA2 versie 3. UI: instellingen `evoMutKind/evoLamarck/evoSelect` (details "Evolutie-regels" geïnjecteerd door evolve.js `rulesSettings`, `rulesAvail` = uit bij engine < 4), state.js `evoOpts`/`evoRules`/`LAM_K` + INFO mk/lam/sel; evolve.js `evalX`/`lamDone`/`rulesAsync` (animatie: regels in workers tijdens pauze, `E.busy`), `rulesInfo` op kampioenkaart (σ, archief, meest vernieuwend, Lamarck); `E.arch` in persist
 - Evolutie 5: genen geheugen/feromoon in `ENGINE` Walker (`last`, `scent/scT`, `DEC`-tabel, alleen als `g8/g9` ≠ 0 → oude scores bit-gelijk); `clamp(v,i,src)` rekt mee, `clampHard` voor import; korte deelcode `toShort`/`fromShort` (`MLDNA2.`, int16 ×1000). evoui: `sureOf`/`sureTag`/`scoreBox`/`vsClassic` (scoretaal + zekerheid), `autoSave`/`autoChecks`/`stall`/`grow`/`autoInfo` (instellingen `evoAutoStop/evoAutoSave/evoGrow`, `.ev-set` details "Automatisch"), `goalHtml` trap 1/2, `shareLink`/`qrSvg`/`shareHtml`/`openShared` (`#dna=`; app.js zet dan mode evo), `TOUR`/`tour` (localStorage `mazelab.tour`), `ML.EvoUI._test`. QR = `vendor/qrcode.js` (qrcode-generator, data-lake qr-trade). Kijken eigen algoritmes: app `S.watchMine`, `#watch-mine`, `evoGo('watch')`
 - UI, standen, lus → `src/app/{settings,runner,lab,daily,watch,main}.js` (gedeeld `ML.App`; opslag-sleutels `ML.STORE_KEYS` + `MIGRATIONS` in settings.js; oude `src/app.js` niet meer geladen) (`Runner` met tick/draw/stepFx/goalFx, `makeLab`, `dailyEnsure`, `findTarget`, `watchNext`, `S` in localStorage `mazelab.settings`)
 
 ## Status
-- v2.4.0 (2026-11-24): scores in vijf treden (woordoordeel, ▼ beste klassieker, ⓘ, zoeker = Moeilijkheid) + ontwerppagina `design/oplossen.html`: 50 live demo's van nieuwe oplosvormen (17 bronnen, 11 genen, 5 combinaties, 13 mutaties/selectie, elk met 'Huidig'), meerkeuze + kopieerbalk. Wacht op keuze gebruiker.
+- v2.5.0 (2026-11-24): keuze uit oplossen.html gebouwd in 3 parallelle chats (`prullenbak/stappenplan-oplossers.md`): 8 nieuwe oplossers met eigen beeld, genen Draaiteller + Zichtveld, mutatievormen (normaal/grote sprongen/zelfregelend), Lamarck, nieuwheid-selectie; rooktest dekt alles. Ongetest door gebruiker.
+- v2.4.0 (2026-11-24): scores in vijf treden + ontwerppagina `design/oplossen.html` (50 live demo's oplosvormen).
 - v2.3.0 (2026-11-24): fase 1 stappenplan (3 parallelle chats): evoui → `src/evo/*`, app.js → `src/app/*`, turbo/testbaan sneller (Vast-1 172 → ~650 gens/s, bit-gelijk), async zware scores, vaste tests `tests/run.sh`. Versie linksboven in kopbalk (`.brand .ver`). Ontwerp scores duidelijker = `design/index.html` sectie 5 (wacht op keuze gebruiker).
 - v2.2.0 Evolutie 5 (2026-11-24): top 10 — bereikfout, één scoretaal + zekerheid, auto-stop/-bewaren, ladder zware testbaan, meegroeiend doolhof, genen geheugen + feromoon (ENGINE_V 3), Kijken alleen eigen algoritmes, rondleiding, link + QR, rooktest 2.0 (20 standen + Kijken). Playwright zonder JS-fouten; gebruiker moet nog kijken.
 - v2.1.0 Evolutie 4 (2026-11-24): Evolutie-pagina opnieuw ingedeeld (combinatie wireframes 2+3+4): tabs Algoritmes · Evolueren · Taak · Analyse, kaartenoverzicht als start, "Wat wil je doen?", taken als volledig scherm (In · doolhof · Uit, stappen Kiezen → Bezig → Uitkomst), evolutie op de achtergrond, mutantenlab met stopregel, sneller tempo. Rooktest (Playwright) zonder JS-fouten; gebruiker moet nog kijken.
@@ -73,6 +75,13 @@
 - Stijl: kartonnen maquette (standaard, migratie via `S.styleV`); oude paletten blijven kiesbaar. Prototype + andere stijlen: `design/index.html`.
 
 ## Valkuilen
+- Turbo engine 4 headless (`tests/turbo.js`) ~20% trager dan v2.4.0 (simple 18→14, max 29→24 gens/s), ook met regels uit. Oorzaak niet onderzocht (13 genen / extra checks in Walker?).
+- Na laden blokkeert de hoofddraad 2–4 s (zware testbaan synchroon opwarmen in `enter`) → rooktest-klikken op evolutie met time-out 10 s.
+- Lamarck/gedrag in animatie op hoofddraad = ~1 s hapering per generatie → daarom `rulesAsync` in workers; opnieuw evalueren = bit-gelijke fitness (zelfde zaadjes).
+- Zichtveld als 'nieuwe cellen in de gang vóór je' = altijd 0 (al gezien vanuit huidige cel) → nieuw uitzicht vánaf de volgende cel. Driehoeksraster: 'rechtdoor' drempel cos 0.45.
+- Nieuw gen: `tests/same.js` wijkt tóch af (test-DNA's krijgen meer genen) → bit-gelijk aantonen met oude code op 11-gen DNA's, dán `--update`.
+- Q-learning met alleen 1-staps-update leert 1 cel per ronde → optimistische onbekende zetten + na elke ronde achterstevoren terugspelen. Slijmzwam: CG met warme start, route = goedkoopste pad met kosten 1/D (dikste buis gulzig volgen loopt vast).
+- Oplosser-generators zijn lui → viz pas na eerste stap; zonder `v.viz = e.viz` bleef oude viz aan oude view-state hangen.
 - oplossen.html: Physarum met Gauss-Seidel convergeert niet op groot doolhof (stroming haalt doel niet) → CG-oplosser per ronde.
 - Tests: `tests/run.sh` (snel) / `tests/run.sh alles` (vóór release); `MAZE_URL=file://…/kopie.html node tests/smoke.js` test een kopie van index.html. `node tests/same.js --update` alleen na bewust ENGINE_V omhoog.
 - Losse IIFE-bestanden: herbenoemde `let` niet destructuren (vaste array/functie); vergeten import = fout pas bij aanroep → rooktest na verplaatsen.
@@ -102,7 +111,9 @@
 - Zuinigheidswaker-hook blokkeert Bash-commando's met het woord `node_modules` of `build` (ook `view-build` in een heredoc) (ook in een heredoc voor .gitignore) → Write gebruiken.
 
 ## Volgende stappen
-- Gebruiker kiest uit `design/oplossen.html` → bouwen. Demo-code (bv. Physarum met CG-oplosser, Pledge, Q-learning) is herbruikbaar als startpunt.
+- Gebruiker test v2.5: nieuwe oplossers (beeld per oplosser), evolutie-regels (zelfregelend σ, nieuwheid, Lamarck-snelheid).
+- Turbo-vertraging engine 4 uitzoeken; zware testbaan async opwarmen. "Evolutie-regels" eventueel van JS-injectie naar index.html.
+- Overige kaarten uit `design/oplossen.html` (niet gekozen) liggen klaar als demo-code.
 - Scores vijf treden gebouwd (scorevak, kaarten, live-kaart, ranglijst, zoeker = Moeilijkheid). Nog kaal: duel-keuzelijst, analysetabel/stamboom (ana.js), grafiek-labels.
 - Fase 2 stappenplan (`stappenplan.md`). Open: `src/app.js` naar prullenbak (C), `evoSame`-standaard weg, release-skill `tests/run.sh alles`.
 - Gebruiker test Evolutie 4 + 5: indeling, mutantenlab-stopregel, QR scannen (werkt pas online), link op ander apparaat, rondleiding op eigen scherm, auto-bewaren niet te vol.
