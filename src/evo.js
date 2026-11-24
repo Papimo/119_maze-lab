@@ -19,9 +19,15 @@
     { k: 'straight', name: 'Rechtdoor', lo: -6, hi: 6, col: '#f4a261', pos: 'gaat het liefst rechtdoor', neg: 'slaat graag af' },
     { k: 'dead', name: 'Doodlopers', lo: -6, hi: 6, col: '#e76f51', pos: 'zoekt doodlopende gangen op', neg: 'onthoudt doodlopers en mijdt ze' },
     { k: 'jct', name: 'Kruispunten', lo: -6, hi: 6, col: '#2ec4b6', pos: 'zoekt kruispunten op', neg: 'kiest rustige gangen' },
+    // nieuw in engine 3: geheugen = hoe lang geleden hij een plek zag; feromoon = verse geur die hij zelf achterlaat (vervliegt)
+    { k: 'mem', name: 'Geheugen', lo: -6, hi: 6, col: '#f72585', pos: 'loopt vergeten hoeken na', neg: 'blijft dicht bij waar hij net was' },
+    { k: 'pher', name: 'Feromoon', lo: -6, hi: 6, col: '#a7c957', pos: 'volgt zijn verse geurspoor', neg: 'mijdt plekken die nog naar hem ruiken' },
     { k: 'chaos', name: 'Chaos', lo: -4, hi: 1.5, col: '#9aa5b1', pos: 'en is vrij grillig', neg: 'en is heel beslist' }
   ];
   const NG = GENES.length, CH = NG - 1;
+  // oude DNA's (9 genen, engine ≤ 2) → 11 genen: geheugen + feromoon = 0 vóór chaos (zelfde gedrag)
+  function upGenes(gs) { if (Array.isArray(gs) && gs.length === 9) { gs = gs.slice(); gs.splice(8, 0, 0, 0); } return gs; }
+  const okGenes = gs => Array.isArray(gs) && gs.length === NG && gs.every(v => typeof v === 'number' && isFinite(v));
   ML.EVO_GENES = GENES;
 
   // ---- Klassiekers als DNA ----
@@ -68,7 +74,9 @@
   // ======================================================================
   function ENGINE() {
     'use strict';
-    const TAU = Math.PI * 2, CH = 8;
+    const TAU = Math.PI * 2, CH = 10, NP = 10; // NP = aantal gen-termen (zonder chaos)
+    const PH = 24, DEC = new Float64Array(256); for (let t = 0; t < 256; t++) DEC[t] = Math.pow(0.5, t / PH); // feromoon: halveert elke 24 stappen
+    const decay = dt => dt < 256 ? DEC[dt] : 0;
     function hashStr(s) {
       let h = 1779033703 ^ s.length;
       for (let i = 0; i < s.length; i++) { h = Math.imul(h ^ s.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
@@ -89,6 +97,7 @@
       constructor(ctx, genes, seed) {
         this.ctx = ctx;
         this.vis = new Uint16Array(ctx.N); this.dead = new Uint8Array(ctx.n);
+        this.last = new Int32Array(ctx.N); this.scent = new Float64Array(ctx.n); this.scT = new Int32Array(ctx.n); // geheugen + feromoon
         this.pos = new Int32Array(ctx.N).fill(-1); this.stk = new Int32Array(ctx.N + 1); this.sl = 0; // stapel als vaste rij (geen array.length-knippen)
         if (genes) this.reset(genes, seed);
       }
@@ -96,11 +105,14 @@
         const ctx = this.ctx, st = this.stk, pos = this.pos;
         for (let i = 0; i < this.sl; i++) pos[st[i]] = -1;
         this.vis.fill(0); this.dead.fill(0);
+        this.g8 = genes[8]; this.g9 = genes[9];
+        if (this.g8 || this.g9 || this.memUsed) { this.last.fill(0); this.scent.fill(0); this.scT.fill(0); this.memUsed = !!(this.g8 || this.g9); }
         this.g = genes; this.rng = makeRng(seed); this.T = Math.exp(genes[CH]);
         this.s = ctx.start; this.c = this.nc = ctx.cellOf[ctx.start]; this.hx = 1; this.hy = 0; this.ha = 0; // kijkrichting (+ als hoek)
         this.ag4 = Math.abs(genes[4]); this.iT = 1 / this.T;
         this.vis[this.s] = 1; st[0] = this.s; this.sl = 1; pos[this.s] = 0;
         this.steps = 0; this.done = false; this.reached = false; this.p = 0; this.jump = false;
+        if (this.memUsed) this.scent[this.c] = 1;
         return this;
       }
       step() {
@@ -117,6 +129,7 @@
         const st = this.stk, sl = this.sl, prev = sl > 1 ? st[sl - 2] : -1, hx = this.hx, hy = this.hy;
         const eu = ctx.eu, exits = ctx.exits, to = ctx.to, an = ctx.an, euc = eu[c], ha = this.ha, ag4 = this.ag4;
         const g0 = G[0], g1 = G[1], g2 = G[2], g3 = G[3], g4 = G[4], g5 = G[5], g6 = G[6], g7 = G[7];
+        const g8 = this.g8, g9 = this.g9, steps = this.steps, last = this.last, scent = this.scent, scT = this.scT;
         let mx = -1e9;
         for (let i = 0; i < n; i++) {
           const e = a + i, s2 = to[e], c2 = tc[e], v = vis[s2];
@@ -132,6 +145,8 @@
               sc += ag4 * (1 - phi * iPI);
             }
           }
+          if (g8 && v) { const age = (steps - last[s2]) * 0.015625; sc += g8 * (age > 1 ? 1 : age); } // geheugen: 0 = net gezien, 1 = ≥64 stappen geleden
+          if (g9) { const f = scent[c2] * decay(steps - scT[c2]); sc += g9 * (f > 2 ? 2 : f) * 0.5; } // feromoon: verse geur 0..1
           SC[i] = sc; if (sc > mx) mx = sc;
         }
         // loting met temperatuur
@@ -148,6 +163,7 @@
         else { pos[t2] = sl; st[sl] = t2; this.sl = sl + 1; }
         if (vis[t2] < 65535) vis[t2]++;
         this.s = t2; this.c = c; this.nc = c2; this.steps++;
+        if (this.memUsed) { const T = this.steps; this.last[t2] = T; this.scent[c2] = this.scent[c2] * decay(T - this.scT[c2]) + 1; this.scT[c2] = T; }
         if (c2 !== c) { this.jump = kd[e] !== 1; if (!this.jump) { this.hx = ex[e]; this.hy = ey[e]; this.ha = an[e]; } }
         else this.jump = false;
         if (c2 === ctx.goal) { this.done = true; this.reached = true; }
@@ -168,16 +184,18 @@
         const st = this.stk, sl = this.sl, prev = sl > 1 ? st[sl - 2] : -1, out = [];
         let mx = -1e9;
         for (let e = a; e < b; e++) {
-          const s2 = ctx.to[e], c2 = ctx.tc[e], v = this.vis[s2], P = new Float64Array(8);
+          const s2 = ctx.to[e], c2 = ctx.tc[e], v = this.vis[s2], P = new Float64Array(NP);
           let d = ctx.eu[c] - ctx.eu[c2]; if (d > 1) d = 1; else if (d < -1) d = -1;
           P[0] = v ? 0 : G[0]; P[1] = v ? G[1] * Math.log(1 + v) : 0; P[2] = s2 === prev ? G[2] : 0; P[3] = G[3] * d;
           P[6] = G[6] * this.dead[c2]; P[7] = G[7] * (ctx.exits[c2] - 2) * 0.5;
+          if (G[8] && v) { const age = (this.steps - this.last[s2]) * 0.015625; P[8] = G[8] * (age > 1 ? 1 : age); }
+          if (G[9]) { const f = this.scent[c2] * decay(this.steps - this.scT[c2]); P[9] = G[9] * (f > 2 ? 2 : f) * 0.5; }
           if (ctx.kd[e] === 1) {
             const dx = ctx.ex[e], dy = ctx.ey[e], cs = this.hx * dx + this.hy * dy;
             P[5] = G[5] * cs;
             if (G[4]) { const th = Math.atan2(this.hx * dy - this.hy * dx, cs); let phi = G[4] > 0 ? Math.PI - th : Math.PI + th; phi = ((phi % TAU) + TAU) % TAU; if (phi < 1e-3) phi = TAU; P[4] = Math.abs(G[4]) * (1 - phi / Math.PI); }
           }
-          let sc = 0; for (let i = 0; i < 8; i++) sc += P[i];
+          let sc = 0; for (let i = 0; i < NP; i++) sc += P[i];
           if (sc > mx) mx = sc;
           out.push({ s2, c2, parts: Array.from(P), sc, visits: v, jump: ctx.kd[e] !== 1 && c2 !== c });
         }
@@ -208,7 +226,7 @@
     return { Walker, evalOne, evalList, makeRng };
   }
   const ENG = ENGINE();
-  const ENGINE_V = 2; // verandert de loper-logica → testscores opnieuw in de geschiedenis
+  const ENGINE_V = 3; // verandert de loper-logica → testscores opnieuw in de geschiedenis
 
   // ---- Doolhof-context (gedeeld door alle lopers op één doolhof) ----
   function context(m) {
@@ -381,7 +399,10 @@
     return Object.assign({ id, name: nameOf(id), genes: genes.map(v => Math.round(v * 1000) / 1000), born, parents: parents || [], fit: 0 }, extra || {});
   }
   function randomGenes(rng) { return GENES.map(G => G.lo + rng() * (G.hi - G.lo)); }
-  const clamp = (v, i) => Math.max(GENES[i].lo, Math.min(GENES[i].hi, v));
+  // bereik rekt mee met de bronwaarde (Kompas heeft fresh 8 > hi 6): een kind wordt nooit teruggeknipt onder zijn ouder
+  const clamp = (v, i, src) => { const G = GENES[i], lo = src != null && src < G.lo ? src : G.lo, hi = src != null && src > G.hi ? src : G.hi; return Math.max(lo, Math.min(hi, v)); };
+  // harde grens (import/deelcode): anderhalf keer het gewone bereik
+  const clampHard = (v, i) => { const G = GENES[i], r = (G.hi - G.lo) * 0.5; return Math.max(G.lo - r, Math.min(G.hi + r, v)); };
   function gauss(rng) { return Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(TAU * rng()); }
 
   // o = { pop, classics, seeds: [genomen], rng }
@@ -407,7 +428,7 @@
     while (out.length < N) {
       if (rng() < 0.05) { out.push(genome(randomGenes(rng), o.gen)); continue; } // nieuwkomer
       const a = pick(), b = pick(), genes = a.genes.map((v, i) => rng() < 0.5 ? v : b.genes[i]);
-      for (let i = 0; i < NG; i++) if (rng() < o.mut) genes[i] = clamp(genes[i] + gauss(rng) * (GENES[i].hi - GENES[i].lo) * 0.12, i);
+      for (let i = 0; i < NG; i++) if (rng() < o.mut) genes[i] = clamp(genes[i] + gauss(rng) * (GENES[i].hi - GENES[i].lo) * 0.12, i, genes[i]);
       // soort erven van de beste ouder (kleur blijft rustig)
       out.push(genome(genes, o.gen, a === b ? [a.name] : [a.name, b.name], { sp: a.sp }));
     }
@@ -531,7 +552,7 @@ if(d.pre)for(const x of d.pre)E.buildMaze(x.o,x.sd,x.i,x.asp);};`; // pre = dool
     a.hist = Array.isArray(a.hist) ? a.hist : [];
     return a;
   }
-  function loadAlgos() { try { return JSON.parse(localStorage.getItem(STORE) || '[]').filter(a => a && Array.isArray(a.genes) && a.genes.length === NG).map(migrate); } catch (e) { return []; } }
+  function loadAlgos() { try { return JSON.parse(localStorage.getItem(STORE) || '[]').filter(a => a && (a.genes = upGenes(a.genes)) && okGenes(a.genes)).map(migrate); } catch (e) { return []; } }
   function saveAlgos(list) { try { localStorage.setItem(STORE, JSON.stringify(list)); } catch (e) { /* geen opslag */ } syncSolvers(list); }
   function newAlgo(o) { return migrate({ id: newId(), name: o.name, genes: o.genes.map(v => Math.round(v * 1000) / 1000), born: o.born || 0, parents: o.parents || [], parent: o.parent || null, ver: o.ver || 1,
     folder: o.folder || '', tags: (o.tags || []).slice(), note: o.note || '', created: today() }); }
@@ -545,19 +566,39 @@ if(d.pre)for(const x of d.pre)E.buildMaze(x.o,x.sd,x.i,x.asp);};`; // pre = dool
   }
   // deelcode: "MLDNA1:" + base64(json)
   function toCode(a) { return 'MLDNA1:' + btoa(unescape(encodeURIComponent(JSON.stringify({ n: a.name, g: a.genes, b: a.born })))); }
+  // korte code (voor link + QR): "MLDNA2." + base64url( versie, NG × int16 (gen × 1000, exact), naam utf-8 )
+  function toShort(a) {
+    const nm = unescape(encodeURIComponent(String(a.name || '').slice(0, 24))), b = [2];
+    a.genes.forEach(v => { const x = Math.max(-32767, Math.min(32767, Math.round(v * 1000))) & 0xffff; b.push(x >> 8, x & 255); });
+    let bin = String.fromCharCode(...b) + nm;
+    return 'MLDNA2.' + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function fromShort(str) {
+    const m = /MLDNA2\.([A-Za-z0-9_-]+)/.exec(str || ''); if (!m) return null;
+    try {
+      const bin = atob(m[1].replace(/-/g, '+').replace(/_/g, '/')), L = 1 + NG * 2;
+      if (bin.charCodeAt(0) !== 2 || bin.length < L) return null;
+      const gs = [];
+      for (let i = 0; i < NG; i++) { let x = (bin.charCodeAt(1 + 2 * i) << 8) | bin.charCodeAt(2 + 2 * i); if (x > 32767) x -= 65536; gs.push(x / 1000); }
+      if (!okGenes(gs)) return null;
+      return { name: decodeURIComponent(escape(bin.slice(L))).slice(0, 40) || 'Gedeeld', genes: gs.map((v, i) => clampHard(v, i)), born: 0 };
+    } catch (e) { return null; }
+  }
   function fromCode(str) {
+    const sh = fromShort(str); if (sh) return sh;
     const m = /MLDNA1:([A-Za-z0-9+/=]+)/.exec(str || '');
     if (!m) return null;
     try {
       const o = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
-      if (!Array.isArray(o.g) || o.g.length !== NG || o.g.some(v => typeof v !== 'number' || !isFinite(v))) return null;
-      return { name: String(o.n || 'Geïmporteerd').slice(0, 40), genes: o.g.map(clamp), born: o.b | 0 };
+      const gs = upGenes(o.g);
+      if (!okGenes(gs)) return null;
+      return { name: String(o.n || 'Geïmporteerd').slice(0, 40), genes: gs.map((v, i) => clampHard(v, i)), born: o.b | 0 };
     } catch (e) { return null; }
   }
 
   // ---- Eregalerij: top 20 van alle records (automatisch) ----
   const FAME = 'mazelab.fame', FAME_N = 20;
-  function loadFame() { try { const l = JSON.parse(localStorage.getItem(FAME) || '[]'); return Array.isArray(l) ? l.filter(a => a && Array.isArray(a.genes) && a.genes.length === NG) : []; } catch (e) { return []; } }
+  function loadFame() { try { const l = JSON.parse(localStorage.getItem(FAME) || '[]'); return Array.isArray(l) ? l.filter(a => a && (a.genes = upGenes(a.genes)) && okGenes(a.genes)) : []; } catch (e) { return []; } }
   // → plaats (1..20) als het erin komt, anders 0
   function addFame(o) {
     const list = loadFame(), key = o.genes.map(v => (+v).toFixed(3)).join();
@@ -592,9 +633,9 @@ if(d.pre)for(const x of d.pre)E.buildMaze(x.o,x.sd,x.i,x.asp);};`; // pre = dool
   }
 
   ML.Evo = { GENES, PRESETS, TEST, TEST_CATS, HEAVY, Walker, ENGINE_V, context, pack, buildMaze, mazeSpec, specMaze, spName, testScore, testPut, testPart, testCombine, testMazes, heavyScore, heavyReady, bestClassic,
-    initPop, evaluate, evalList: ENG.evalList, nextGen, nextGenIslands, assignIslands, Pool, loadFame, addFame, delFame, syncSolvers, MAKERS, GRIDS,
-    evalOne: ENG.evalOne, genome, nameOf, colorOf, describe, dominant, norm, dnaDist, clamp, randomGenes,
-    loadAlgos, saveAlgos, newAlgo, stampHist, toCode, fromCode, newId, today };
+    initPop, evaluate, evalList: ENG.evalList, nextGen, nextGenIslands, assignIslands, Pool, loadFame, addFame, delFame, syncSolvers, solverFn, MAKERS, GRIDS,
+    evalOne: ENG.evalOne, genome, nameOf, colorOf, describe, dominant, norm, dnaDist, clamp, clampHard, upGenes, okGenes, randomGenes,
+    loadAlgos, saveAlgos, newAlgo, stampHist, toCode, toShort, fromCode, newId, today };
   // eigen algoritmes meteen als oplosser (niet in de Web Worker: daar is geen ML.SOLVERS)
   if (ML.SOLVERS && typeof localStorage !== 'undefined') { try { syncSolvers(); } catch (e) { /* geen opslag */ } }
 }); MLDEF[MLDEF.length - 1](window.ML = window.ML || {});

@@ -17,11 +17,12 @@
     sound: false, follow: false, view3d: false, cam3d: 'orbit',
     // evolutie
     evoPop: 40, evoMazes: 1, evoGrid: 'square', evoMakers: 'mix', evoSize: 14, evoBraid: 0, evoPuzzle: false, evoSame: false,
-    evoMut: 30, evoSpeed: 50, evoClassics: true, evoSeedSaved: false,
+    evoMut: 30, evoSpeed: 50, evoClassics: true, evoSeedSaved: false, evoAutoStop: 0, evoAutoSave: false, evoGrow: false, watchMine: false,
     evoMazeMode: 'new', evoSetN: 6, evoColor: 'species', evoFast: 'simple', evoV: 0, evoRuns: 1, evoIslands: 1, evoHunt: [], evoTaskSpeed: 75
   };
   try { Object.assign(S, JSON.parse(localStorage.getItem(STORE) || '{}')); } catch (e) { /* geen opslag */ }
   if (S.mode === 'watch') S.mode = 'build';
+  if (/#dna=/.test(location.hash)) S.mode = 'evo'; // gedeelde link → Evolutie (evoui openShared zet hem in de bibliotheek)
   if ((S.evoV | 0) < 2) { S.mode = 'evo'; S.evoMazes = 1; S.evoMazeMode = S.evoSame ? 'fixed' : 'new'; S.evoV = 2; } // Evolutie 2 = startscherm, 1 groot paneel
   if (S.styleV !== 1) { S.palette = 'maquette'; S.styleV = 1; } // maquette = nieuwe standaardstijl
   ML.V2.S = S;
@@ -684,6 +685,7 @@
     W.runner.resize();
     watchNext();
   }
+  function watchMineBtn() { const b = $('#watch-mine'); if (b) { b.classList.toggle('on', !!S.watchMine); b.textContent = S.watchMine ? '🧬 Alleen mijn algoritmes ✓' : '🧬 Alleen mijn algoritmes'; } }
   function watchStop() { W.on = false; $('#watch').hidden = true; if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); }
 
   // ---- 2.0: 3D, camera, sfeer, schermvullend ----
@@ -726,8 +728,9 @@
     };
     const plain = s.braid === 0 && !s.torus && s.levels === 1 && !s.timed;
     const sr = rng();
-    const evoS = ML.SOLVERS.filter(x => x.evo); // eigen algoritmes: 14% kans
-    s.solver = sr < 0.22 ? 'swarm' : sr < 0.36 ? 'ants' : sr < 0.5 && evoS.length ? rng.pick(evoS).id : rng.pick(ML.SOLVERS.filter(x => !x.evo && (plain || x.id !== 'wall'))).id;
+    const evoS = ML.SOLVERS.filter(x => x.evo); // eigen algoritmes: 14% kans; stand "alleen mijn algoritmes" (S.watchMine) = altijd
+    const mine = S.watchMine && evoS.length;
+    s.solver = mine ? rng.pick(evoS).id : sr < 0.22 ? 'swarm' : sr < 0.36 ? 'ants' : sr < 0.5 && evoS.length ? rng.pick(evoS).id : rng.pick(ML.SOLVERS.filter(x => !x.evo && (plain || x.id !== 'wall'))).id;
     if (rng() < 0.18 && grid !== 'polar') s.gen = 'patchwork';
     if (s.solver === 'ants' && !s.braid) s.braid = 12 + rng.int(20); // mieren leren pas echt iets als er lussen zijn
     const [a, b] = rng.pick(AMB);
@@ -741,7 +744,8 @@
     W.solveSpf = Math.max(0.5, n / (6 * 60));
     W.stage = 'gen'; W.enterT = performance.now() / 1000;
     $('#cv-watch').style.opacity = 1;
-    $('#watch-info').textContent = `${GRID_NAMES[grid]} · ${g.name} → ${s.solver === 'swarm' ? 'Zwerm van 100 lopers' : s.solver === 'ants' ? 'Mierenkolonie van 60' : byId(ML.SOLVERS, s.solver).name}`;
+    watchMineBtn();
+    $('#watch-info').textContent = (S.watchMine && !evoS.length ? 'Nog geen eigen algoritmes bewaard · ' : '') + `${GRID_NAMES[grid]} · ${g.name} → ${s.solver === 'swarm' ? 'Zwerm van 100 lopers' : s.solver === 'ants' ? 'Mierenkolonie van 60' : byId(ML.SOLVERS, s.solver).name}`;
   }
   function watchFrame(t) {
     const r = W.runner;
@@ -874,6 +878,7 @@
   $('#btn-restart').addEventListener('click', () => { if (daily && daily.m) { ML.Play.start(daily); D.msg = ''; dailyPanel(); } });
   $('#btn-giveup').addEventListener('click', () => { if (daily && daily.play && !daily.play.done) { daily.play.gaveUp = true; daily.solve('astar'); } });
   $('#watch-exit').addEventListener('click', watchStop);
+  $('#watch-mine').addEventListener('click', () => { S.watchMine = !S.watchMine; save(); watchMineBtn(); watchNext(); });
 
   function download(blob, name) {
     const a = document.createElement('a');
@@ -935,7 +940,20 @@
     requestAnimationFrame(frame);
   }
 
-  ML.EvoUI.init({ Runner, S, save, pal });
+  // eigen algoritme inzetten vanuit Evolutie: 'build' = lopen in Bouwen, 'race' = race tegen klassiekers in Lab
+  function evoGo(where, a) {
+    const id = 'evo-' + a.id;
+    if (!ML.SOLVERS.some(x => x.id === id)) { ML.SOLVERS.push({ id, name: '🧬 ' + a.name, desc: 'eigen algoritme', fn: ML.Evo.solverFn(a.genes, a.name), evo: true }); fillSolvers(); }
+    const setKey = (k, v) => { S[k] = v; const el = $(`[data-key="${k}"]`); if (el) el.value = v; };
+    if (where === 'watch') { S.watchMine = true; save(); watchStart(); return; }
+    if (where === 'race') {
+      setKey('compare', 'race'); setKey('panes', 4); S.raceSel = [id, 'dfs', 'tremaux', 'wall']; save();
+      setMode('lab'); makeLab(); refreshPanel();
+    } else { setKey('solver', id); save(); setMode('build'); }
+    newSeed(); regenerate(false);
+    setTimeout(solveAll, 400);
+  }
+  ML.EvoUI.init({ Runner, S, save, pal, go: evoGo });
   outputs(); refreshPanel(); setPalette();
   if (S.mode === 'lab') makeLab();
   else if (S.mode === 'daily') { build.generate(S, S.gen, false); requestAnimationFrame(dailyEnsure); }

@@ -43,22 +43,23 @@
     try {
       const slim = g => ({ id: g.id, name: g.name, genes: g.genes, born: g.born, parents: g.parents, fit: g.fit, age: g.age, from: g.from, sp: g.sp, isl: g.isl });
       const sp = E.species.map(s => ({ id: s.id, name: s.name, col: s.col, c: s.c }));
-      localStorage.setItem(STORE, JSON.stringify({ gen: E.gen, base: E.base, pop: E.pop.map(slim), hist: E.hist.slice(-1500), champ: E.champ, species: sp, spSeq: E.spSeq, spThr: E.spThr }));
+      localStorage.setItem(STORE, JSON.stringify({ gen: E.gen, base: E.base, pop: E.pop.map(slim), hist: E.hist.slice(-1500), champ: E.champ, species: sp, spSeq: E.spSeq, spThr: E.spThr, growG: E.growG || 0, autoA: E.autoA || null }));
     } catch (e) { /* geen opslag */ }
   }
   function restore() {
     try {
       const o = JSON.parse(localStorage.getItem(STORE) || 'null');
+      if (o && Array.isArray(o.pop)) { o.pop.forEach(g => { if (g) g.genes = EV().upGenes(g.genes); }); if (o.champ) o.champ.genes = EV().upGenes(o.champ.genes); (o.species || []).forEach(sp => { if (sp && sp.c) sp.c = EV().upGenes(sp.c); }); }
       if (o && Array.isArray(o.pop) && o.pop.length && o.pop[0].genes && o.pop[0].genes.length === EV().GENES.length) {
         Object.assign(E, { gen: o.gen | 0, base: o.base || ML.randomSeed(), pop: o.pop, hist: o.hist || [], champ: o.champ || null,
-          species: Array.isArray(o.species) ? o.species : [], spSeq: o.spSeq | 0, spThr: o.spThr || SP_THR });
+          species: Array.isArray(o.species) ? o.species : [], spSeq: o.spSeq | 0, spThr: o.spThr || SP_THR, growG: o.growG | 0, autoA: o.autoA || null });
         return true;
       }
     } catch (e) { /* kapot */ }
     return false;
   }
   function fresh(seeds) {
-    E.base = String(ML.randomSeed()); E.gen = 0; E.hist = []; E.champ = null; E.species = []; E.spSeq = 0; E.spThr = SP_THR;
+    E.base = String(ML.randomSeed()); E.gen = 0; E.hist = []; E.champ = null; E.species = []; E.spSeq = 0; E.spThr = SP_THR; E.growG = 0; E.autoA = null; E.stopFrom = 0;
     E.pop = EV().assignIslands(EV().initPop({ pop: A.S.evoPop, classics: A.S.evoClassics, seeds, rng: rng() }), isl());
     speciate(); persist();
   }
@@ -183,7 +184,7 @@
     const dt = E.lastT ? Math.min(0.05, t - E.lastT) : 0;
     E.lastT = t;
     stepView(V, t, dt, rate(A.S.evoSpeed));
-    stepView(T, t, dt, rate(A.S.evoTaskSpeed == null ? 75 : A.S.evoTaskSpeed));
+    stepView(T, t, dt, mutRate(rate(A.S.evoTaskSpeed == null ? 75 : A.S.evoTaskSpeed)));
     const vis = E.page === 'evolve' ? V : E.page === 'task' && E.task ? T : null;
     if (vis) vis.panes.forEach(r => { if (vis.phase === 'run') r.dirty = true; r.draw(t); });
     if (E.msg && t - E.msgT > 6) { E.msg = ''; toast(); }
@@ -241,8 +242,46 @@
     if (later) E.pend = rec; else record(rec, EV().testScore(best.genes), quiet);
     E.gen++;
     E.pop = EV().nextGenIslands(E.pop, { pop: Number(A.S.evoPop), mut: A.S.evoMut / 100, elite: 2, rng: rng(), gen: E.gen }, isl(), 8);
-    speciate();
+    speciate(); autoChecks();
     if (!quiet) { persist(); refreshUI(true); }
+  }
+  // ---- automatisch: bewaren, stoppen, meegroeien ----
+  // nieuwe kampioen die alle klassiekers verslaat → bibliotheek (map Auto-bewaard; elke volgende = nieuwe versie van de vorige)
+  function autoSave(tb) {
+    const c = E.champ, prev = E.autoA && EV().loadAlgos().find(a => a.id === E.autoA.id);
+    if (prev && tb.score < EV().testScore(prev.genes).score + 0.5) return; // pas bij ≥ 0,5 winst (anders loopt de bibliotheek vol)
+    const a = addAlgo({ name: c.name, genes: c.genes, born: c.born, parents: c.parents || [], parent: prev ? prev.id : null, ver: prev ? (prev.ver || 1) + 1 : 1,
+      folder: 'Auto-bewaard', tags: ['auto'], note: `Automatisch bewaard: score ${tb.score} op de testbaan, generatie ${c.gen}.` });
+    if (a) { E.autoA = { id: a.id, name: a.name, s: tb.score }; E.autoN = (E.autoN || 0) + 1; note(`💾 Nieuwe kampioen ${a.name} (${tb.score}) automatisch bewaard.`); if (E.page === 'algos') { algoGrid(); algoDetail(); } }
+  }
+  const stall = () => E.gen - Math.max(E.champ ? E.champ.gen + 1 : 0, E.stopFrom || 0); // generaties zonder nieuw record
+  function autoInfo() {
+    const n = Number(A.S.evoAutoStop) || 0, bits = [];
+    if (n) bits.push(`stopt na ${n} generaties zonder record (nu ${Math.max(0, stall())})`);
+    if (A.S.evoAutoSave) bits.push(E.autoA ? `laatst bewaard: ${esc(E.autoA.name)} (${E.autoA.s})` : 'bewaart nieuwe kampioenen');
+    if (A.S.evoGrow) bits.push(`doolhof groeit mee (nu ${A.S.evoSize})`);
+    return bits.length ? `<p class="hint auto-i">🔁 ${bits.join(' · ')}</p>` : '';
+  }
+  function autoChecks() {
+    const n = Number(A.S.evoAutoStop) || 0;
+    if (n && stall() >= n && (E.turbo || V.running)) {
+      E.turbo = 0; V.running = false; E.stopFrom = E.gen;
+      note(`⏹ Gestopt: ${n} generaties geen nieuw record. Kampioen: ${E.champ ? E.champ.name + ' (' + E.champ.test + ')' : '—'}.`);
+      setTimeout(evoBar, 0);
+    }
+    if (A.S.evoGrow && mm() !== 'hunt') grow();
+  }
+  // meegroeiende moeilijkheid: beste van de generatie haalt gemiddeld ≥ 80 over 12 generaties → doolhof 2 groter (vanaf 30 ook meer lussen)
+  function grow() {
+    const from = E.growG || 0, hs = E.hist.filter(h => h.gen >= from).slice(-12);
+    if (hs.length < 12 || E.gen - from < 12) return;
+    const avg = hs.reduce((s, h) => s + h.best, 0) / hs.length;
+    if (avg < 80 || A.S.evoSize >= 80) return;
+    const S = A.S; S.evoSize = Math.min(80, S.evoSize + 2);
+    if (S.evoSize >= 30 && S.evoBraid < 40) S.evoBraid = Math.min(40, S.evoBraid + 5);
+    E.growG = E.gen;
+    ['evoSize', 'evoBraid'].forEach(k => { const el = document.querySelector(`[data-key="${k}"]`); if (el) el.value = S[k]; });
+    A.save(); outputs(); note(`📈 Te makkelijk geworden (gem. ${Math.round(avg)}): doolhof groeit naar ${S.evoSize}${S.evoBraid ? ', lussen ' + S.evoBraid + '%' : ''}.`);
   }
   function flushPend() { if (E.pend) { const p = E.pend; E.pend = null; record(p, EV().testScore(p.best.genes), true); } }
   // geschiedenis + kampioen + eregalerij voor één generatie
@@ -256,6 +295,7 @@
       const beat = tb.score > bc.t.score && (!E.champ || E.champ.test <= bc.t.score);
       E.champ = { id: best.id, name: best.name, genes: best.genes.slice(), born: best.born, parents: best.parents, test: tb.score, gen: rec.gen, from: best.from,
         heavy: Ev.heavyReady() ? Ev.heavyScore(best.genes).score : null };
+      if (A.S.evoAutoSave && !best.from && tb.score > bc.t.score) autoSave(tb);
       if (beat && !best.from) { note(`🏆 ${best.name} verslaat alle klassiekers (${tb.score} tegen ${bc.t.score} van ${bc.p.name})!`); if (A.S.sound && ML.Sound) ML.Sound.chord(); }
       // eregalerij: elk nieuw record (geen klassiekers/gezaaiden)
       if (!best.from) {
@@ -292,9 +332,9 @@
         await (pr || P.evaluate(E.pop, mazesFor(g0), g0, runs()));
         if (pr && pend) record(pend, tRes || EV().testScore(pend.best.genes), true);
         if (!E.turbo) break;
-        advance(true, !!pr); E.turbo--; E.turboDone++;
+        advance(true, !!pr); if (E.turbo) E.turbo--; E.turboDone++;
       } else {
-        while (E.turbo && performance.now() - t0 < 40) { EV().evaluate(E.pop, mazesFor(E.gen), E.gen, runs()); advance(true); E.turbo--; E.turboDone++; }
+        while (E.turbo && performance.now() - t0 < 40) { EV().evaluate(E.pop, mazesFor(E.gen), E.gen, runs()); advance(true); if (E.turbo) E.turbo--; E.turboDone++; }
         await new Promise(r => setTimeout(r, 0));
       }
       const now = performance.now();
@@ -409,7 +449,7 @@
       g.stroke();
     }
     let lx = L; g.textBaseline = 'middle';
-    [['#4cc9f0', 'kampioen (record testbaan)'], ['#4cc9f077', 'beste v.d. generatie op testbaan'], ['#ffd166', 'fitness beste'], [muted, 'gemiddelde']].forEach(([c, s]) => {
+    [['#4cc9f0', 'kampioen (record score testbaan)'], ['#4cc9f077', 'beste v.d. generatie, score testbaan'], ['#ffd166', 'score beste (eigen doolhoven)'], [muted, 'gemiddelde']].forEach(([c, s]) => {
       g.fillStyle = c; g.fillRect(lx, 8 * d, 14 * d, 3 * d); g.fillStyle = muted; g.fillText(s, lx + 18 * d, 10 * d); lx += g.measureText(s).width + 34 * d;
     });
     g.textBaseline = 'alphabetic';
@@ -433,6 +473,27 @@
   const isSaved = genes => EV().loadAlgos().some(a => a.genes.join() === genes.join());
 
   // ---- alle algoritmes (klassiekers + bibliotheek + kampioen) ----
+  // ---- één scoretaal: Score 0–100 (100 = elke keer de kortste route); testbaan = 12 vaste doolhoven × 2 ----
+  // zekerheid: gepaard per testdoolhof (zelfde regel als het mutantenlab: ≥3 doolhoven en verschil ≥ 2× de standaardfout)
+  function sureOf(as, bs) {
+    const n = Math.min(as ? as.length : 0, bs ? bs.length : 0); if (!n) return { k: 'base', icon: '', txt: '' };
+    const d = []; for (let i = 0; i < n; i++) d.push((as[i] - bs[i]) * 100);
+    const m = d.reduce((a, b) => a + b, 0) / n;
+    if (Math.abs(m) < 0.05) return { k: 'eq', icon: '🟰', txt: 'even goed' };
+    const sd = n > 1 ? Math.sqrt(d.reduce((a, b) => a + (b - m) ** 2, 0) / (n - 1)) : Infinity, se = sd / Math.sqrt(n);
+    const sure = n >= 3 && (se === 0 || Math.abs(m) >= 2 * se);
+    if (m > 0) return sure ? { k: 'yes', icon: '✅', txt: 'zeker beter' } : { k: 'maybe', icon: '🤔', txt: 'misschien beter' };
+    return sure ? { k: 'no', icon: '❌', txt: 'zeker slechter' } : { k: 'maybe', icon: '🤔', txt: 'misschien slechter' };
+  }
+  const signed = v => v > 0 ? `<em class="up">+${v}</em>` : v < 0 ? `<em class="down">${v}</em>` : '<em>±0</em>';
+  const sureTag = su => su.icon ? `<span class="sure ${su.k}" title="${esc(su.txt)}: per testdoolhof vergeleken (wisselt het per doolhof, dan kan het geluk zijn)">${su.icon} ${esc(su.txt)}</span>` : '';
+  // scorevak: grote Score (testbaan), optioneel zwaar en een vergelijking vs = { name, t }
+  function scoreBox(t, h, vs) {
+    let cmp = '';
+    if (vs && vs.t) cmp = `<br>${signed(r1(t.score - vs.t.score))} t.o.v. ${esc(vs.name)} ${sureTag(sureOf(t.per, vs.t.per))}`;
+    return `<div class="evo-score"><b title="Score 0–100: 100 = elke keer de kortste route">${t.score}</b><span>Score · testbaan<br>${t.solved}/${t.of} gehaald${cmp}</span>${h && h.score != null ? `<b class="hv" title="Score op de zware testbaan (8 grote doolhoven met lussen en puzzels)">${h.score}</b><span>Score<br>zwaar</span>` : ''}</div>`;
+  }
+  const vsClassic = () => { const bc = EV().bestClassic(); return { name: bc.p.name, t: bc.t, id: bc.p.id }; };
   function entries() {
     const Ev = EV(), mine = Ev.loadAlgos().map(a => ({ ...a, mine: true }));
     const list = [...Ev.PRESETS, ...mine];
@@ -472,11 +533,60 @@
   function todoHtml(a) {
     const id = esc(a.id), b = (ev, t, s) => `<button class="todo-b" data-ev="${ev}" data-id="${id}"><b>${t}</b><small>${s}</small></button>`;
     return `<div class="todo"><h4>Wat wil je doen met ${esc(a.name)}?</h4>
-      <div class="todo-g"><span>Verbeteren</span>${b('task-bench', '🔧 Werkbank', 'genen zelf bijschuiven + proefrit')}${b('task-mut', '🧬 Mutanten', 'varianten racen, de beste gaat door')}</div>
+      <div class="todo-g"><span>Verbeteren</span>${b('task-bench', '🔧 Werkbank', 'genen zelf bijschuiven + proefrit')}${b('task-mut', '🧬 Mutanten', 'varianten over meerdere doolhoven, beste gemiddelde wint')}</div>
       <div class="todo-g"><span>Laten strijden</span>${b('task-duel', 'vs Duel', '2–4 algoritmes in hetzelfde doolhof')}</div>
       <div class="todo-g"><span>Begrijpen</span>${b('task-why', '❔ Uitleg', 'stap voor stap: waarom die kant op?')}${b('tree', '🌳 Stamboom', 'versies en ouders (Analyse)')}</div>
       <div class="todo-g"><span>Zwakte zoeken</span>${b('task-hunt', '🎯 Zoeker', 'de moeilijkste doolhoven voor dit algoritme')}</div>
-      <div class="todo-g"><span>Verder kweken</span>${b('seed', '＋ Zaai in evolutie', 'doet mee vanaf de volgende generatie')}</div></div>`;
+      <div class="todo-g"><span>Verder kweken</span>${b('seed', '＋ Zaai in evolutie', 'doet mee vanaf de volgende generatie')}</div>
+      <div class="todo-g"><span>Inzetten</span>${b('go-build', '▶ Bouwen', 'laat hem een nieuw doolhof oplossen')}${b('go-race', '🏁 Race', 'tegen drie klassiekers in Lab')}</div>
+      <div class="todo-g"><span>Tonen & delen</span>${b('go-watch', '📺 Kijken', 'eindeloos kijken, alleen eigen algoritmes')}${b('share', '🔗 Link + QR', 'korte link of QR-code voor een ander apparaat')}</div></div>`;
+  }
+
+  // delen: korte link (#dna=…, opent de app en zet hem in de bibliotheek) + QR-code (qrcode-generator in vendor/, geen externe dienst)
+  const APP_URL = 'https://papimo.github.io/119_maze-lab/';
+  function shareLink(a) { const base = /^https?:/.test(location.protocol) ? location.href.split('#')[0] : APP_URL; return base + '#dna=' + EV().toShort(a); }
+  function qrSvg(txt) {
+    if (typeof qrcode !== 'function') return '<p class="hint">QR-bibliotheek niet geladen.</p>';
+    try { const q = qrcode(0, 'M'); q.addData(txt); q.make(); return q.createSvgTag({ cellSize: 4, margin: 3, scalable: true }); } catch (e) { return '<p class="hint">Link te lang voor een QR-code.</p>'; }
+  }
+  function shareHtml(a) {
+    const url = shareLink(a);
+    return `<div class="share"><h4>🔗 Delen: ${esc(a.name)}</h4><div class="share-row"><div class="qr">${qrSvg(url)}</div>
+      <div class="share-r"><span class="hint" style="margin:0">Scan met een telefoon, of stuur de link. Wie hem opent krijgt ${esc(a.name)} in de eigen bibliotheek (DNA exact, ${url.length} tekens).</span>
+      <input class="share-url" readonly value="${esc(url)}"><div class="btns"><button class="btn primary" data-ev="share-copy" data-id="${esc(a.id)}">Kopieer link</button><button class="btn" data-ev="share" data-id="${esc(a.id)}">Sluiten</button></div></div></div></div>`;
+  }
+  // link geopend met #dna=… → in de bibliotheek + selecteren
+  function openShared() {
+    const m = /#dna=([^&]+)/.exec(location.hash || ''); if (!m) return false;
+    try { history.replaceState(null, '', location.href.split('#')[0]); } catch (e) { /* file:// */ }
+    const o = EV().fromCode(decodeURIComponent(m[1]));
+    if (!o) { note('Die link bevat geen geldig algoritme.'); return true; }
+    const have = EV().loadAlgos().find(x => x.genes.join() === o.genes.map(v => Math.round(v * 1000) / 1000).join());
+    const x = have || addAlgo({ ...o, folder: 'Gedeeld', tags: ['gedeeld'], note: 'Binnengekomen via een gedeelde link.' });
+    E.page = 'algos'; E.sel = x ? x.id : null;
+    note(have ? `${o.name} stond al in je bibliotheek.` : `📥 ${o.name} toegevoegd aan je bibliotheek (map Gedeeld).`);
+    return true;
+  }
+
+  // ---- rondleiding: 3 stappen bij het eerste bezoek (localStorage mazelab.tour) ----
+  const TOUR = [
+    { sel: '#evo-tabs [data-page="algos"]', t: '1 · Algoritmes', d: 'Hier staan de klassiekers en jouw eigen algoritmes, met hun Score (0–100, 100 = altijd de kortste route). Klik een kaart en kies “Wat wil je doen?”: verbeteren, laten strijden, begrijpen, inzetten of delen.' },
+    { sel: '#evo-tabs [data-page="evolve"]', t: '2 · Evolueren', d: 'Een zwerm lopers met eigen DNA kweekt hier nieuwe algoritmes, ook als je op een andere pagina bent. Turbo rekent duizenden generaties zonder animatie; onder Automatisch kan hij zelf stoppen, kampioenen bewaren en het doolhof laten meegroeien.' },
+    { sel: '#lib-ladder', t: '3 · Doelen', d: 'De doelenladder: versla eerst alle klassiekers op de testbaan, daarna wacht de zware testbaan. Een taak (werkbank, mutantenlab, duel) opent als volledig scherm onder Taak.' }
+  ];
+  function tour(k) {
+    let el = $('#evo-tour');
+    document.querySelectorAll('.tour-hl').forEach(x => x.classList.remove('tour-hl'));
+    if (k == null || k >= TOUR.length) { if (el) el.remove(); try { localStorage.setItem('mazelab.tour', '1'); } catch (e) { /* geen opslag */ } return; }
+    if (E.page !== 'algos') setPage('algos');
+    const st = TOUR[k], tg = $(st.sel);
+    if (!el) { el = document.createElement('div'); el.id = 'evo-tour'; $('#view-evo').appendChild(el); }
+    el.innerHTML = `<b>${esc(st.t)}</b><p>${esc(st.d)}</p><div class="btns"><span class="tour-n">${k + 1}/${TOUR.length}</span><button class="btn" data-ev="tour-end">Overslaan</button><button class="btn primary" data-ev="tour" data-k="${k + 1}">${k + 1 < TOUR.length ? 'Volgende' : 'Klaar'}</button></div>`;
+    if (tg) {
+      tg.classList.add('tour-hl');
+      const r = tg.getBoundingClientRect(), W = Math.min(340, innerWidth - 24);
+      el.style.width = W + 'px'; el.style.left = Math.max(12, Math.min(innerWidth - W - 12, r.left)) + 'px'; el.style.top = Math.min(innerHeight - 200, r.bottom + 10) + 'px';
+    }
   }
 
   // ---------------- Algoritmes (startscherm) ----------------
@@ -492,12 +602,13 @@
     $('#lib-sort').value = E.libSort;
     if (document.activeElement !== $('#lib-q')) $('#lib-q').value = E.libQ;
     algoGrid(); algoDetail();
+    const lad = $('#lib-ladder'); if (lad) lad.innerHTML = goalHtml();
   }
   function algoCard(a) {
     const tags = (a.tags || []).slice(0, 3).map(t => `<em class="tag">${esc(t)}</em>`).join('');
     return `<div class="acard${a.classic ? ' classic' : ''}${E.sel === a.id ? ' sel' : ''}" data-ev="sel" data-id="${esc(a.id)}" title="${esc(EV().describe(a.genes))}">
       <div class="ac-top"><i class="sw" style="background:${EV().colorOf(a.genes)}"></i><b>${esc(a.name)}</b>${a.ver > 1 && !/ v\d+$/.test(a.name) ? `<em class="ver">v${a.ver}</em>` : ''}</div>
-      <div class="ac-sc"><b>${a.t.score}</b><span>testbaan · ${a.t.solved}/${a.t.of}${a.h ? `<br>zwaar ${a.h.score}` : ''}</span></div>
+      <div class="ac-sc"><b title="Score 0–100 op de testbaan">${a.t.score}</b><span>score · ${a.t.solved}/${a.t.of}${a.h ? `<br>zwaar ${a.h.score}` : ''}</span></div>
       <small class="ac-sub">${esc(subOf(a))}</small>${tags ? `<div class="ac-tags">${tags}</div>` : ''}${dnaStrip(a.genes)}</div>`;
   }
   function algoGrid() {
@@ -546,9 +657,10 @@
       + (mine ? '<span>🧬 ook als oplosser in Bouwen, Lab en Kijken</span>' : '');
     let html = `<div class="det-head"><i class="sw" style="background:${Ev.colorOf(a.genes)}"></i><h3>${esc(a.name)}</h3><button class="btn x" data-ev="unsel" title="Sluiten (Esc)">✕</button></div>
       <small class="det-sub0">${esc(a.classic ? 'klassieker · ' + a.desc : mine ? subOf(a) : a.live ? 'kampioen van de lopende evolutie, nog niet bewaard' : 'uit de eregalerij')}</small>
-      <div class="evo-score"><b>${t.score}</b><span>testbaan<br>${t.solved}/${t.of} gehaald</span>${h ? `<b class="hv">${h.score}</b><span>zware<br>testbaan</span>` : ''}</div>
+      ${scoreBox(t, h, a.id === vsClassic().id ? null : vsClassic())}
       <p class="desc">${esc(Ev.describe(a.genes))}</p>${dnaHtml(a.genes)}<div class="cats">${cats}</div>`;
     if (!saved) html += `<div class="btns"><button class="btn primary" data-ev="save-any" data-id="${id}">Bewaar in mijn algoritmes</button></div>`;
+    if (E.share === a.id) html += shareHtml(a);
     html += todoHtml(a);
     if (mine) {
       const { chain, kids } = lineage(a);
@@ -571,7 +683,7 @@
       <div class="btns"><button class="btn primary" data-ev="page" data-page="evolve">Naar Evolueren →</button></div>`;
     if (c) {
       const saved = !!c.from || isSaved(c.genes);
-      html += `<h4 class="det-sub">Kampioen: ${esc(c.name)}</h4><div class="evo-score"><b>${c.test}</b><span>testbaan${c.heavy != null ? `<br>zwaar ${c.heavy}` : ''}</span></div>
+      html += `<h4 class="det-sub">Kampioen: ${esc(c.name)}</h4>${scoreBox(EV().testScore(c.genes), { score: c.heavy }, c.from ? null : vsClassic())}
         <p class="desc">${esc(EV().describe(c.genes))}</p>${dnaHtml(c.genes)}
         ${saved ? '' : '<div class="btns"><button class="btn primary" data-ev="save-champ">Bewaar kampioen</button></div>'}${todoHtml(c)}`;
     }
@@ -602,9 +714,9 @@
     const el = $('#evo-champ'); if (!el) return;
     const c = E.champ, bc = EV().bestClassic();
     if (!c) { el.innerHTML = '<h4>Kampioen</h4><p class="hint">Nog geen generatie klaar. Kijk mee, of druk op een Turbo-knop.</p>'; return; }
-    const saved = !!c.from || isSaved(c.genes), diff = Math.round((c.test - bc.t.score) * 10) / 10;
+    const saved = !!c.from || isSaved(c.genes);
     el.innerHTML = `<h4><i class="sw" style="background:${EV().colorOf(c.genes)}"></i>${esc(c.name)} <small>${c.from ? 'klassieker ' + esc(c.from) : 'geboren in generatie ' + c.born}${c.parents && c.parents.length ? ' · ouders ' + c.parents.map(esc).join(' × ') : ''}</small></h4>
-      <div class="evo-score"><b>${c.test}</b><span>testbaan<br>${diff >= 0 ? `<em class="up">+${diff}</em>` : `<em class="down">${diff}</em>`} t.o.v. ${esc(bc.p.name)}</span>${c.heavy != null ? `<b class="hv">${c.heavy}</b><span>zware<br>testbaan</span>` : ''}</div>
+      ${scoreBox(EV().testScore(c.genes), { score: c.heavy }, c.from === bc.p.name ? null : { name: bc.p.name, t: bc.t })}${autoInfo()}
       <p class="desc">${esc(EV().describe(c.genes))}</p>
       ${dnaHtml(c.genes)}
       <div class="btns"><button class="btn${saved ? '' : ' primary'}" data-ev="save-champ"${saved ? ' disabled' : ''}>${c.from ? 'Klassieker' : saved ? 'Bewaard ✓' : 'Bewaar kampioen'}</button><button class="btn" data-ev="sel-go" data-id="${esc(c.id)}">Wat wil je doen? →</button></div>`;
@@ -630,7 +742,7 @@
     }
     const nm = V.mazes.length || nEval(), dz = nm > 1 ? 'doolhoven' : 'doolhof', h = E.hist[E.hist.length - 1];
     el.textContent = `Generatie ${E.gen} · ${E.pop.length} lopers × ${nm} ${dz}${runs() > 1 ? ' × ' + runs() + ' runs' : ''}${mm() === 'hunt' ? ' (zoeker-set)' : ''} · ${E.species.length} ${E.species.length === 1 ? 'soort' : 'soorten'}${isl() > 1 ? ' op ' + isl() + ' eilanden' : ''} · ${E.seen.size} verschillende doolhoven`
-      + (h ? ` · vorige: beste ${h.best}, gem. ${h.mean}` : '');
+      + (h ? ` · vorige generatie: score beste ${h.best}, gem. ${h.mean}` : '') + (A.S.evoGrow ? ` · groeit mee (grootte ${A.S.evoSize})` : '');
   }
   function evoBar() {
     const run = $('#evo-run');
@@ -656,7 +768,7 @@
     let items;
     const hs = V.heatSel, on = k => hs === k ? ' class="on"' : '', tip = 'klik: hittekaart van alleen deze soort';
     if (A.S.evoColor === 'gene') items = EV().GENES.slice(0, -1).map(G => `<span><i class="sw" style="background:${G.col}"></i>${esc(G.name)}</span>`);
-    else items = E.species.slice(0, 8).map(s => `<span data-heat="${s.id}"${on(s.id)} title="${s.n} lopers · beste fitness ${Math.round((s.best || 0) * 100)} · ${tip}"><i class="sw" style="background:${s.col}"></i>${esc(s.name)} <small>${s.n}</small></span>`)
+    else items = E.species.slice(0, 8).map(s => `<span data-heat="${s.id}"${on(s.id)} title="${s.n} lopers · beste score ${Math.round((s.best || 0) * 100)} · ${tip}"><i class="sw" style="background:${s.col}"></i>${esc(s.name)} <small>${s.n}</small></span>`)
       .concat(E.species.length > 8 ? [`<span><small>+${E.species.length - 8}</small></span>`] : []);
     if (hs != null) items.unshift('<span data-heat="" class="all" title="Hittekaart van iedereen">✕ alle</span>');
     el.innerHTML = items.join('');
@@ -690,9 +802,8 @@
       benchRide();
     } else if (kind === 'mut') {
       const o = E.mut || {};
-      E.mut = { src: { ...algo, name: algo.name.replace(/ M\d+\.\d+$/, '') }, orig: algo.genes.slice(), orig0: algo.genes.slice(), origName: algo.name,
-        n: o.n || 16, str: o.str || 'middel', rounds: o.rounds || 3, heavy: !!o.heavy, need: o.need != null ? o.need : 3, maxT: o.maxT || 8,
-        round: 0, res: null, log: [], busy: false, bestName: null };
+      E.mut = { src: algo, root: algo.name, rootId: algo.id, orig0: algo.genes.slice(), hist: [], auto: false, n: o.n || 8, str: o.str || 'klein', rounds: o.rounds || 3, need: o.need != null ? o.need : 1, maxT: o.maxT || 4,
+        round: 0, list: null, sc: null, res: null, lead: [], busy: false };
       preview();
     } else if (kind === 'duel') {
       const Ev = EV(), bc = Ev.bestClassic().p, other = bc.genes.join() !== algo.genes.join() ? bc : Ev.PRESETS.find(p => p.genes.join() !== algo.genes.join());
@@ -755,7 +866,7 @@
   }
   function afterHtml() {
     const K = E.task; if (!K || (K.step !== 'done' && K.kind !== 'bench')) return '';
-    const changed = (K.kind === 'bench' && E.bench && E.bench.genes.join() !== E.bench.src.genes.join()) || (K.kind === 'mut' && E.mut && !E.mut.busy && E.mut.src.genes.join() !== E.mut.orig0.join());
+    const changed = (K.kind === 'bench' && E.bench && E.bench.genes.join() !== E.bench.src.genes.join()); // mutantenlab heeft een eigen bewaar-vak (naam, map, notitie)
     return `<div class="after"><h4>${K.step === 'done' ? 'Klaar. En nu?' : 'En nu?'}</h4>${changed ? '<button class="btn primary" data-ev="save-ver">Bewaar als nieuwe versie</button>' : ''}<button class="btn" data-ev="next-task">Volgende taak</button><button class="btn" data-ev="page" data-page="algos">Terug naar overzicht</button></div>`;
   }
   // nieuw bewaarde versie: krijgt de kaart, en is het algoritme voor de volgende taak
@@ -785,9 +896,9 @@
   function benchOut() {
     const B = E.bench; if (!B) return '';
     const t = EV().testScore(B.genes), o = EV().testScore(B.src.genes), d = Math.round((t.score - o.score) * 10) / 10;
-    const sign = v => v > 0 ? `<em class="up">+${v}</em>` : v < 0 ? `<em class="down">${v}</em>` : '<em>±0</em>';
+    const sign = signed;
     const w = T.runs && T.runs[0] && T.runs[0].ws[0];
-    return `<div class="evo-score"><b>${t.score}</b><span>testbaan (${t.solved}/${t.of} gehaald)<br>${sign(d)} t.o.v. origineel ${o.score}</span></div>
+    return `${scoreBox(t, null, d || t.per.join() !== o.per.join() ? { name: 'origineel (' + o.score + ')', t: o } : null)}
       <div class="cats">${EV().TEST_CATS.map(c => `<span>${esc(c.name)} <b>${t.cats[c.k]}</b> ${sign(Math.round((t.cats[c.k] - o.cats[c.k]) * 10) / 10)}</span>`).join('')}</div>
       <p class="hint">Proefrit: ${!w ? '—' : w.reached ? `gehaald in ${w.steps} stappen (kortste ${T.runs[0].mz.ctx.opt})` : w.done ? 'niet gehaald binnen de limiet' : 'bezig…'}</p>
       <div class="btns"><button class="btn" data-ev="bench-duel">Vergelijk met origineel (duel)</button></div>`;
@@ -836,7 +947,7 @@
   }
   function duelOut() {
     const D = E.duel;
-    if (!D || !D.list) return '<p class="hint" style="margin-top:0">Nog niet gestart. Kies links de deelnemers en druk op Start duel. Hier verschijnt dan per deelnemer: stappen in dit doolhof, testbaan en score per doolhof-soort.</p>';
+    if (!D || !D.list) return '<p class="hint" style="margin-top:0">Nog niet gestart. Kies links de deelnemers en druk op Start duel. Hier verschijnt dan per deelnemer: stappen in dit doolhof, Score op de testbaan (met zekerheid) en per doolhof-soort.</p>';
     const cats = EV().TEST_CATS, ts = D.list.map(a => EV().testScore(a.genes));
     const best = key => Math.max(...ts.map(key));
     const cell = (v, b, base, k) => `<td class="${v === b ? 'best' : ''}">${v}${k && base != null ? `<small>${v - base > 0 ? '+' : ''}${Math.round((v - base) * 10) / 10}</small>` : ''}</td>`;
@@ -849,30 +960,48 @@
     let win = '';
     if (D.done && D.res) { const tots = D.res.map(r => r.every(x => x.ok) ? r.reduce((s, x) => s + x.steps, 0) : 1e9), m = Math.min(...tots); win = m < 1e9 ? `🏁 Dit doolhof: <b>${esc(D.list[tots.indexOf(m)].name)}</b> was het snelst.` : 'Niemand haalde het doel binnen de limiet.'; }
     const tw = ts.indexOf(ts.reduce((a, b) => b.score > a.score ? b : a));
-    return `<p style="margin-top:0">${D.done ? win : 'Bezig…'}${D.done ? `<br>📏 Testbaan: <b>${esc(D.list[tw].name)}</b> is algemeen het sterkst.` : ''}</p>
-      <div class="duel-wrap"><table class="duel"><thead><tr><th></th><th>Dit doolhof</th><th>Testbaan</th>${cats.map(c => `<th>${esc(c.name)}</th>`).join('')}</tr></thead><tbody>
-      ${D.list.map((a, k) => `<tr><th><i class="sw" style="background:${a.col}"></i>${esc(a.name)}</th>${mazeCol(k)}${cell(ts[k].score, best(t => t.score), ts[0].score, k)}${cats.map(c => cell(ts[k].cats[c.k], best(t => t.cats[c.k]), ts[0].cats[c.k], k)).join('')}</tr>`).join('')}
+    return `<p style="margin-top:0">${D.done ? win : 'Bezig…'}${D.done ? `<br>📏 Score testbaan: <b>${esc(D.list[tw].name)}</b> is algemeen het sterkst.` : ''}</p>
+      <div class="duel-wrap"><table class="duel"><thead><tr><th></th><th>Dit doolhof</th><th title="Score 0–100 op de testbaan">Score</th><th title="t.o.v. ${esc(D.list[0].name)}, per testdoolhof vergeleken">Zeker?</th>${cats.map(c => `<th>${esc(c.name)}</th>`).join('')}</tr></thead><tbody>
+      ${D.list.map((a, k) => `<tr><th><i class="sw" style="background:${a.col}"></i>${esc(a.name)}</th>${mazeCol(k)}${cell(ts[k].score, best(t => t.score), ts[0].score, k)}<td>${k ? sureTag(sureOf(ts[k].per, ts[0].per)) : '<small>basis</small>'}</td>${cats.map(c => cell(ts[k].cats[c.k], best(t => t.cats[c.k]), ts[0].cats[c.k], k)).join('')}</tr>`).join('')}
       </tbody></table></div><p class="hint">Groen = beste in die kolom; kleine getallen = verschil met de eerste rij.</p>`;
   }
 
-  // ---- Mutantenlab: algoritme → N mutanten → race in één doolhof + testbaan; de beste gaat door ----
-  // De rangorde komt van de testbaan; de race is om te zien. Daarom stopregel: klaar zodra genoeg binnen zijn of na max tijd.
-  const MUT_STR = { klein: 0.06, middel: 0.12, groot: 0.25 };
-  function mutRound() {
+  // ---- Mutantenlab: algoritme → N mutanten (vast voor de hele reeks) → elke ronde een ánder doolhof ----
+  // Score = 0–100 (100 = elke keer de kortste route), zelfde maat als de testbaan. Winnaar = hoogste gemiddelde over alle rondes.
+  // Stopregel is alleen voor het kijken: wie afgekapt wordt, wordt onzichtbaar afgemaakt (zelfde zaadje) → iedereen een eerlijke score.
+  // Zekerheid: verschil met het origineel per doolhof (gepaard); gemiddeld verschil ≥ 2× de standaardfout en ≥ 3 doolhoven = zeker.
+  const MUT_STR = { mini: 0.03, klein: 0.06, middel: 0.12, groot: 0.25 }, STR_ORDER = ['mini', 'klein', 'middel', 'groot'];
+  const MUT_PRESET = { snel: { n: 8, rounds: 3, need: 1, maxT: 4 }, grondig: { n: 24, rounds: 10, need: 3, maxT: 8 } };
+  const AUTO_MAX = 8;
+  const r1 = v => Math.round(v * 10) / 10;
+  function mutMake() {
     const M = E.mut; if (!M) return;
-    M.round++; M.busy = true; M.res = null;
-    const r = ML.makeRng(M.src.name + '|mut|' + M.round + '|' + Math.random()), G = EV().GENES, f = MUT_STR[M.str] || 0.12;
-    const list = [{ id: 'mut-0-' + M.round, name: M.src.name + (M.round > 1 ? ' (beste vorige)' : ' (origineel)'), genes: M.src.genes.slice(), col: '#ffffff', base: true }];
+    const r = ML.makeRng(M.src.name + '|mut|' + Math.random()), G = EV().GENES, f = MUT_STR[M.str] || 0.12;
+    const list = [{ id: 'mut-0', name: M.src.name + (M.auto && M.hist.length ? ' (huidige)' : ' (origineel)'), genes: M.src.genes.slice(), col: '#ffffff', base: true }];
     for (let k = 1; k <= M.n; k++) {
       let genes;
-      do { genes = M.src.genes.map((v, i) => r() < 0.5 ? EV().clamp(v + Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(TAU * r()) * (G[i].hi - G[i].lo) * f, i) : v); } while (genes.join() === M.src.genes.join());
-      list.push({ id: `mut-${k}-${M.round}`, name: `${M.src.name} M${M.round}.${k}`, genes: genes.map(v => Math.round(v * 100) / 100), col: `hsl(${Math.round(k * 360 / M.n)},85%,62%)` });
+      do { genes = M.src.genes.map((v, i) => r() < 0.5 ? Math.max(Math.min(G[i].lo, v), Math.min(Math.max(G[i].hi, v), v + Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(TAU * r()) * (G[i].hi - G[i].lo) * f)) : v); } while (genes.join() === M.src.genes.join()); // bereik rekt mee als de bron erbuiten ligt (Kompas: fresh 8)
+      list.push({ id: `mut-${k}`, name: `${M.src.name} m${k}`, genes: genes.map(v => Math.round(v * 100) / 100), col: `hsl(${Math.round(k * 360 / M.n)},85%,62%)` });
     }
-    M.list = list; T.salt++; T.forced = null;
-    startShow('mut', list, false);
+    M.list = list; M.sc = list.map(() => []); M.round = 0; M.target = +M.rounds; M.extended = false; M.res = null; M.lead = []; M.pick = 0; M.saved = null; M.saveName = null; M.saveNote = null;
+  }
+  function mutRound() {
+    const M = E.mut; if (!M) return;
+    M.round++; M.busy = true;
+    T.salt++; T.forced = null; // nieuw zaadje = nieuw doolhof
+    startShow('mut', M.list, false);
     setStep('busy'); taskIn();
   }
-  // stopregel: genoeg binnen of tijd op → rest niet afwachten; kansloos (al 2× zo veel stappen als de eerste) → afkappen
+  // tempo: een ronde duurt minstens ~1,5 s (doorkweken 0,6 s), anders is er niets te volgen; herhaling rustig
+  function mutRate(spd) {
+    const M = E.mut, k = T.show && T.show.kind, run = T.runs && T.runs[0];
+    if (!M || !run || !E.task || E.task.kind !== 'mut') return spd;
+    const opt = run.mz.ctx.opt || 30;
+    if (k === 'replay') return Math.min(spd, opt * 1.2);
+    if (k === 'mut') return Math.min(spd, opt * 3 / (M.auto ? 0.6 : 1.5));
+    return spd;
+  }
+  // stopregel: genoeg binnen of tijd op → rest niet afwachten (wel uitrekenen in mutDone); kansloos (> 2× stappen eerste) → afkappen
   function mutCheck(t, alive) {
     const M = E.mut, run = T.runs && T.runs[0]; if (!M || !run) return alive;
     const n = run.ws.length, need = M.need ? Math.min(M.need, n) : n, first = run.order[0];
@@ -881,65 +1010,190 @@
     if (run.order.length >= need || t - T.t0 > M.maxT) { for (const w of run.ws) if (!w.done) cut(w); return 0; }
     return alive;
   }
+  // tussenstand: gemiddelde over de gespeelde rondes, beste eerst
+  function mutStand() {
+    const M = E.mut;
+    return M.list.map((a, k) => { const s = M.sc[k], avg = s.length ? s.reduce((x, y) => x + y, 0) / s.length : 0; return { a, k, s, avg }; })
+      .sort((x, y) => y.avg - x.avg);
+  }
+  // hoe zeker is "beter dan het origineel"? gepaard per doolhof
+  function mutSure(x, base) {
+    const n = x.s.length, d = x.s.map((v, i) => v - base.s[i]), m = d.reduce((a, b) => a + b, 0) / Math.max(1, n);
+    if (x === base || x.a.base) return { k: 'base', icon: '', txt: '' };
+    if (m <= 0) return { k: 'no', icon: '❌', txt: 'niet beter dan het origineel' };
+    const sd = n > 1 ? Math.sqrt(d.reduce((a, b) => a + (b - m) ** 2, 0) / (n - 1)) : Infinity, se = sd / Math.sqrt(n);
+    if (n >= 3 && (se === 0 || m >= 2 * se)) return { k: 'yes', icon: '✅', txt: 'zeker beter: wint op bijna elk doolhof' };
+    return { k: 'maybe', icon: '🤔', txt: n < 3 ? 'nog onzeker: te weinig doolhoven' : 'nog onzeker: wisselt per doolhof, kan geluk zijn' };
+  }
   function mutDone() {
     const M = E.mut; if (!M || !M.list) return;
     const run = T.runs[0], Ev = EV();
-    M.res = M.list.map((a, k) => {
-      const w = run.ws[k], t = Ev.testScore(a.genes), h = M.heavy ? Ev.heavyScore(a.genes) : null;
-      return { a, race: w.reached ? w.steps : null, cut: !!w.cut, t: t.score, solved: t.solved, h: h ? h.score : null, score: h ? (t.score + h.score) / 2 : t.score };
-    }).sort((x, y) => y.score - x.score || (x.race || 1e9) - (y.race || 1e9));
-    const best = M.res[0], base = M.res.find(x => x.a.base);
-    M.log.push({ round: M.round, name: best.a.name, score: Math.round(best.score * 10) / 10, gain: Math.round((best.score - base.score) * 10) / 10 });
-    if (!best.a.base) { M.src = { ...M.src, genes: best.a.genes.slice() }; M.bestName = best.a.name; }
-    if (M.round < M.rounds && M.busy) { M.wait = true; setTimeout(() => { M.wait = false; if (E.mut === M && M.busy) mutRound(); }, 900); taskOut(); }
-    else { M.busy = false; setStep('done'); taskIn(); }
+    run.ws.forEach((w, k) => {
+      const sc = w.cut ? Ev.evalOne(run.mz.ctx, M.list[k].genes, w.seed).score() : w.score();
+      M.sc[k].push(r1(sc * 100));
+    });
+    const st = mutStand();
+    M.lead.push({ round: M.round, name: st[0].a.name, avg: r1(st[0].avg) });
+    if (M.round < M.target && M.busy) { M.wait = true; setTimeout(() => { M.wait = false; if (E.mut === M && M.busy) mutRound(); }, M.auto ? 300 : 900); taskOut(); return; }
+    mutFinish();
   }
+  // klaar (of gestopt na ≥1 ronde): eindstand, zekerheid, sterkte bijstellen, evt. doorkweken
+  function mutFinish() {
+    const M = E.mut, Ev = EV();
+    const st = mutStand(), base = st.find(x => x.a.base);
+    M.res = st.map(x => ({ ...x, avg: r1(x.avg), t: Ev.testScore(x.a.genes).score, sure: mutSure(x, base) }));
+    const w = M.res[0], bAvg = base.avg;
+    if (M.auto && M.busy && w.sure.k === 'maybe' && !M.extended) { // twijfel → eerst langer meten
+      M.extended = true; M.target += 5; taskOut(); mutRound(); return;
+    }
+    // sterkte bijstellen voor de volgende reeks
+    const muts = M.res.filter(x => !x.a.base), bad = muts.filter(x => x.avg < bAvg * 0.5).length / Math.max(1, muts.length), si = STR_ORDER.indexOf(M.str);
+    M.strNote = '';
+    if (bad > 0.6 && si > 0) { M.str = STR_ORDER[si - 1]; M.strNote = `Sterkte omlaag naar <b>${M.str}</b>: ${Math.round(bad * 100)}% van de mutanten was veel slechter.`; }
+    else if (bad < 0.1 && w.sure.k !== 'yes' && si < STR_ORDER.length - 1) { M.str = STR_ORDER[si + 1]; M.strNote = `Sterkte omhoog naar <b>${M.str}</b>: de mutanten leken te veel op het origineel.`; }
+    if (M.auto) {
+      M.hist.push({ n: M.hist.length + 1, name: w.a.name, gain: r1(w.avg - bAvg), sure: w.sure.k === 'yes' && !w.a.base });
+      if (w.sure.k === 'yes' && !w.a.base && M.hist.length < AUTO_MAX && M.busy) {
+        M.src = { ...M.src, id: null, name: `${M.root} r${M.hist.length}`, genes: w.a.genes.slice() };
+        taskOut();
+        setTimeout(() => { if (E.mut === M && M.auto && M.busy) { mutMake(); mutRound(); } }, 700);
+        return;
+      }
+      M.auto = false;
+    }
+    // kiezen: winnaar, of bij doorkweken de beste gevonden (= huidige bron) als er geen zekere winnaar meer was
+    const evolved = M.src.genes.join() !== M.orig0.join();
+    M.pick = !w.a.base ? 0 : evolved ? M.res.indexOf(base) : -1;
+    M.busy = false; setStep('done'); taskIn();
+    // winnaar nog één keer rustig laten lopen naast het origineel, op het laatste doolhof
+    const show = [M.res.find(x => x.a.base).a]; if (!w.a.base) show.push(w.a);
+    startShow('replay', show, true);
+  }
+  const canSave = x => x && (!x.a.base || x.a.genes.join() !== E.mut.orig0.join());
   function mutIn() {
     const M = E.mut; if (!M) return '';
-    const sel = (id, opts, v) => `<select data-mut="${id}"${M.busy ? ' disabled' : ''}>${opts.map(([k, t]) => `<option value="${k}"${String(k) === String(v) ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
-    return `<p class="hint" style="margin-top:0">Het lab maakt varianten van <b>${esc(M.origName)}</b>, laat ze racen en meet ze op de testbaan. De beste gaat door naar de volgende ronde.</p>
+    const dis = M.busy ? ' disabled' : '';
+    const sel = (id, opts, v) => `<select data-mut="${id}"${dis}>${opts.map(([k, t]) => `<option value="${k}"${String(k) === String(v) ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
+    const pre = Object.keys(MUT_PRESET).find(p => Object.entries(MUT_PRESET[p]).every(([k, v]) => +M[k] === v));
+    const pb = (p, t, d) => `<button class="btn mut-pre${pre === p ? ' on' : ''}" data-ev="mut-preset" data-p="${p}"${dis}><b>${t}</b><small>${d}</small></button>`;
+    return `<p class="hint" style="margin-top:0">Het lab maakt <b>één groep</b> varianten van <b>${esc(M.src.name)}</b>. Die groep loopt <b>elke ronde een ander doolhof</b>. Winnaar = <b>hoogste gemiddelde score</b> over alle rondes. Het origineel loopt mee als maatstaf.</p>
+      <div class="mut-pres">${pb('snel', '⚡ Snel', '8 mutanten · 3 doolhoven')}${pb('grondig', '🔬 Grondig', '24 mutanten · 10 doolhoven')}</div>
+      <details class="ev-set"${pre ? '' : ' open'}><summary>Meer instellingen</summary>
       <div class="frow2"><span>Mutanten</span>${sel('n', [[8, 8], [16, 16], [24, 24], [40, 40]], M.n)}</div>
-      <div class="frow2"><span>Sterkte</span>${sel('str', [['klein', 'klein'], ['middel', 'middel'], ['groot', 'groot']], M.str)}</div>
-      <div class="frow2"><span>Rondes</span>${sel('rounds', [[1, 1], [3, 3], [5, 5], [10, 10]], M.rounds)}</div>
-      <div class="frow2"><span></span><label class="check"><input type="checkbox" data-mut="heavy"${M.heavy ? ' checked' : ''}${M.busy ? ' disabled' : ''}> ook zware testbaan</label></div>
-      <h4 class="col-h" style="margin-top:12px">Stopregel per ronde</h4>
-      <div class="frow2"><span>Klaar als</span>${sel('need', [[1, 'de eerste binnen is'], [3, '3 binnen zijn'], [5, '5 binnen zijn'], [0, 'iedereen klaar is']], M.need)}</div>
+      <div class="frow2"><span>Sterkte</span>${sel('str', STR_ORDER.map(s => [s, s]), M.str)}</div>
+      <div class="frow2"><span>Rondes</span>${sel('rounds', [[1, '1 doolhof'], [3, '3 doolhoven'], [5, '5 doolhoven'], [10, '10 doolhoven'], [20, '20 doolhoven']], M.rounds)}</div>
+      <div class="frow2"><span>Kijken tot</span>${sel('need', [[1, 'de eerste binnen is'], [3, '3 binnen zijn'], [5, '5 binnen zijn'], [0, 'iedereen klaar is']], M.need)}</div>
       <div class="frow2"><span>of na</span>${sel('maxT', [[4, '4 s'], [8, '8 s'], [15, '15 s'], [30, '30 s']], M.maxT)}</div>
-      <p class="hint">Wie al 2× zo veel stappen zette als de eerste aankomer, wordt afgekapt. De race is om te kijken: de rangorde komt van de testbaan, dus wachten op de rest verandert niets.</p>
-      <div class="btns"><button class="btn primary" data-ev="mut-go"${M.busy ? ' disabled' : ''}>${M.busy ? 'Bezig…' : M.round ? `Nog ${M.rounds} ronde${M.rounds > 1 ? 's' : ''}` : 'Start'}</button>${M.busy ? '<button class="btn" data-ev="mut-stop">Stop</button>' : ''}</div>`;
+      <p class="hint">Sterkte past zich na elke reeks vanzelf aan. Wie je niet ziet uitlopen, wordt op de achtergrond afgemaakt: de uitslag is altijd eerlijk.</p></details>
+      <div class="btns"><button class="btn primary" data-ev="mut-go"${dis}>${M.busy && !M.auto ? 'Bezig…' : M.round ? 'Nieuwe reeks' : 'Start'}</button><button class="btn" data-ev="mut-auto"${dis} title="Steeds de zekere winnaar als nieuwe bron, tot er geen zekere winst meer is (max ${AUTO_MAX} reeksen)">${M.auto ? '🔁 Doorkweken…' : '🔁 Doorkweken'}</button>${M.busy ? '<button class="btn" data-ev="mut-stop">Stop</button>' : ''}</div>
+      ${goalHtml()}`;
+  }
+  // tabel: plaats, naam, score, score per ronde, (testbaan), verschil met origineel + zekerheid
+  function mutTable(rows, done) {
+    const M = E.mut, base = rows.find(x => x.a.base), R = M.sc[0].length, perR = R <= 10;
+    const head = `<tr><th>#</th><th>Algoritme</th><th title="gemiddelde over alle rondes, 0–100">Score</th>${perR ? Array.from({ length: R }, (_, i) => `<th>R${i + 1}</th>`).join('') : '<th>laagste</th><th>hoogste</th>'}${done ? '<th title="12 vaste doolhoven, zelfde maat, ter controle">Testbaan</th>' : ''}<th>Δ</th></tr>`;
+    const body = rows.slice(0, done ? 41 : 12).map((x, i) => {
+      const d = r1(x.avg - base.avg), idx = done ? M.res.indexOf(x) : -1, on = done && M.pick === idx, clk = done && canSave(x);
+      const cells = perR ? x.s.map((v, j) => `<td${!x.a.base && v > base.s[j] ? ' class="win"' : ''}>${v}</td>`).join('') : `<td>${Math.min(...x.s)}</td><td>${Math.max(...x.s)}</td>`;
+      const sure = x.sure ? `<span title="${esc(x.sure.txt)}">${x.sure.icon}</span>` : '';
+      return `<tr class="${i ? '' : 'top'}${on ? ' pick' : ''}${clk ? ' clk' : ''}"${clk ? ` data-ev="mut-pick" data-k="${idx}" title="klik om deze te kiezen"` : ''}><td>${i + 1}</td><th><i class="sw" style="background:${x.a.col}"></i>${esc(x.a.name)}${x.a.base ? ' <small>maatstaf</small>' : ''}</th><td class="${i ? '' : 'best'}"><b>${r1(x.avg)}</b></td>${cells}${done ? `<td>${x.t}</td>` : ''}<td>${x.a.base ? '' : (d > 0 ? '+' : '') + d} ${sure}</td></tr>`;
+    }).join('');
+    return `<div class="duel-wrap"><table class="duel mut-tab"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+  }
+  function autoHtml() {
+    const M = E.mut; if (!M.hist || !M.hist.length) return '';
+    return `<div class="tree"><b>Doorkweken</b> ${M.hist.map(h => `reeks ${h.n}: ${h.gain > 0 ? '+' : ''}${h.gain} ${h.sure ? '✅' : '❌'}`).join(' · ')}${!M.auto && !M.busy ? ' → klaar' : ''}</div>`;
   }
   function mutOut() {
     const M = E.mut; if (!M) return '';
-    const Ev = EV(), o = Ev.testScore(M.orig0).score, cur = Ev.testScore(M.src.genes).score;
-    let html = `<p style="margin-top:0">Bron <b>${esc(M.origName)}</b>: testbaan ${o}${M.round ? ` · beste nu ${cur} ${cur > o ? `<em class="up">+${Math.round((cur - o) * 10) / 10}</em>` : ''}` : ''}</p>`;
-    const run = T.runs && T.runs[0];
-    if (M.busy && !M.res && run && T.show && T.show.kind === 'mut') {
-      const n = run.ws.length, need = M.need ? Math.min(M.need, n) : n, got = run.order.length;
-      const el = performance.now() / 1000 - T.t0, left = Math.max(0, Math.ceil(M.maxT - el)), p = Math.min(1, Math.max(got / need, el / M.maxT));
-      html += `<div class="wait">Ronde <b>${M.round}/${M.rounds}</b> · wacht op <b>${need}</b> van ${n} · <b>${got}</b> binnen · ${run.cut} afgekapt · nog max ${left} s</div>
-        <div class="prog"><i style="width:${Math.round(p * 100)}%"></i></div>
-        <div class="wsec">Binnen</div><ol class="arrivals">${run.order.map(w => `<li><i class="sw" style="background:${w.col}"></i>${esc(w.ge.name)}<em>${w.steps} st.</em></li>`).join('') || '<li class="hint">nog niemand…</li>'}</ol>`;
+    let html = '';
+    const run = T.runs && T.runs[0], played = M.list ? M.sc[0].length : 0;
+    if (M.busy && M.auto && !played && M.hist.length) html += `<div class="wait">Reeks ${M.hist.length} gaf een zekere winnaar. Reeks ${M.hist.length + 1} start met die winnaar als bron…</div>`;
+    if (M.busy && run && T.show && T.show.kind === 'mut') {
+      const ser = M.auto ? `Reeks ${M.hist.length + 1} · ` : '';
+      if (M.wait) html += `<div class="wait">${ser}Ronde ${M.round} klaar. Ronde ${M.round + 1} van ${M.target} start zo, op een nieuw doolhof…</div>`;
+      else {
+        const n = run.ws.length, need = M.need ? Math.min(M.need, n) : n, got = run.order.length;
+        const el = performance.now() / 1000 - T.t0, left = Math.max(0, Math.ceil(M.maxT - el)), p = Math.min(1, Math.max(got / need, el / M.maxT));
+        html += `<div class="wait">${ser}Ronde <b>${M.round}/${M.target}</b> (doolhof ${M.round}) · <b>${got}</b> binnen · ${run.cut} afgekapt · nog max ${left} s</div>
+          <div class="prog"><i style="width:${Math.round(p * 100)}%"></i></div>
+          <div class="wsec">Binnen deze ronde</div><ol class="arrivals">${run.order.slice(0, 6).map(w => `<li><i class="sw" style="background:${w.col}"></i>${esc(w.ge.name)}<em>${w.steps} st.</em></li>`).join('') || '<li class="hint">nog niemand…</li>'}</ol>`;
+      }
+      if (played) html += `<p><b>Tussenstand na ${played} ${played > 1 ? 'doolhoven' : 'doolhof'}</b> · score 0–100, beste eerst</p>` + mutTable(mutStand(), false);
+      html += autoHtml();
     } else if (M.res) {
-      if (M.busy) html += `<div class="wait">Ronde ${M.round} klaar — ronde ${M.round + 1} start zo…</div>`;
-      html += `<p><b>Ronde ${M.round}</b> · volgorde op ${M.heavy ? 'gemiddelde van testbaan en zware testbaan' : 'testbaan'}; race = stappen in dit doolhof (– = niet afgewacht).</p>
-        <div class="duel-wrap"><table class="duel"><thead><tr><th></th><th>Race</th><th>Test</th>${M.heavy ? '<th>Zwaar</th>' : ''}<th>Δ</th></tr></thead><tbody>
-        ${M.res.slice(0, 14).map((x, i) => { const b = M.res.find(y => y.a.base), d = Math.round((x.score - b.score) * 10) / 10;
-          return `<tr${i ? '' : ' class="top"'}><th><i class="sw" style="background:${x.a.col}"></i>${esc(x.a.name)}</th><td>${x.race != null ? x.race : x.cut ? '–' : '✗'}</td><td class="${i ? '' : 'best'}">${x.t}</td>${M.heavy ? `<td>${x.h}</td>` : ''}<td>${x.a.base ? '' : (d > 0 ? '+' : '') + d}</td></tr>`; }).join('')}
-        </tbody></table></div>`;
-    } else if (!M.busy) html += '<p class="hint">Stel links in hoeveel mutanten en rondes, en druk op Start. Het doolhof laat nu een voorproefje van het origineel zien.</p>';
-    if (M.log.length) html += `<div class="tree"><b>Verloop</b> ${M.log.map(l => `R${l.round}: ${l.score}${l.gain > 0 ? ` (+${l.gain})` : ' (geen winst)'}`).join(' · ')}</div>`;
-    if (!M.busy && M.round && M.src.genes.join() !== M.orig0.join()) html += '<div class="btns"><button class="btn" data-ev="mut-duel">Duel met origineel</button><button class="btn" data-ev="mut-bench">Beste naar werkbank</button></div>';
+      const w = M.res[0], base = M.res.find(x => x.a.base), d = r1(w.avg - base.avg), s = w.sure;
+      const evolved = M.src.genes.join() !== M.orig0.join();
+      if (w.a.base) html += evolved
+        ? `<div class="mut-win"><span class="md">🔁</span><div><b>Doorkweken klaar</b><span>Geen zekere winst meer. Beste gevonden: <b>${esc(M.src.name)}</b>, testbaan ${base.t} (start ${EV().testScore(M.orig0).score}).</span></div></div>`
+        : `<div class="mut-win lose"><b>Geen mutant was beter</b><span>Het origineel won met score ${base.avg} over ${played} doolhoven. Probeer opnieuw: de sterkte is al aangepast.</span></div>`;
+      else html += `<div class="mut-win ${s.k}"><span class="md">${s.k === 'yes' ? '🏆' : '🤔'}</span><div><b>${esc(w.a.name)}</b><span>score <b>${w.avg}</b> over <b>${played}</b> verschillende doolhoven · origineel ${base.avg} <em class="up">+${d}</em></span><span class="sure">${s.icon} ${esc(s.txt)}</span></div>
+        ${s.k === 'maybe' ? '<button class="btn primary" data-ev="mut-more">+5 doolhoven</button>' : ''}</div>`;
+      if (M.strNote) html += `<p class="hint">${M.strNote}</p>`;
+      html += `<p class="hint">Score = gemiddelde van R1…R${played}, 0–100 (100 = elke keer de kortste route). Groen = beter dan het origineel op dat doolhof. Testbaan = 12 vaste doolhoven, zelfde maat, ter controle. Klik een rij om die te bewaren. Het doolhof laat de winnaar nog eens rustig lopen.</p>` + mutTable(M.res, true);
+      html += autoHtml() + mutSaveBox();
+      if (M.lead.length > 1) html += `<div class="tree"><b>Koploper per ronde</b> ${M.lead.map(l => `R${l.round}: ${esc(l.name.replace(M.src.name + ' ', ''))} (${l.avg})`).join(' · ')}</div>`;
+    } else if (!M.busy) html += '<p class="hint">Kies ⚡ Snel of 🔬 Grondig en druk op Start. Of laat het lab zelf doorkweken. Het doolhof laat nu een voorproefje van het origineel zien.</p>';
     return html;
   }
+  // doelen: klassiekers als ladder, jouw beste eigen algoritme ertussen
+  function goalHtml(extra) {
+    const Ev = EV(), cls = Ev.PRESETS.map(p => ({ name: p.name, s: Ev.testScore(p.genes).score, g: p.genes })).filter(c => c.s >= 10).sort((a, b) => a.s - b.s); // Dwaler is geen doel
+    const own = Ev.loadAlgos().map(a => ({ name: a.name, s: Ev.testScore(a.genes).score, g: a.genes })).concat(extra ? [extra] : []);
+    const mine = own.slice().sort((a, b) => b.s - a.s)[0];
+    const next = mine ? cls.find(c => c.s >= mine.s) : cls[0]; // gelijk = nog niet verslagen
+    const bar = (goals, me, nx, unit) => {
+      const top = Math.max(100, ...goals.map(c => c.s));
+      const dots = goals.map(c => `<i class="lg-c${me && me.s > c.s ? ' beat' : ''}${c.mile ? ' mile' : ''}" style="left:${c.s / top * 100}%" title="${esc(c.name)} ${c.s}${unit}">${c === nx ? `<span class="${c.s / top < 0.2 ? 'l' : c.s / top > 0.8 ? 'r' : ''}">doel: ${esc(c.name)}</span>` : ''}</i>`).join('');
+      return `<div class="lg-bar">${dots}${me ? `<i class="lg-me" style="left:${me.s / top * 100}%" title="${esc(me.name)} ${me.s}${unit}"></i>` : ''}</div>`;
+    };
+    // trap 1: klassiekers op de testbaan
+    if (!mine || next) {
+      const txt = !mine ? `Nog geen eigen algoritme. Eerste doel: <b>${esc(cls[0].name)}</b> verslaan.`
+        : `Jouw beste: <b>${esc(mine.name)}</b> ${mine.s} · volgende doel: <b>${esc(next.name)}</b> ${next.s} <small>(${next.s === mine.s ? 'gelijk: net iets beter nodig' : 'nog ' + r1(next.s - mine.s)})</small>`;
+      return `<div class="ladder"><div class="lg-t"><em class="lg-k">Trap 1 · testbaan</em>${txt}</div>${bar(cls, mine, next, '')}</div>`;
+    }
+    // trap 2: zware testbaan (klassiekers + mijlpalen 50/70/90)
+    if (!Ev.heavyReady()) return `<div class="ladder"><div class="lg-t"><em class="lg-k">Trap 1 ✓</em>🏆 Jouw <b>${esc(mine.name)}</b> (${mine.s}) verslaat alle klassiekers. Volgende trap: de zware testbaan <small>(wordt klaargezet…)</small></div>${bar(cls, mine, null, '')}</div>`;
+    const hc = Ev.PRESETS.map(p => ({ name: p.name, s: Ev.heavyScore(p.genes).score })).filter(c => c.s >= 5);
+    const miles = [50, 70, 90].filter(v => !hc.some(c => Math.abs(c.s - v) < 2)).map(v => ({ name: 'zwaar ' + v, s: v, mile: true }));
+    const goals = hc.concat(miles).sort((a, b) => a.s - b.s);
+    const hm = own.map(o => ({ name: o.name, s: Ev.heavyScore(o.g).score })).sort((a, b) => b.s - a.s)[0];
+    const nx = goals.find(c => c.s >= hm.s);
+    const txt = nx ? `Zware testbaan: jouw beste <b>${esc(hm.name)}</b> ${hm.s} · volgende doel: <b>${esc(nx.name)}</b> ${nx.s} <small>(nog ${r1(nx.s - hm.s)})</small>`
+      : `👑 Jouw <b>${esc(hm.name)}</b> (${hm.s}) verslaat ook alles op de zware testbaan. Alle doelen gehaald!`;
+    return `<div class="ladder heavy"><div class="lg-t"><em class="lg-k">Trap 2 · zware testbaan</em>${txt}</div>${bar(goals, hm, nx, ' zwaar')}</div>`;
+  }
+  // bewaren: gekozen rij met eigen naam, map en notitie
+  function mutSaveBox() {
+    const M = E.mut, x = M.res[M.pick];
+    if (M.saved) return `<div class="after mut-save"><h4>✓ Bewaard als <b>${esc(M.saved.name)}</b></h4><span class="hint" style="width:100%;margin:0">Staat nu bij Algoritmes en kan als oplosser gekozen worden. Zet hem meteen in:</span>
+      <button class="btn primary" data-ev="mut-go-build">▶ Laat hem lopen (Bouwen)</button><button class="btn primary" data-ev="mut-go-race">🏁 Race tegen klassiekers (Lab)</button>
+      <button class="btn" data-ev="mut-again">Nieuwe reeks met ${esc(M.saved.name)} als bron</button><button class="btn" data-ev="mut-duel">Duel met origineel</button><button class="btn" data-ev="mut-bench">Naar werkbank</button>
+      <div style="width:100%">${goalHtml()}</div></div>`;
+    if (!canSave(x)) return '<div class="after mut-save"><h4>Kies een mutant</h4><span class="hint" style="margin:0">Klik een rij in de tabel om die te bewaren.</span></div>';
+    const algos = EV().loadAlgos(), parent = algos.find(a => a.genes.join() === M.orig0.join());
+    const name = M.saveName != null ? M.saveName : `${M.root.replace(/ v\d+$/, '')} v${parent ? parent.ver + 1 : 2}`;
+    const nt = M.saveNote != null ? M.saveNote : `Mutantenlab: score ${x.avg} over ${M.sc[0].length} doolhoven, testbaan ${x.t}${M.hist.length ? `, ${M.hist.length} reeksen doorgekweekt` : ''}, vanaf ${M.root}`;
+    return `<div class="after mut-save"><h4>💾 Bewaar <i class="sw" style="background:${x.a.col}"></i>${esc(x.a.name)} als nieuw algoritme</h4>
+      <label class="frow" style="width:100%"><span>Naam</span><input id="mut-name" value="${esc(name)}" maxlength="40"></label>
+      <label class="frow" style="width:100%"><span>Map</span><input id="mut-folder" value="${esc(M.saveFolder != null ? M.saveFolder : parent ? parent.folder || '' : '')}" maxlength="30" placeholder="(geen)"></label>
+      <label class="frow" style="width:100%"><span>Notitie</span><textarea id="mut-note" rows="2" maxlength="500">${esc(nt)}</textarea></label>
+      <button class="btn primary" data-ev="mut-save">Bewaar</button><button class="btn" data-ev="mut-duel">Eerst duel met origineel</button>
+      <div style="width:100%">${goalHtml({ name: x.a.name, s: x.t, g: x.a.genes })}</div></div>`;
+  }
   function mutSave() {
-    const M = E.mut; if (!M) return;
-    const algos = EV().loadAlgos(), parent = algos.find(a => a.id === M.src.id) || algos.find(a => a.genes.join() === M.orig0.join());
-    const ver = parent ? parent.ver + 1 : 2, name = `${M.src.name.replace(/ v\d+$/, '')} v${ver}`;
-    const a = saveVersion({ name, genes: M.src.genes, parent: parent ? parent.id : M.src.id, ver, parents: [M.origName], folder: parent ? parent.folder : '', tags: parent ? parent.tags : ['mutant'], born: E.gen, note: `Mutantenlab: ${M.log.length} rondes vanaf ${M.origName}` });
+    const M = E.mut; if (!M || !M.res) return;
+    const x = M.res[M.pick]; if (!canSave(x)) { note('Kies eerst een mutant in de tabel.'); return; }
+    const algos = EV().loadAlgos(), parent = algos.find(a => a.genes.join() === M.orig0.join());
+    const ver = parent ? parent.ver + 1 : 2;
+    const name = ($('#mut-name') ? $('#mut-name').value : M.saveName || '').trim().slice(0, 40) || `${M.root.replace(/ v\d+$/, '')} v${ver}`;
+    const folder = ($('#mut-folder') ? $('#mut-folder').value : M.saveFolder || '').trim().slice(0, 30);
+    const nt = ($('#mut-note') ? $('#mut-note').value : M.saveNote || '').slice(0, 500);
+    const a = saveVersion({ name, genes: x.a.genes, parent: parent ? parent.id : M.rootId, ver, parents: [M.root], folder, tags: parent && parent.tags && parent.tags.length ? parent.tags : ['mutant'], born: E.gen, note: nt });
     if (!a) return;
-    note(`${name} bewaard.`);
-    E.task.algo = pick({ ...a, mine: true }); M.orig0 = a.genes.slice(); M.src = { ...M.src, id: a.id };
-    stepsRender(); taskOut();
+    M.saved = a; note(`${a.name} bewaard.`);
+    taskOut();
   }
 
   // ---- Doolhof-zoeker: welke doolhoven zijn het moeilijkst voor dit algoritme? (zoekt + klimt naar slechtere scores) ----
@@ -1115,7 +1369,7 @@
       const bc = Ev.bestClassic();
       svg = `<svg viewBox="0 0 700 210" class="chart"><line x1="40" x2="680" y1="${Y(bc.t.score)}" y2="${Y(bc.t.score)}" stroke="#ff6b6b" stroke-dasharray="6 5"/><text x="44" y="${Y(bc.t.score) - 5}" fill="#ff6b6b">beste klassieker ${esc(bc.p.name)} ${bc.t.score}</text>
         <polyline points="${bestPts.join(' ')}" fill="none" stroke="#ffd166" stroke-width="1.2" opacity=".7"/><polyline points="${recPts.join(' ')}" fill="none" stroke="#4cc9f0" stroke-width="2.6"/>
-        <text x="40" y="206">generatie ${hs[0].gen}</text><text x="680" y="206" text-anchor="end">generatie ${hs[n - 1].gen}</text><text x="44" y="14" fill="#4cc9f0">record testbaan</text><text x="170" y="14" fill="#ffd166">fitness beste</text></svg>`;
+        <text x="40" y="206">generatie ${hs[0].gen}</text><text x="680" y="206" text-anchor="end">generatie ${hs[n - 1].gen}</text><text x="44" y="14" fill="#4cc9f0">record score testbaan</text><text x="200" y="14" fill="#ffd166">score beste (eigen doolhoven)</text></svg>`;
     }
     const rows = list.map((a, i) => `<tr><td>${i + 1}</td><td><i class="sw" style="background:${Ev.colorOf(a.genes)}"></i>${esc(a.name)}<small>${a.classic ? 'klassieker' : a.live ? 'kampioen (niet bewaard)' : 'eigen'}</small></td>
       <td class="n">${a.t.score}</td><td class="n">${heavy ? Ev.heavyScore(a.genes).score : '–'}</td><td class="n">${a.t.solved}/${a.t.of}</td>${Ev.TEST_CATS.map(k => `<td class="n">${a.t.cats[k.k]}</td>`).join('')}<td>${bars(a.genes)}</td></tr>`).join('');
@@ -1159,7 +1413,7 @@ ${fame.length ? `<h2>Eregalerij</h2><div class="wrap"><table><thead><tr><th>#</t
     const list = EV().loadAlgos();
     if (list.some(a => a.genes.join() === o.genes.join())) return false;
     const a = EV().newAlgo(o); EV().stampHist(a); list.push(a);
-    EV().saveAlgos(list); return true;
+    EV().saveAlgos(list); return a;
   }
   function onClick(e) {
     const hb = e.target.closest('[data-heat]');
@@ -1179,6 +1433,12 @@ ${fame.length ? `<h2>Eregalerij</h2><div class="wrap"><table><thead><tr><th>#</t
     else if (act === 'unsel') { E.sel = null; markSel(); algoDetail(); }
     else if (act === 'sel-go') { E.sel = id; setPage('algos'); const c = document.querySelector(`#algo-grid .acard.sel`); if (c) c.scrollIntoView({ block: 'nearest' }); }
     else if (act === 'save-champ') saveChamp();
+    else if (act === 'tour') tour(+b.dataset.k || 0);
+    else if (act === 'tour-end') tour(null);
+    else if ((act === 'go-build' || act === 'go-race') && a && A.go) A.go(act === 'go-race' ? 'race' : 'build', a);
+    else if (act === 'go-watch' && A.go) { if (a && !a.classic && !isSaved(a.genes)) addAlgo({ name: a.name, genes: a.genes, born: a.born || 0, parents: a.parents || [] }); if (!EV().loadAlgos().length) { note('Bewaar eerst een eigen algoritme; Kijken toont dan alleen jouw algoritmes.'); return; } A.go('watch', a); }
+    else if (act === 'share' && a) { E.share = E.share === a.id ? null : a.id; algoDetail(); }
+    else if (act === 'share-copy' && a) { const url = shareLink(a); (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => note('Link gekopieerd.'), () => prompt('Kopieer deze link', url)); }
     else if (act === 'save-any' && a) { note(addAlgo({ name: a.name, genes: a.genes, born: a.born || a.gen || 0, parents: a.parents || [] }) ? `${a.name} bewaard.` : 'Stond er al.'); afterSave(); }
     else if (act.startsWith('task-') && TASKS[act.slice(5)]) openTask(act.slice(5), a);
     else if (act === 'tree') { E.treeSel = id; setPage('ana'); }
@@ -1208,17 +1468,26 @@ ${fame.length ? `<h2>Eregalerij</h2><div class="wrap"><table><thead><tr><th>#</t
     else if (act === 'bench-reset' && B) { B.genes = B.src.genes.slice(); taskIn(); benchRide(); }
     else if (act === 'bench-nudge' && B) {
       const r = ML.makeRng(Math.random()), G = EV().GENES;
-      B.genes = B.genes.map((v, i) => r() < 0.4 ? EV().clamp(v + (r() * 2 - 1) * (G[i].hi - G[i].lo) * 0.12, i) : v).map(v => Math.round(v * 10) / 10);
+      B.genes = B.genes.map((v, i) => r() < 0.4 ? EV().clamp(v + (r() * 2 - 1) * (G[i].hi - G[i].lo) * 0.12, i, v) : v).map(v => Math.round(v * 10) / 10);
       taskIn(); benchRide();
     }
     // duel
     else if (act === 'duel-start' && E.duel) startDuel(E.duel.pick, true);
     else if (act === 'duel-again' && E.duel) { T.salt++; T.forced = null; T.mazes = []; startDuel(E.duel.pick, false); }
     // mutanten
-    else if (act === 'mut-go' && M) { M.rounds = +M.rounds; M.round = 0; M.log = []; M.orig = M.src.genes.slice(); M.origName = M.bestName || M.origName; mutRound(); }
-    else if (act === 'mut-stop' && M) { M.busy = false; if (T.show && T.show.kind === 'mut' && T.phase === 'run') { T.running = false; } setStep(M.res ? 'done' : 'pick'); taskIn(); }
-    else if (act === 'mut-bench' && M) openTask('bench', { id: M.src.id, name: M.bestName || M.src.name, genes: M.src.genes, ver: M.src.ver, folder: M.src.folder, tags: M.src.tags });
-    else if (act === 'mut-duel' && M) duelNow([{ id: 'mut-orig', name: M.origName, genes: M.orig0 }, { id: 'mut-best', name: M.bestName || 'Beste mutant', genes: M.src.genes }]);
+    else if (act === 'mut-go' && M) { M.rounds = +M.rounds; M.auto = false; M.hist = []; mutMake(); mutRound(); }
+    else if (act === 'mut-auto' && M) { M.rounds = +M.rounds; M.auto = true; M.hist = []; M.src = { ...M.src, genes: M.orig0.slice(), name: M.root }; mutMake(); mutRound(); }
+    else if (act === 'mut-preset' && M && !M.busy) { Object.assign(M, MUT_PRESET[b.dataset.p]); taskIn(); }
+    else if (act === 'mut-more' && M && M.res) { M.target = M.sc[0].length + 5; M.res = null; M.saved = null; mutRound(); }
+    else if ((act === 'mut-go-build' || act === 'mut-go-race') && M && M.saved && A.go) A.go(act === 'mut-go-race' ? 'race' : 'build', M.saved);
+    else if (act === 'mut-stop' && M) {
+      M.busy = false; M.wait = false; M.auto = false; if (T.show && T.show.kind === 'mut' && T.phase === 'run') T.running = false;
+      if (M.list && M.sc[0].length) mutFinish(); else { M.round = 0; setStep('pick'); taskIn(); }
+    }
+    else if (act === 'mut-pick' && M && M.res) { M.pick = +b.dataset.k; M.saved = null; M.saveNote = null; taskOut(); }
+    else if (act === 'mut-save' && M) mutSave();
+    else if ((act === 'mut-again' || act === 'mut-bench') && M && M.saved) openTask(act === 'mut-again' ? 'mut' : 'bench', { ...M.saved, mine: true });
+    else if (act === 'mut-duel' && M && M.res && M.res[M.pick]) { const x = M.res[M.pick]; duelNow([{ id: 'mut-orig', name: M.root, genes: M.orig0 }, { id: M.saved ? M.saved.id : 'mut-best', name: M.saved ? M.saved.name : x.a.name, genes: x.a.genes }]); }
     // zoeker
     else if (act === 'hunt-go' && H) { if (H.running) H.running = false; else huntRun(); }
     else if (act === 'hunt-watch') huntShow(+b.dataset.i, false);
@@ -1267,8 +1536,8 @@ ${fame.length ? `<h2>Eregalerij</h2><div class="wrap"><table><thead><tr><th>#</t
       let n = 0;
       try {
         const o = JSON.parse(rd.result), NG = EV().GENES.length, str = (v, k) => typeof v === 'string' ? v.slice(0, k) : '';
-        for (const x of (o.algos || [])) if (Array.isArray(x.genes) && x.genes.length === NG && x.genes.every(v => typeof v === 'number' && isFinite(v))) {
-          if (addAlgo({ name: str(x.name, 40) || 'Geïmporteerd', genes: x.genes.map(EV().clamp), born: x.born | 0, parents: Array.isArray(x.parents) ? x.parents.map(p => str(p, 40)) : [],
+        for (const x of (o.algos || [])) if ((x.genes = EV().upGenes(x.genes)) && EV().okGenes(x.genes)) {
+          if (addAlgo({ name: str(x.name, 40) || 'Geïmporteerd', genes: x.genes.map((v, i) => EV().clampHard(v, i)), born: x.born | 0, parents: Array.isArray(x.parents) ? x.parents.map(p => str(p, 40)) : [],
             ver: x.ver | 0 || 1, folder: str(x.folder, 30), tags: Array.isArray(x.tags) ? x.tags.map(t => str(t, 20)).filter(Boolean) : [], note: str(x.note, 500) })) n++;
         }
       } catch (e) { /* ongeldig */ }
@@ -1277,7 +1546,7 @@ ${fame.length ? `<h2>Eregalerij</h2><div class="wrap"><table><thead><tr><th>#</t
     rd.readAsText(f);
   }
   function pasteCode() {
-    const s = prompt('Plak een deelcode (begint met MLDNA1:)');
+    const s = prompt('Plak een deelcode of link (MLDNA1:…, MLDNA2.… of …#dna=…)');
     if (!s) return;
     const o = EV().fromCode(s);
     note(!o ? 'Dat is geen geldige deelcode.' : addAlgo(o) ? `${o.name} toegevoegd.` : `${o.name} stond er al.`); afterSave();
@@ -1303,6 +1572,7 @@ ${fame.length ? `<h2>Eregalerij</h2><div class="wrap"><table><thead><tr><th>#</t
         else if (['evoGrid', 'evoSize', 'evoBraid', 'evoPuzzle', 'evoMakers'].includes(k)) { startGen(); evoBar(); }
         else if (k === 'evoIslands') { EV().assignIslands(E.pop, isl()); speciate(); persist(); status(); note(isl() > 1 ? `${isl()} eilanden: elk eiland evolueert apart; elke 8 generaties verhuist de beste naar het volgende eiland.` : 'Weer één populatie.'); }
         else if (k === 'evoRuns') status();
+        else if (k === 'evoAutoStop' || k === 'evoAutoSave' || k === 'evoGrow') { E.stopFrom = E.gen; E.growG = E.gen; champCard(); status(); }
       });
     });
     const view = $('#view-evo');
@@ -1314,13 +1584,16 @@ ${fame.length ? `<h2>Eregalerij</h2><div class="wrap"><table><thead><tr><th>#</t
       if (t.id === 'lib-q') { E.libQ = t.value; algoGrid(); }
       else if (t.dataset.g != null) benchInput(t);
       else if (t.id === 'bench-name' && E.bench) E.bench.name = t.value;
+      else if (E.mut && t.id === 'mut-name') E.mut.saveName = t.value;
+      else if (E.mut && t.id === 'mut-folder') E.mut.saveFolder = t.value;
+      else if (E.mut && t.id === 'mut-note') E.mut.saveNote = t.value;
     });
     view.addEventListener('change', e => {
       const t = e.target;
       if (t.id === 'lib-folder') { E.libFolder = t.value; algoGrid(); }
       else if (t.id === 'lib-sort') { E.libSort = t.value; algoGrid(); }
       else if (t.dataset.f) libField(t);
-      else if (t.dataset.mut && E.mut) { const k = t.dataset.mut; E.mut[k] = k === 'heavy' ? t.checked : k === 'str' ? t.value : +t.value; if (k === 'heavy' && t.checked) setTimeout(() => { EV().heavyScore(E.mut.orig); taskOut(); }, 30); }
+      else if (t.dataset.mut && E.mut) { const k = t.dataset.mut; E.mut[k] = k === 'str' ? t.value : +t.value; }
       else if (t.dataset.hunt && E.hunt) E.hunt.grids = t.value;
       else if (t.dataset.duel != null && E.duel) {
         const id = t.dataset.duel;
@@ -1341,6 +1614,7 @@ ${fame.length ? `<h2>Eregalerij</h2><div class="wrap"><table><thead><tr><th>#</t
   }
   function enter() {
     if (!E.pop.length || !E.base) fresh([]);
+    const shared = openShared();
     if (!started) {
       started = true; makePanes(); setPage(E.page);
       requestAnimationFrame(() => { startGen(); refreshUI(true); evoBar(); });
@@ -1350,6 +1624,9 @@ ${fame.length ? `<h2>Eregalerij</h2><div class="wrap"><table><thead><tr><th>#</t
         refreshUI(true); if (E.page === 'algos') { algoGrid(); algoDetail(); }
       }, 1500);
     } else setPage(E.page);
+    if (shared) { algoGrid(); algoDetail(); }
+    let seenTour = true; try { seenTour = !!localStorage.getItem('mazelab.tour'); } catch (e) { /* geen opslag */ }
+    if (!seenTour && !shared) setTimeout(() => { if (A.S.mode === 'evo' && !$('#evo-tour')) tour(0); }, 600);
   }
   function key(e) {
     if (e.key === ' ') {
@@ -1364,5 +1641,5 @@ ${fame.length ? `<h2>Eregalerij</h2><div class="wrap"><table><thead><tr><th>#</t
   }
   function setPalette(p) { V.panes.concat(T.panes).forEach(r => r.setPalette(p)); }
 
-  ML.EvoUI = { init, enter, frame, key, setPalette };
+  ML.EvoUI = { init, enter, frame, key, setPalette, _test: { E, autoSave, grow } }; // _test: alleen voor de rooktest
 })(window.ML = window.ML || {});

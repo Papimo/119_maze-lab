@@ -87,7 +87,9 @@
   #watch .v3 { transition: opacity .7s ease; }
   #watch-info { position: absolute; left: 20px; bottom: 16px; color: #ffffff70; font-size: 13px; letter-spacing: .05em; }
   #watch-exit { position: absolute; right: 16px; top: 14px; background: #ffffff14; color: #fffc; border-color: #ffffff22; opacity: .4; transition: opacity .3s; }
-  #watch-exit:hover { opacity: 1; }
+  #watch-exit:hover, #watch-mine:hover { opacity: 1; }
+  #watch-mine { position: absolute; right: 150px; top: 14px; background: #ffffff14; color: #fffc; border-color: #ffffff22; opacity: .4; transition: opacity .3s; z-index: 3; }
+  #watch-mine.on { opacity: .85; border-color: #4cc9f0aa; }
   .check { display: flex; align-items: center; gap: 8px; color: var(--muted); }
   .check input { width: auto; accent-color: var(--accent); }
   .meter { height: 8px; border-radius: 4px; background: var(--field); border: 1px solid var(--line); overflow: hidden; margin: 4px 0 6px; }
@@ -132,7 +134,9 @@
   .algo-head input[type="search"] { width: 260px; }
   .algo-head select { width: auto; }
   .algo-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 410px; }
-  #algo-grid { overflow-y: auto; padding: 0 12px 24px; min-width: 0; }
+  .algo-main { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  #lib-ladder { padding: 4px 12px 0; } #lib-ladder .ladder { margin: 0 0 6px; }
+  #algo-grid { overflow-y: auto; padding: 0 12px 24px; min-width: 0; flex: 1; }
   #algo-det { border-left: 1px solid var(--line); background: var(--panel); overflow-y: auto; padding: 12px 14px 24px; font-size: 12.5px; }
   .ag-h { margin: 14px 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
   .ag-h small { margin-left: 4px; letter-spacing: 0; }
@@ -304,6 +308,18 @@
   #evo-species span.on { background: var(--accent); color: var(--accent-ink); }
   #evo-species span.all { color: var(--muted); }
   .evo-score .hv { font-size: 22px; color: #b388ff; margin-left: 8px; }
+  .sure { display: inline-block; font-size: 10.5px; padding: 0 6px; border-radius: 9px; border: 1px solid var(--line); white-space: nowrap; color: var(--muted); }
+  .sure.yes { color: #80ed99; border-color: #80ed9966; } .sure.no { color: #ff6b6b; border-color: #ff6b6b66; } .sure.maybe { color: #ffd166; border-color: #ffd16666; }
+  .auto-i { margin: 6px 0 0; }
+  .ladder .lg-k { font-style: normal; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-right: 8px; }
+  .ladder.heavy .lg-me { background: #b388ff; } .ladder .lg-c.mile { border-radius: 2px; }
+  .share { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 10px 0; }
+  .share h4 { margin: 0 0 8px; } .share-row { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+  .share .qr { width: 150px; height: 150px; background: #fff; border-radius: 6px; flex: none; } .share .qr svg { width: 100%; height: 100%; display: block; }
+  .share-r { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 6px; } .share-url { width: 100%; font: 11px monospace; }
+  #evo-tour { position: fixed; z-index: 9; background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 14px; box-shadow: 0 10px 40px #0008; font-size: 13px; }
+  #evo-tour p { margin: 6px 0 10px; line-height: 1.45; } #evo-tour .btns { display: flex; gap: 6px; align-items: center; justify-content: flex-end; } #evo-tour .tour-n { margin-right: auto; color: var(--muted); font-size: 11px; }
+  .tour-hl { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; position: relative; z-index: 8; }
   .podium { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 8px; }
   .pod { border: 1px solid var(--line); border-radius: 9px; padding: 7px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; background: var(--field); }
   .pod.p1 { border-color: #ffd166; box-shadow: 0 0 0 1px #ffd16655 inset; }
@@ -317,6 +333,27 @@
   .mut-set { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 6px 0; font-size: 12px; color: var(--muted); }
   .mut-set select { background: var(--field); color: var(--text); border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 12px; padding: 2px 4px; margin-left: 4px; }
   .duel tr.top th { color: var(--accent); }
+  .mut-tab tr.clk { cursor: pointer; } .mut-tab tr.clk:hover td, .mut-tab tr.clk:hover th { background: var(--field); }
+  .mut-tab tr.pick td, .mut-tab tr.pick th { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  .mut-tab th small { display: inline; margin-left: 4px; }
+  .mut-tab thead th:nth-child(2) { text-align: left; } .mut-tab td:first-child { color: var(--muted); }
+  .mut-save h4 .sw { margin: 0 4px 0 6px; vertical-align: -1px; }
+  .mut-win { display: flex; gap: 10px; align-items: center; padding: 10px 12px; margin: 4px 0 8px; border: 1px solid var(--accent); border-radius: 10px; background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .mut-win .md { font-size: 26px; } .mut-win b { display: block; font-size: 15px; } .mut-win span { font-size: 12.5px; } .mut-win span b { display: inline; font-size: inherit; }
+  .mut-win.lose { flex-direction: column; align-items: flex-start; border-color: var(--line); background: none; }
+  .mut-win.maybe { border-color: #ffd166; background: color-mix(in srgb, #ffd166 8%, transparent); } .mut-win > div { flex: 1; min-width: 0; }
+  .mut-win .sure { display: block; margin-top: 2px; color: var(--muted); }
+  .mut-tab td.win { color: #80ed99; }
+  .mut-pres { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0; }
+  .mut-pre { display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 7px 9px; min-width: 0; white-space: normal; }
+  .mut-pre small { color: var(--muted); font-size: 11px; font-weight: 400; } .mut-pre.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .ladder { margin: 12px 0 4px; font-size: 12px; } .lg-t small { color: var(--muted); }
+  .lg-bar { position: relative; height: 22px; margin: 6px 6px 0; border-top: 2px solid var(--line); }
+  .lg-c { position: absolute; top: -6px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--line); border: 2px solid var(--panel); }
+  .lg-c.beat { background: #80ed99; }
+  .lg-c span { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font-size: 10px; font-style: normal; color: var(--muted); white-space: nowrap; }
+  .lg-c span.l { left: -2px; transform: none; } .lg-c span.r { left: auto; right: -2px; transform: none; }
+  .lg-me { position: absolute; top: -9px; width: 4px; height: 16px; margin-left: -2px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
   .duel th small { display: block; font-weight: 400; color: var(--muted); font-size: 10px; }
   .duel td.worse { color: #ff6b6b; font-weight: 700; }
   .duel.hunt th, .duel.hunt td { white-space: normal; } .duel.hunt td small { display: block; color: var(--muted); font-size: 10px; } .duel.hunt td.acts { white-space: nowrap; }
@@ -515,11 +552,11 @@
           <select id="lib-folder"></select>
           <select id="lib-sort"><option value="score">Beste eerst</option><option value="new">Nieuwste eerst</option><option value="name">Naam</option></select>
           <span class="sp"></span>
-          <button class="btn" data-ev="import">Importeer</button><button class="btn" data-ev="export">Exporteer</button><button class="btn" data-ev="paste">Plak code</button>
+          <button class="btn" data-ev="tour" data-k="0" title="Rondleiding in 3 stappen">? Rondleiding</button><button class="btn" data-ev="import">Importeer</button><button class="btn" data-ev="export">Exporteer</button><button class="btn" data-ev="paste">Plak code</button>
           <input type="file" id="evo-file" accept=".json,application/json" hidden>
           <datalist id="lib-folders"></datalist>
         </div>
-        <div class="algo-body"><div id="algo-grid"></div><aside id="algo-det"></aside></div>
+        <div class="algo-body"><div class="algo-main"><div id="lib-ladder"></div><div id="algo-grid"></div></div><aside id="algo-det"></aside></div>
       </div>
 
       <div class="evo-page" data-page="evolve" id="ep-evolve" hidden>
@@ -549,6 +586,11 @@
             <label class="row" title="Voor Turbo: eenvoudig = slanke loper op de hoofddraad; maximaal = Web Workers op alle processorkernen (bouwen ook zelf de doolhoven)"><span>Rekenkracht</span><select data-key="evoFast"><option value="simple">Eenvoudig sneller</option><option value="max">Maximaal (alle kernen)</option></select></label>
             <label class="row"><span>Kleur</span><select data-key="evoColor"><option value="species">Per soort (familie)</option><option value="gene">Sterkste gen</option></select></label>
           </details>
+          <details><summary>Automatisch</summary>
+            <label class="row" title="Evolutie (en turbo) stopt vanzelf als er zo lang geen nieuw record op de testbaan komt"><span>Stoppen</span><select data-key="evoAutoStop" data-num><option value="0">Nooit</option><option value="50">50 gen. zonder record</option><option value="200">200 gen. zonder record</option><option value="1000">1000 gen. zonder record</option></select></label>
+            <div class="row" title="Elke nieuwe kampioen die alle klassiekers verslaat (en ≥ 0,5 beter is dan de vorige) komt in map Auto-bewaard, als nieuwe versie"><span>Bewaren</span><label class="check"><input type="checkbox" data-key="evoAutoSave"> nieuwe kampioen automatisch</label></div>
+            <div class="row" title="Haalt de beste van de generatie gemiddeld ≥ 80 over 12 generaties, dan wordt het doolhof 2 groter (vanaf 30 ook meer lussen, tot 40%)"><span>Moeilijkheid</span><label class="check"><input type="checkbox" data-key="evoGrow"> doolhof groeit mee met niveau</label></div>
+          </details>
           <p class="hint">Kleur = soort: lopers met lijkend DNA vormen een familie (legenda boven het doolhof; klik = hittekaart van die soort). Witte ring = kampioen van de vorige ronde, gouden ring = koploper.</p>
         </aside>
         <div class="ev-main">
@@ -564,8 +606,8 @@
         </div>
         <aside class="ev-side">
           <div id="evo-champ"></div>
-          <h3>Ranglijst · testbaan</h3>
-          <p class="hint" style="margin:0 0 4px">Vaste toets: 12 doolhoven (4 rasters, met en zonder lussen), elk algoritme 2×. Score = kortste route ÷ gelopen stappen. “zwaar” = zware testbaan (8 grote doolhoven met lussen en puzzels). Klik een rij om hem te openen.</p>
+          <h3>Ranglijst · Score testbaan</h3>
+          <p class="hint" style="margin:0 0 4px">Vaste toets: 12 doolhoven (4 rasters, met en zonder lussen), elk algoritme 2×. Score 0–100 = kortste route ÷ gelopen stappen (100 = altijd de kortste route). “zwaar” = zware testbaan (8 grote doolhoven met lussen en puzzels). Klik een rij om hem te openen.</p>
           <div id="evo-rank"></div>
           <p class="hint">spatie pauze · V volgende · T turbo · B bewaar</p>
         </aside>
@@ -595,6 +637,7 @@
 <div id="watch" hidden>
   <canvas id="cv-watch"></canvas>
   <div id="watch-info"></div>
+  <button class="btn" id="watch-mine" title="Kijken met alleen je eigen bewaarde algoritmes als oplosser (aan/uit)">🧬 Alleen mijn algoritmes</button>
   <button class="btn" id="watch-exit">Stoppen (Esc)</button>
 </div>
 
@@ -614,6 +657,7 @@
 <script>window.THREE || document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"><\/script>')</script>
 <script src="src/v2fx.js"></script>
 <script src="src/view3d.js"></script>
+<script src="vendor/qrcode.js"></script>
 <script src="src/evo.js"></script>
 <script src="src/evoui.js"></script>
 <script src="src/app.js"></script>
