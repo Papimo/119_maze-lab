@@ -38,7 +38,7 @@
         if (hs != null && w.hk !== hs) return;
         const o = (k - k0) * s * 0.12, pl = new Path2D();
         let first = true, pc = -1;
-        for (const st of w.st) { const c = cellOf[st]; if (c === pc) continue; const ce = C[c].center; const X = r.X(ce[0]) + o, Y = r.Y(ce[1]) + o; if (first) pl.moveTo(X, Y); else pl.lineTo(X, Y); first = false; pc = c; }
+        const S = w.stk; for (let q = 0; q < w.sl; q++) { const c = cellOf[S[q]]; if (c === pc) continue; const ce = C[c].center; const X = r.X(ce[0]) + o, Y = r.Y(ce[1]) + o; if (first) pl.moveTo(X, Y); else pl.lineTo(X, Y); first = false; pc = c; }
         g.globalAlpha = 0.85; g.strokeStyle = w.col; g.stroke(pl);
       });
       g.globalAlpha = 1;

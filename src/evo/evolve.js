@@ -2,9 +2,9 @@
 (function (ML) {
   'use strict';
   const U = ML.EvoUI._;
-  const { $, A, E, EV, T, V, addAlgo, dnaHtml, entries, esc, fresh, huntSet, isSaved, isl, mm, nEval, note, persist, rng, runs, scoreBox, speciate, subOf } = U;
-  let afterSave, algoDetail, algoGrid, drawChart, famRender, finishNow, key, liveCard, makePanes, mazesFor, rate, setPage, specsFor, startGen, tabsInfo, viewAspect;
-  U.link(() => ({ afterSave, algoDetail, algoGrid, drawChart, famRender, finishNow, key, liveCard, makePanes, mazesFor, rate, setPage, specsFor, startGen, tabsInfo, viewAspect } = U));
+  const { $, A, E, EV, HUNT_ASP, T, V, addAlgo, dnaHtml, entries, esc, fresh, huntSet, isSaved, isl, mm, nEval, note, persist, rng, runs, scoreBox, speciate, subOf } = U;
+  let afterSave, algoDetail, algoGrid, drawChart, famRender, finishNow, huntMazes, key, liveCard, makePanes, mazesFor, rate, setPage, specsFor, startGen, tabsInfo, viewAspect;
+  U.link(() => ({ afterSave, algoDetail, algoGrid, drawChart, famRender, finishNow, huntMazes, key, liveCard, makePanes, mazesFor, rate, setPage, specsFor, startGen, tabsInfo, viewAspect } = U));
 
   // na een geëvalueerde generatie: geschiedenis, kampioen, kinderen, soorten
   // later = testbaan-score volgt (turbo: rekent in een worker tijdens de volgende generatie) → E.pend, daarna record()
@@ -66,7 +66,9 @@
     if (!E.champ || tb.score > E.champ.test) {
       const beat = tb.score > bc.t.score && (!E.champ || E.champ.test <= bc.t.score);
       E.champ = { id: best.id, name: best.name, genes: best.genes.slice(), born: best.born, parents: best.parents, test: tb.score, gen: rec.gen, from: best.from,
-        heavy: Ev.heavyReady() ? Ev.heavyScore(best.genes).score : null };
+        heavy: null };
+      // zware score in een worker (hoofddraad blokkeert niet); daarna kampioenkaart bijwerken
+      if (Ev.heavyReady()) Ev.heavyScoreAsync(best.genes).then(h => { if (E.champ && E.champ.id === best.id) { E.champ.heavy = h.score; champCard(); } });
       if (A.S.evoAutoSave && !best.from && tb.score > bc.t.score) autoSave(tb);
       if (beat && !best.from) { note(`🏆 ${best.name} verslaat alle klassiekers (${tb.score} tegen ${bc.t.score} van ${bc.p.name})!`); if (A.S.sound && ML.Sound) ML.Sound.chord(); }
       // eregalerij: elk nieuw record (geen klassiekers/gezaaiden)
@@ -96,7 +98,8 @@
         let tRes = null;
         E.pend = null;
         // doolhoven bouwen in de workers; volgende generatie alvast bouwen; testbaan van de vorige beste rekent mee in een worker
-        const pr = mm() !== 'hunt' && P.evaluateSpecs(E.pop, specsFor(g0), g0, runs(), () => mazesFor(g0),
+        const specs = mm() === 'hunt' ? huntSet().map((sp, i) => ({ sp, i, asp: HUNT_ASP })) : specsFor(g0); // zoeker: zelfde volgorde/zaadjes als huntMazes
+        const pr = P.evaluateSpecs(E.pop, specs, g0, runs(), () => mazesFor(g0),
           { next: mm() === 'new' ? specsFor(g0 + 1, true) : null, test: pend && pend.best.genes, onTest: t => { tRes = t; } });
         if (!pr && pend) record(pend, EV().testScore(pend.best.genes), true);
         await (pr || P.evaluate(E.pop, mazesFor(g0), g0, runs()));
@@ -142,7 +145,7 @@
     const el = $('#evo-status'); if (!el) return;
     if (E.turbo) {
       const sec = (performance.now() - E.turboT0) / 1000, gps = sec > 0.3 ? Math.round(E.turboDone / sec) : 0;
-      el.textContent = `Turbo${A.S.evoFast === 'max' && !EV().Pool.broken ? ` (${EV().Pool.size()} kernen${EV().Pool.canBuild && mm() !== 'hunt' ? ', bouwen in workers' : ''})` : ''}: ${E.turboDone}${E.turboN ? '/' + E.turboN : ''} generaties · ${gps}/s · generatie ${E.gen} · ${E.seen.size} verschillende doolhoven`;
+      el.textContent = `Turbo${A.S.evoFast === 'max' && !EV().Pool.broken ? ` (${EV().Pool.size()} kernen${EV().Pool.canBuild ? ', bouwen in workers' : ''})` : ''}: ${E.turboDone}${E.turboN ? '/' + E.turboN : ''} generaties · ${gps}/s · generatie ${E.gen} · ${E.seen.size} verschillende doolhoven`;
       return;
     }
     const nm = V.mazes.length || nEval(), dz = nm > 1 ? 'doolhoven' : 'doolhof', h = E.hist[E.hist.length - 1];
