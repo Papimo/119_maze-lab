@@ -281,6 +281,7 @@
             this.emit('solved'); break;
           }
           const e = r.value;
+          if (e.viz) v.viz = e.viz; // oplosser-beeld (solvers2.js) aan déze view-state; render2d leest vs.viz eerst
           if (e.visit !== undefined && v.heat) v.heat[e.visit]++;
           if (e.dead !== undefined) {
             v.dead[e.dead] = 1;

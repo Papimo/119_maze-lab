@@ -2,18 +2,39 @@
 (function (ML) {
   'use strict';
   const U = ML.EvoUI._;
-  const { $, A, E, EV, HUNT_ASP, T, V, addAlgo, dnaHtml, entries, esc, fresh, huntSet, isSaved, isl, mm, nEval, note, persist, rng, runs, scoreBox, speciate, subOf, band, treden } = U;
+  const { $, A, E, EV, evoOpts, evoRules, info, LAM_K, HUNT_ASP, T, V, addAlgo, dnaHtml, entries, esc, fresh, huntSet, isSaved, isl, mm, nEval, note, persist, rng, runs, scoreBox, speciate, subOf, band, treden } = U;
   let afterSave, algoDetail, algoGrid, drawChart, famRender, finishNow, huntMazes, key, liveCard, makePanes, mazesFor, rate, setPage, specsFor, startGen, tabsInfo, viewAspect;
   U.link(() => ({ afterSave, algoDetail, algoGrid, drawChart, famRender, finishNow, huntMazes, key, liveCard, makePanes, mazesFor, rate, setPage, specsFor, startGen, tabsInfo, viewAspect } = U));
 
   // na een geëvalueerde generatie: geschiedenis, kampioen, kinderen, soorten
   // later = testbaan-score volgt (turbo: rekent in een worker tijdens de volgende generatie) → E.pend, daarna record()
-  function advance(quiet, later) {
+  // evolutie-regels na de evaluatie (engine 4): gedrag (bh) voor nieuwheid, Lamarck-leren op dezelfde doolhoven
+  // ready = turbo heeft al met bh geëvalueerd en geleerd; anders (animatie) hier op V.mazes (zelfde zaadjes → zelfde fitness)
+  const needBh = () => evoRules() && evoOpts().select !== 'fitness';
+  const lamOn = () => evoRules() && !!evoOpts().lamarck;
+  // animatie: gedrag + leren in de workers tijdens de pauze tussen generaties (hoofddraad blijft vrij); geen workers → hoofddraad
+  // x voor evaluate/evaluateSpecs: bh = gedrag meten (nieuwheid), lamarck = k proefstapjes daarna (uitkomst in x.lamInfo)
+  const evalX = extra => Object.assign({ bh: needBh(), lamarck: lamOn() ? LAM_K : 0 }, extra);
+  const lamDone = x => { if (x && x.lamInfo) E.lam = x.lamInfo; };
+  async function rulesAsync() { // opnieuw evalueren geeft dezelfde fitness (zelfde zaadjes), nu mét gedrag + leren
+    const P = EV().Pool, g = E.gen, fb = () => V.mazes, x = evalX();
+    const specs = mm() === 'hunt' ? huntSet().map((sp, i) => ({ sp, i, asp: HUNT_ASP })) : specsFor(g, true);
+    const pr = P.ensure() && P.evaluateSpecs(E.pop, specs, g, runs(), fb, x);
+    if (pr) await pr; else EV().evaluate(E.pop, fb(), g, runs(), x);
+    lamDone(x);
+  }
+  function advance(quiet, later, ready) {
+    if (!ready && (needBh() || lamOn()) && V.mazes && V.mazes.length) {
+      const base = E.base, g = E.gen; E.busy = true;
+      rulesAsync().catch(e => console.warn('evolutie-regels', e)).then(() => { E.busy = false; if (E.base === base && E.gen === g) advance(quiet, later, true); });
+      return;
+    }
     const sorted = E.pop.slice().sort((a, b) => b.fit - a.fit), best = sorted[0];
     const rec = { gen: E.gen, best, base: E.base, mean: E.pop.reduce((s, g) => s + g.fit, 0) / E.pop.length };
     if (later) E.pend = rec; else record(rec, EV().testScore(best.genes), quiet);
     E.gen++;
-    E.pop = EV().nextGenIslands(E.pop, { pop: Number(A.S.evoPop), mut: A.S.evoMut / 100, elite: 2, rng: rng(), gen: E.gen }, isl(), 8);
+    const eo = evoRules() ? { mutKind: evoOpts().mutKind, select: evoOpts().select, archive: E.arch || (E.arch = []) } : {};
+    E.pop = EV().nextGenIslands(E.pop, { pop: Number(A.S.evoPop), mut: A.S.evoMut / 100, elite: 2, rng: rng(), gen: E.gen, ...eo }, isl(), 8);
     speciate(); autoChecks();
     if (!quiet) { persist(); refreshUI(true); }
   }
@@ -66,7 +87,7 @@
     if (!E.champ || tb.score > E.champ.test) {
       const beat = tb.score > bc.t.score && (!E.champ || E.champ.test <= bc.t.score);
       E.champ = { id: best.id, name: best.name, genes: best.genes.slice(), born: best.born, parents: best.parents, test: tb.score, gen: rec.gen, from: best.from,
-        heavy: null };
+        heavy: null, sig: best.sig };
       // zware score in een worker (hoofddraad blokkeert niet); daarna kampioenkaart bijwerken
       if (Ev.heavyReady()) Ev.heavyScoreAsync(best.genes).then(h => { if (E.champ && E.champ.id === best.id) { E.champ.heavy = h.score; champCard(); } });
       if (A.S.evoAutoSave && !best.from && tb.score > bc.t.score) autoSave(tb);
@@ -87,6 +108,7 @@
   // ---- turbo: generaties zonder animatie (×25 / ×100 / ×1000 / tot ik stop) ----
   async function turbo(n) {
     if (E.turbo) { E.turbo = 0; return; }
+    while (E.busy) await new Promise(r => setTimeout(r, 30)); // animatie-generatie leert nog (Lamarck/nieuwheid)
     V.phase = 'idle'; E.turbo = n || Infinity; E.turboN = n || 0; E.turboDone = 0; E.turboT0 = performance.now();
     viewAspect(V);
     evoBar();
@@ -99,15 +121,17 @@
         E.pend = null;
         // doolhoven bouwen in de workers; volgende generatie alvast bouwen; testbaan van de vorige beste rekent mee in een worker
         const specs = mm() === 'hunt' ? huntSet().map((sp, i) => ({ sp, i, asp: HUNT_ASP })) : specsFor(g0); // zoeker: zelfde volgorde/zaadjes als huntMazes
-        const pr = P.evaluateSpecs(E.pop, specs, g0, runs(), () => mazesFor(g0),
-          { next: mm() === 'new' ? specsFor(g0 + 1, true) : null, test: pend && pend.best.genes, onTest: t => { tRes = t; } });
+        const sx = { next: mm() === 'new' ? specsFor(g0 + 1, true) : null, test: pend && pend.best.genes, onTest: t => { tRes = t; }, ...evalX() };
+        const pr = P.evaluateSpecs(E.pop, specs, g0, runs(), () => mazesFor(g0), sx);
+        const px = pr ? null : evalX();
         if (!pr && pend) record(pend, EV().testScore(pend.best.genes), true);
-        await (pr || P.evaluate(E.pop, mazesFor(g0), g0, runs()));
+        await (pr || P.evaluate(E.pop, mazesFor(g0), g0, runs(), px));
+        lamDone(pr ? sx : px);
         if (pr && pend) record(pend, tRes || EV().testScore(pend.best.genes), true);
         if (!E.turbo) break;
-        advance(true, !!pr); if (E.turbo) E.turbo--; E.turboDone++;
+        advance(true, !!pr, true); if (E.turbo) E.turbo--; E.turboDone++;
       } else {
-        while (E.turbo && performance.now() - t0 < 40) { EV().evaluate(E.pop, mazesFor(E.gen), E.gen, runs()); advance(true); if (E.turbo) E.turbo--; E.turboDone++; }
+        while (E.turbo && performance.now() - t0 < 40) { const x = evalX(); EV().evaluate(E.pop, mazesFor(E.gen), E.gen, runs(), x); lamDone(x); advance(true, false, true); if (E.turbo) E.turbo--; E.turboDone++; }
         await new Promise(r => setTimeout(r, 0));
       }
       const now = performance.now();
@@ -123,11 +147,29 @@
     const c = E.champ, bc = EV().bestClassic();
     if (!c) { el.innerHTML = '<h4>Kampioen</h4><p class="hint">Nog geen generatie klaar. Kijk mee, of druk op een Turbo-knop.</p>'; return; }
     const saved = !!c.from || isSaved(c.genes);
-    el.innerHTML = `<h4><i class="sw" style="background:${EV().colorOf(c.genes)}"></i>${esc(c.name)} <small>${c.from ? 'klassieker ' + esc(c.from) : 'geboren in generatie ' + c.born}${c.parents && c.parents.length ? ' · ouders ' + c.parents.map(esc).join(' × ') : ''}</small></h4>
+    el.innerHTML = `<h4><i class="sw" style="background:${EV().colorOf(c.genes)}"></i>${esc(c.name)} <small>${evoOpts().select !== 'fitness' ? 'beste ooit · ' : ''}${c.from ? 'klassieker ' + esc(c.from) : 'geboren in generatie ' + c.born}${c.parents && c.parents.length ? ' · ouders ' + c.parents.map(esc).join(' × ') : ''}</small></h4>
       ${scoreBox(EV().testScore(c.genes), { score: c.heavy }, c.from === bc.p.name ? null : { name: bc.p.name, t: bc.t })}${autoInfo()}
       <p class="desc">${esc(EV().describe(c.genes))}</p>
-      ${dnaHtml(c.genes)}
+      ${dnaHtml(c.genes)}${rulesInfo(c)}
       <div class="btns"><button class="btn${saved ? '' : ' primary'}" data-ev="save-champ"${saved ? ' disabled' : ''}>${c.from ? 'Klassieker' : saved ? 'Bewaard ✓' : 'Bewaar kampioen'}</button><button class="btn" data-ev="sel-go" data-id="${esc(c.id)}">Wat wil je doen? →</button></div>`;
+  }
+  // C3: zelfregelend → σ van kampioen + populatie; nieuwheid → archief + meest vernieuwende loper naast de kampioen (= beste ooit)
+  const meanSig = g => { const v = g && g.sig != null ? g.sig : g ? EV().SIG0 : null; if (v == null) return null; const a = Array.isArray(v) ? v : [v]; return a.length ? a.reduce((s, x) => s + x, 0) / a.length : null; };
+  const fmtSig = v => v == null ? '—' : v < 0.1 ? v.toFixed(3) : v.toFixed(2);
+  function rulesInfo(c) {
+    if (!evoRules()) return '';
+    const eo = evoOpts(), bits = [];
+    if (eo.mutKind === 'self') {
+      const ps = E.pop.map(meanSig).filter(v => v != null), avg = ps.length ? ps.reduce((s, x) => s + x, 0) / ps.length : null;
+      bits.push(`<span title="Eigen mutatiestap van dit DNA (zelfregelend); populatie = gemiddelde van alle lopers">σ kampioen <b>${fmtSig(meanSig(c))}</b> · populatie ${fmtSig(avg)}</span>`);
+    } else if (eo.mutKind === 'cauchy') bits.push('<span>Grote sprongen aan</span>');
+    if (eo.select !== 'fitness') {
+      const nov = E.pop.filter(g => typeof g.nov === 'number').sort((a, b) => b.nov - a.nov)[0];
+      bits.push(`<span title="Gedragingen in het nieuwheid-archief">Archief <b>${(E.arch || []).length}</b></span>`);
+      if (nov) bits.push(`<span title="Selectie op ${eo.select === 'mix' ? 'fitness + nieuwheid' : 'nieuwheid'}: deze loper gedraagt zich het meest anders. De kampioen hierboven blijft de beste ooit op de testbaan.">Meest vernieuwend: <b>${esc(nov.name)}</b> (nieuwheid ${nov.nov.toFixed(2)}, fitness ${Math.round((nov.fit || 0) * 100)})</span>`);
+    }
+    if (eo.lamarck) bits.push(`<span title="Laatste generatie: zoveel lopers vonden met ${LAM_K} proefstapjes betere genen">Lamarck${E.lam ? `: ${E.lam.better}/${E.pop.length} leerden iets · ×${(+E.lam.cost).toFixed(1)} rekentijd` : ' aan'}</span>`);
+    return bits.length ? `<p class="hint rules-i">🧬 ${bits.join(' · ')}</p>` : '';
   }
   function rankList() {
     const el = $('#evo-rank'); if (!el) return;
@@ -220,7 +262,7 @@
     'save-champ': () => saveChamp(),
     seed: ({ a }) => { if (a) { seed(a); setPage('evolve'); } },
     run: () => toggleRun(),
-    skip: () => { if (V.phase === 'run') finishNow(); else startGen(); },
+    skip: () => { if (V.phase === 'run') finishNow(); else if (!E.busy) startGen(); },
     turbo: c => turbo(+c.b.dataset.turbo),
     mm: c => { A.S.evoMazeMode = c.b.dataset.mm; A.save(); makePanes(); startGen(); evoBar(); },
     reset: () => {
@@ -228,5 +270,21 @@
       E.turbo = 0; fresh(A.S.evoSeedSaved ? EV().loadAlgos() : []); refreshUI(true); startGen(); evoBar();
     },
   });
-  Object.assign(U, { advance, autoSave, stall, autoInfo, autoChecks, grow, flushPend, record, refreshUI, turbo, champCard, rankList, status, evoBar, outputs, legend, taskLegend, saveChamp, seed, toggleRun, resizePop });
+  // C1: instellingen 'Evolutie-regels' in .ev-set (na Populatie). Hier i.p.v. index.html (dat is van chat A); app/main.js bindt data-key daarna.
+  (function rulesSettings() {
+    const pop = document.querySelector('.ev-set [data-key="evoIslands"]'), after = pop && pop.closest('details'); if (!after) return;
+    const d = document.createElement('details'); d.className = 'ev-rules';
+    d.innerHTML = `<summary>Evolutie-regels</summary>
+      <div class="row"><span>Vorm ${info('mk')}</span><select data-key="evoMutKind"><option value="gauss">Normaal (kleine stapjes)</option><option value="cauchy">Grote sprongen (soms ver)</option><option value="self">Zelfregelend (eigen σ)</option></select></div>
+      <div class="row"><span>Leren ${info('lam')}</span><label class="check"><input type="checkbox" data-key="evoLamarck"> Lamarck (kinderen erven wat ouders leerden)</label></div>
+      <div class="row"><span>Selectie ${info('sel')}</span><select data-key="evoSelect"><option value="fitness">Fitness (de besten)</option><option value="novelty">Nieuwheid (de anderen)</option><option value="mix">Mix</option></select></div>
+      <p class="hint ev-rules-off" hidden>Engine kent deze regels nog niet (komt in engine 4).</p>`;
+    after.after(d);
+  })();
+  function rulesAvail() {
+    const on = evoRules(), d = document.querySelector('.ev-rules'); if (!d) return;
+    d.querySelectorAll('select, input').forEach(el => { el.disabled = !on; });
+    const h = d.querySelector('.ev-rules-off'); if (h) h.hidden = on;
+  }
+  Object.assign(U, { rulesInfo, rulesAvail, advance, autoSave, stall, autoInfo, autoChecks, grow, flushPend, record, refreshUI, turbo, champCard, rankList, status, evoBar, outputs, legend, taskLegend, saveChamp, seed, toggleRun, resizePop });
 })(window.ML = window.ML || {});

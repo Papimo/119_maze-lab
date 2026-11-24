@@ -120,7 +120,7 @@
       if (!alive) endView(v, t);
       else if (Math.floor(t * 4) !== Math.floor((t - dt) * 4)) { paneStats(v); if (v === T) taskTick(); }
     } else if (v.phase === 'pause' && v.running && t > v.endT) {
-      if (v === V) startGen(); else { v.phase = 'idle'; v.running = false; }
+      if (v === V) { if (!E.busy) startGen(); } else { v.phase = 'idle'; v.running = false; }
     }
   }
   function finishNow() { // "volgende generatie": rest direct uitrekenen

@@ -3,8 +3,8 @@
   'use strict';
   const U = ML.EvoUI._;
   const { $, A, E, EV, T, TASKS, V, colorFor, entryById, fresh, isl, note, persist, pick, restore, speciate } = U;
-  let algoDetail, algoGrid, algosRender, anaRender, autoSave, benchInput, champCard, drawChart, ensureTaskPane, evoBar, finishNow, frame, grow, importFile, legend, libField, makePanes, markSel, openShared, outputs, rankList, refreshUI, resizePop, saveChamp, startGen, status, taskIn, taskLegend, taskRender, toggleRun, tour, turbo, whyPlay;
-  U.link(() => ({ algoDetail, algoGrid, algosRender, anaRender, autoSave, benchInput, champCard, drawChart, ensureTaskPane, evoBar, finishNow, frame, grow, importFile, legend, libField, makePanes, markSel, openShared, outputs, rankList, refreshUI, resizePop, saveChamp, startGen, status, taskIn, taskLegend, taskRender, toggleRun, tour, turbo, whyPlay } = U));
+  let rulesAvail, algoDetail, algoGrid, algosRender, anaRender, autoSave, benchInput, champCard, drawChart, ensureTaskPane, evoBar, finishNow, frame, grow, importFile, legend, libField, makePanes, markSel, openShared, outputs, rankList, refreshUI, resizePop, saveChamp, startGen, status, taskIn, taskLegend, taskRender, toggleRun, tour, turbo, whyPlay;
+  U.link(() => ({ rulesAvail, algoDetail, algoGrid, algosRender, anaRender, autoSave, benchInput, champCard, drawChart, ensureTaskPane, evoBar, finishNow, frame, grow, importFile, legend, libField, makePanes, markSel, openShared, outputs, rankList, refreshUI, resizePop, saveChamp, startGen, status, taskIn, taskLegend, taskRender, toggleRun, tour, turbo, whyPlay } = U));
 
   // ======================= pagina's =======================
   function setPage(p) {
@@ -44,6 +44,11 @@
   }
 
 
+  const RULE_NOTE = {
+    evoMutKind: v => ({ gauss: 'Mutatie: kleine stapjes rond de ouders.', cauchy: 'Mutatie: grote sprongen — meestal klein, soms ver weg.', self: 'Mutatie zelfregelend: elk DNA evolueert zijn eigen stapgrootte σ (zie kampioen).' })[v] || '',
+    evoLamarck: v => v ? 'Lamarck aan: lopers leren tijdens hun leven en geven dat door (trager per generatie).' : 'Lamarck uit.',
+    evoSelect: v => ({ fitness: 'Selectie op fitness: de besten krijgen kinderen.', novelty: 'Selectie op nieuwheid: wie zich anders gedraagt krijgt kinderen. Kampioen = beste ooit.', mix: 'Selectie: half fitness, half nieuwheid.' })[v] || ''
+  };
   // ---- koppeling met app.js ----
   let started = false;
   function init(app) {
@@ -53,6 +58,7 @@
     else speciate();
     const fo = document.querySelector('[data-key="evoFast"] option[value="max"]');
     if (fo) fo.textContent = `Maximaal (${EV().Pool.size()} kernen)`;
+    rulesAvail();
     document.querySelectorAll('[data-key^="evo"]').forEach(el => {
       el.addEventListener('input', outputs);
       el.addEventListener('change', () => {
@@ -65,6 +71,7 @@
         else if (k === 'evoIslands') { EV().assignIslands(E.pop, isl()); speciate(); persist(); status(); note(isl() > 1 ? `${isl()} eilanden: elk eiland evolueert apart; elke 8 generaties verhuist de beste naar het volgende eiland.` : 'Weer één populatie.'); }
         else if (k === 'evoRuns') status();
         else if (k === 'evoAutoStop' || k === 'evoAutoSave' || k === 'evoGrow') { E.stopFrom = E.gen; E.growG = E.gen; champCard(); status(); }
+        else if (k === 'evoMutKind' || k === 'evoLamarck' || k === 'evoSelect') { champCard(); persist(); note(RULE_NOTE[k](A.S[k])); }
       });
     });
     const view = $('#view-evo');

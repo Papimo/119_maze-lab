@@ -27,6 +27,10 @@
 
   const opts = () => ({ grid: A.S.evoGrid, size: A.S.evoSize, braid: A.S.evoBraid, puzzle: A.S.evoPuzzle, makers: A.S.evoMakers });
   const rng = () => ML.makeRng(E.base + '|ga|' + E.gen);
+  // evolutie-regels (engine 4): mutatiesoort, Lamarck, selectie → opties voor nextGen/evaluate. Alles uit = oude gedrag (bit-gelijk)
+  const LAM_K = 4; // proefstapjes per loper (rekenwerk × (1 + LAM_K), = Ev.LAMARCK_COST)
+  const evoOpts = () => ({ mutKind: A.S.evoMutKind || 'gauss', select: A.S.evoSelect || 'fitness', lamarck: A.S.evoLamarck ? LAM_K : 0 });
+  const evoRules = () => (EV().ENGINE_V | 0) >= 4;  // engine kent de nieuwe regels
   const mm = () => A.S.evoMazeMode || 'new';
   // nieuw per generatie: minstens 4 doolhoven tellen mee (anders is de fitness vooral geluk); de rest rekent op de achtergrond
   const nEval = () => mm() === 'hunt' ? Math.max(1, huntSet().length) : mm() === 'set' ? Number(A.S.evoSetN) || 6 : mm() === 'new' ? Math.max(4, Number(A.S.evoMazes) || 1) : Number(A.S.evoMazes) || 1;
@@ -41,9 +45,9 @@
   function persist() {
     E.saveT = performance.now();
     try {
-      const slim = g => ({ id: g.id, name: g.name, genes: g.genes, born: g.born, parents: g.parents, fit: g.fit, age: g.age, from: g.from, sp: g.sp, isl: g.isl });
+      const slim = g => ({ id: g.id, name: g.name, genes: g.genes, born: g.born, parents: g.parents, fit: g.fit, age: g.age, from: g.from, sp: g.sp, isl: g.isl, sig: g.sig });
       const sp = E.species.map(s => ({ id: s.id, name: s.name, col: s.col, c: s.c }));
-      localStorage.setItem(STORE, JSON.stringify({ gen: E.gen, base: E.base, pop: E.pop.map(slim), hist: E.hist.slice(-1500), champ: E.champ, species: sp, spSeq: E.spSeq, spThr: E.spThr, growG: E.growG || 0, autoA: E.autoA || null }));
+      localStorage.setItem(STORE, JSON.stringify({ gen: E.gen, base: E.base, pop: E.pop.map(slim), hist: E.hist.slice(-1500), champ: E.champ, species: sp, spSeq: E.spSeq, spThr: E.spThr, growG: E.growG || 0, autoA: E.autoA || null, arch: (E.arch || []).slice(-300) }));
     } catch (e) { /* geen opslag */ }
   }
   function restore() {
@@ -52,14 +56,14 @@
       if (o && Array.isArray(o.pop)) { o.pop.forEach(g => { if (g) g.genes = EV().upGenes(g.genes); }); if (o.champ) o.champ.genes = EV().upGenes(o.champ.genes); (o.species || []).forEach(sp => { if (sp && sp.c) sp.c = EV().upGenes(sp.c); }); }
       if (o && Array.isArray(o.pop) && o.pop.length && o.pop[0].genes && o.pop[0].genes.length === EV().GENES.length) {
         Object.assign(E, { gen: o.gen | 0, base: o.base || ML.randomSeed(), pop: o.pop, hist: o.hist || [], champ: o.champ || null,
-          species: Array.isArray(o.species) ? o.species : [], spSeq: o.spSeq | 0, spThr: o.spThr || SP_THR, growG: o.growG | 0, autoA: o.autoA || null });
+          species: Array.isArray(o.species) ? o.species : [], spSeq: o.spSeq | 0, spThr: o.spThr || SP_THR, growG: o.growG | 0, autoA: o.autoA || null, arch: Array.isArray(o.arch) ? o.arch : [] });
         return true;
       }
     } catch (e) { /* kapot */ }
     return false;
   }
   function fresh(seeds) {
-    E.base = String(ML.randomSeed()); E.gen = 0; E.hist = []; E.champ = null; E.species = []; E.spSeq = 0; E.spThr = SP_THR; E.growG = 0; E.autoA = null; E.stopFrom = 0;
+    E.base = String(ML.randomSeed()); E.gen = 0; E.hist = []; E.champ = null; E.species = []; E.spSeq = 0; E.spThr = SP_THR; E.growG = 0; E.autoA = null; E.stopFrom = 0; E.arch = []; E.lam = null;
     E.pop = EV().assignIslands(EV().initPop({ pop: A.S.evoPop, classics: A.S.evoClassics, seeds, rng: rng() }), isl());
     speciate(); persist();
   }
@@ -144,6 +148,9 @@
   const INFO = {
     t: () => { const bc = EV().bestClassic(), dw = EV().testScore(EV().PRESETS[0].genes); return `<b>Score 0–100, hoger = beter.</b> 100 = elke keer de kortste route. Testbaan = 12 vaste doolhoven, elk 2×; iedereen loopt dezelfde, dus scores zijn eerlijk te vergelijken.<p>Vijf treden: verdwaalt (0–20) · zwak · redelijk · goed · bijna perfect (80–100). Ijkpunten: ${esc(EV().PRESETS[0].name)} (willekeurig) ${dw.score} · ${esc(bc.p.name)} (beste klassieker) ${bc.t.score} = ▼.</p>`; },
     h: () => { const bc = EV().bestClassic(), kh = EV().heavyReady() ? EV().heavyScore(bc.p.genes).score : null; return `<b>Zwaar = zelfde maat, veel moeilijkere doolhoven.</b> 8 grote doolhoven met lussen en puzzels${kh != null ? `; ook ${esc(bc.p.name)} haalt hier maar ${kh}` : ''}.<p>Zelfde treden als de testbaan, dus bijna alles staat hier op “verdwaalt”: vergelijk zwaar alleen met zwaar.</p>`; },
+    mk: () => `<b>Hoe kinderen afwijken van hun ouders.</b><p><b>Normaal</b>: kleine stapjes rond de ouder (klokvorm), zoals altijd.<br><b>Grote sprongen</b>: meestal klein, maar soms een flinke sprong (zware staart). Helpt uit een vastgelopen stand.<br><b>Zelfregelend</b>: elk DNA draagt zijn eigen stapgrootte σ mee en die evolueert mee; goede lopers krijgen vanzelf de juiste σ (te zien bij de kampioen).</p>`,
+    lam: () => `<b>Lamarck: leren tijdens het leven.</b> Na het lopen probeert elke loper ${LAM_K} kleine aanpassingen aan zijn genen op dezelfde doolhoven en houdt de beste; zijn kinderen erven wat hij geleerd heeft.<p>Sneller vooruit, maar kost ${esc(EV().LAMARCK_COST || '×' + (LAM_K + 1) + ' rekentijd')}.</p>`,
+    sel: () => `<b>Wie mag kinderen krijgen?</b><p><b>Fitness</b>: de besten op deze doolhoven (zoals altijd).<br><b>Nieuwheid</b>: wie zich anders gedraagt dan alles wat er al was (archief van gedrag). Vindt soms routes die fitness mist, omdat het niet vastloopt op één idee.<br><b>Mix</b>: half fitness, half nieuwheid.</p><p>De kampioen blijft altijd de beste op de testbaan (“beste ooit”).</p>`,
     d: () => `<b>Moeilijkheid = 100 − score op dit doolhof.</b> Hoger = moeilijker doolhof = beter gevonden. Paars, zodat je het niet verwart met een algoritme-score.<p>“voor klassieker”: hoe moeilijk hetzelfde doolhof is voor de beste klassieker. Rood = moeilijker voor jouw algoritme dan voor de klassieker (een zwakke plek).</p>`
   };
   const info = k => `<details class="inf" onclick="event.stopPropagation()"><summary title="Uitleg">i</summary><div>${INFO[k]()}</div></details>`;
@@ -186,5 +193,5 @@
     EV().saveAlgos(list); return a;
   }
 
-  Object.assign(U, { $, TAU, EV, STORE, GRID_NAMES, SP_COLS, DUEL_COLS, SP_THR, SP_MAX, TASKS, esc, A, E, mkView, V, T, opts, rng, mm, nEval, nPanes, runs, isl, huntSet, HUNT_ASP, mazeSeed, persist, restore, fresh, nv, vd, speciate, colorFor, note, toast, geneZ, dnaHtml, dnaStrip, isSaved, sureOf, signed, sureTag, scoreBox, vsClassic, BANDS, HBANDS, band, treden, scoreWord, info, kompasMark, entries, entryById, subOf, pick, r1, addAlgo });
+  Object.assign(U, { evoOpts, evoRules, LAM_K, $, TAU, EV, STORE, GRID_NAMES, SP_COLS, DUEL_COLS, SP_THR, SP_MAX, TASKS, esc, A, E, mkView, V, T, opts, rng, mm, nEval, nPanes, runs, isl, huntSet, HUNT_ASP, mazeSeed, persist, restore, fresh, nv, vd, speciate, colorFor, note, toast, geneZ, dnaHtml, dnaStrip, isSaved, sureOf, signed, sureTag, scoreBox, vsClassic, BANDS, HBANDS, band, treden, scoreWord, info, kompasMark, entries, entryById, subOf, pick, r1, addAlgo });
 })(window.ML = window.ML || {});

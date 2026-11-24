@@ -25,6 +25,17 @@ const CASES = [
   ['lab-mieren', { mode: 'lab', compare: 'ants' }],
   ['vandaag', { mode: 'daily' }]
 ];
+// nieuwe oplossers (chat A, v2.5): ontbrekende worden overgeslagen met een melding
+const NEW_SOLVERS = ['junction', 'beam', 'collision', 'micromouse', 'frontier', 'vision', 'physarum', 'qlearn'];
+// evolutie-regels (chat B/C, engine 4): elk een paar generaties turbo
+const EVO_RULES = [
+  ['cauchy', { evoMutKind: 'cauchy' }],
+  ['zelfregelend', { evoMutKind: 'self' }],
+  ['lamarck', { evoLamarck: true }],
+  ['nieuwheid', { evoSelect: 'novelty' }],
+  ['mix', { evoSelect: 'mix' }],
+  ['alles-workers', { evoMutKind: 'self', evoLamarck: true, evoSelect: 'novelty', evoFast: 'max', evoIslands: 2 }]
+];
 const ALGO = JSON.stringify([{ id: 'rook1', name: 'Rook Vos', genes: [8, 0, 4, 1.5, 0, 0, 0, 0, -3, 0, 0], born: 5 }]);
 
 (async () => {
@@ -50,6 +61,19 @@ const ALGO = JSON.stringify([{ id: 'rook1', name: 'Rook Vos', genes: [8, 0, 4, 1
     await sleep(QUICK ? 2000 : 4000);
     await shot('v2-' + name);
     return pg.evaluate(() => (document.querySelector('#score, .pane-stats, #daily-info') || {}).textContent || '');
+  });
+
+  // 1b. nieuwe oplossers: Bouwen, 1 doolhof
+  const have = await pg.evaluate(() => (ML.SOLVERS || []).map(x => x.id));
+  const miss = NEW_SOLVERS.filter(k => !have.includes(k));
+  if (miss.length) console.log('oplossers'.padEnd(26), 'nog niet aanwezig (overgeslagen): ' + miss.join(', '));
+  for (const k of NEW_SOLVERS.filter(k => have.includes(k)).filter((_, i) => !QUICK || i % 2 === 0)) await step('oplosser-' + k, async () => {
+    await fresh(pg, { ...BASE, mode: 'build', palette: 'maquette', gen: 'backtracker', solver: k, size: 12 }); await sleep(1500);
+    const btn = await pg.$('#btn-solve');
+    if (btn && await btn.isVisible()) await btn.click();
+    await sleep(QUICK ? 2000 : 4000);
+    await shot('oplosser-' + k);
+    return pg.evaluate(() => (document.querySelector('#score, .pane-stats') || {}).textContent || '');
   });
 
   // 2. Kijken (3 doolhoven) + alleen eigen algoritmes
@@ -104,6 +128,33 @@ const ALGO = JSON.stringify([{ id: 'rook1', name: 'Rook Vos', genes: [8, 0, 4, 1
     await shot('evo-taak-' + t);
     if (t === 'hunt' && go) await pg.click(go).catch(() => {}); // zoeker stoppen
     return note || await pg.evaluate(() => (document.querySelector('#task-pane') || {}).innerText || '').then(s => s.slice(0, 60));
+  });
+  // evolutie-regels: instellingen zichtbaar, daarna per regel turbo x25 (zonder JS-fouten)
+  const rules = await pg.evaluate(() => (ML.Evo.ENGINE_V | 0) >= 4);
+  await step('evo-regels-paneel', async () => {
+    await click('#evo-tabs [data-page="evolve"]'); await sleep(300);
+    const n = await pg.$$eval('.ev-rules [data-key]', l => l.length);
+    if (n !== 3) throw new Error('evolutie-regels: ' + n + ' instellingen i.p.v. 3');
+    return rules ? 'engine 4: aan' : 'engine < 4: uitgeschakeld';
+  });
+  if (!rules) console.log('evo-regels'.padEnd(26), 'engine < 4 -> turbo per regel overgeslagen');
+  for (const [name, cfg] of rules ? (QUICK ? EVO_RULES.filter((_, i) => i % 2 === 1) : EVO_RULES) : []) await step('evo-regel-' + name, async () => {
+    await fresh(pg, { ...BASE, mode: 'evo', ...cfg }); await sleep(2000);
+    await click('#evo-tabs [data-page="evolve"]', 10000); await sleep(300); // 10 s: zware testbaan warmt synchroon op na laden
+    await click('[data-turbo="25"]', 10000);
+    for (let i = 0; i < 60; i++) { await sleep(500); if (!/Turbo/.test(await pg.$eval('#evo-status', e => e.textContent))) break; }
+    const champ = await pg.$eval('#evo-champ', e => e.innerText);
+    if (!/\d/.test(champ)) throw new Error('geen kampioen na turbo');
+    return (await pg.$eval('#evo-champ', e => (e.querySelector('.rules-i') || {}).innerText || '')) || champ.split('\n')[0];
+  });
+  if (rules) await step('evo-regels-animatie', async () => { // zonder turbo: gedrag + leren in de workers tijdens de pauze
+    await fresh(pg, { ...BASE, mode: 'evo', evoLamarck: true, evoSelect: 'mix' }); await sleep(2000);
+    await click('#evo-tabs [data-page="evolve"]', 10000);
+    const g0 = await pg.evaluate(() => ML.EvoUI._.E.gen);
+    for (let i = 0; i < 2; i++) { await click('[data-ev="skip"]', 10000); await sleep(2500); }
+    const o = await pg.evaluate(() => { const E = ML.EvoUI._.E; return { gen: E.gen, arch: (E.arch || []).length, lam: !!E.lam, busy: !!E.busy }; });
+    if (!(o.gen > g0) || !o.lam || !o.arch) throw new Error('geen generatie met regels: ' + JSON.stringify(o));
+    return JSON.stringify(o);
   });
   await step('evo-analyse', async () => { await click('#evo-tabs [data-page="ana"]'); await sleep(800); await shot('evo-ana'); });
 
