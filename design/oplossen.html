@@ -1,0 +1,1051 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maze Lab · Oplosvormen</title>
+<style>
+:root {
+  --bg: #11100e; --card: #1b1a17; --card2: #24221e; --line: rgba(240, 225, 200, 0.12);
+  --text: #efe9de; --muted: #a39b8c; --accent: #ffb547; --pick: #6ad48a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.wrap { max-width: 1400px; margin: 0 auto; padding: 0 20px 150px; }
+header.page { padding: 38px 0 6px; }
+header.page h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: -0.01em; }
+header.page p { margin: 0; color: var(--muted); max-width: 900px; }
+nav.toc { display: flex; gap: 8px; margin: 16px 0 0; flex-wrap: wrap; }
+nav.toc a { text-decoration: none; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--text); font-size: 14px; }
+nav.toc button { font: inherit; font-size: 14px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; }
+.sechead { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin: 54px 0 4px; }
+.sechead h2 { margin: 0; font-size: 23px; }
+.sechead button { font: inherit; font-size: 13px; padding: 4px 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--card2); color: var(--text); cursor: pointer; }
+p.lead { margin: 0 0 16px; color: var(--muted); max-width: 900px; }
+h3.sub { margin: 26px 0 10px; font-size: 15px; color: var(--accent); font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+@media (max-width: 400px) { .grid { grid-template-columns: 1fr; } }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; transition: border-color .15s, box-shadow .15s; }
+.card.cur { opacity: .92; border-style: dashed; }
+.card.picked { border-color: var(--pick); box-shadow: 0 0 0 2px rgba(106, 212, 138, 0.35); }
+.card canvas { display: block; width: 100%; aspect-ratio: 16 / 10; cursor: zoom-in; background: #151411; }
+.card .body { padding: 12px 15px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.card h4 { margin: 0; font-size: 16.5px; display: flex; align-items: center; gap: 8px; }
+.card h4 .num { font: 600 11.5px/1 ui-monospace, monospace; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+.card p { margin: 0; color: var(--muted); font-size: 14px; }
+.card ul { margin: 2px 0 0; padding-left: 18px; font-size: 13.5px; color: #d6cfc2; }
+.card ul li { margin: 1px 0; }
+.tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.tag { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.tag.ok { color: #8fe0a6; border-color: rgba(106,212,138,.35); }
+.tag.warn { color: #ffcf7a; border-color: rgba(255,181,71,.35); }
+.tag.bad { color: #ff9a9a; border-color: rgba(255,107,107,.35); }
+.tag.info { color: #9ccfff; border-color: rgba(90,169,255,.35); }
+.foot { margin-top: auto; padding-top: 8px; display: flex; gap: 8px; }
+.foot button { font: inherit; font-size: 13.5px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card2); color: var(--text); cursor: pointer; }
+.card.picked .foot .pick { background: var(--pick); color: #10200f; border-color: var(--pick); font-weight: 600; }
+.bar { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(20,19,16,.96); border-top: 1px solid var(--line); backdrop-filter: blur(6px); z-index: 20; }
+.bar .in { max-width: 1400px; margin: 0 auto; padding: 10px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bar .count { font-weight: 700; color: var(--pick); white-space: nowrap; }
+.bar .chips { flex: 1; min-width: 200px; display: flex; gap: 5px; flex-wrap: wrap; max-height: 58px; overflow: auto; }
+.bar .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: rgba(106,212,138,.14); color: #bfeccc; cursor: pointer; }
+.bar .chip:hover { text-decoration: line-through; }
+.bar button { font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 9px; border: 1px solid var(--line); background: var(--card2); color: var(--text); cursor: pointer; }
+.bar button.main { background: var(--pick); color: #10200f; border-color: var(--pick); font-weight: 700; }
+.bar .empty { color: var(--muted); font-size: 14px; }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.82); display: none; align-items: center; justify-content: center; z-index: 40; padding: 20px; flex-direction: column; gap: 10px; }
+.modal.on { display: flex; }
+.modal canvas { width: min(94vw, 150vh); aspect-ratio: 16/10; border-radius: 12px; background: #151411; }
+.modal .cap { color: var(--muted); font-size: 14px; }
+.toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); background: var(--pick); color: #10200f; padding: 8px 16px; border-radius: 10px; font-weight: 600; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 50; }
+.toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <h1>Oplosvormen — bronnen, tactieken, mutaties</h1>
+    <p>Elke kaart draait live op een klein doolhof (of, bij mutaties, op een heuvellandschap waarin elke stip een DNA is). Klik op een beeld om groot te kijken. Kies zoveel kaarten als je wilt, mengen mag; onderin staat je keuze klaar om te kopiëren.</p>
+    <nav class="toc">
+      <a href="#s1">1 · Bronnen</a><a href="#s2">2 · Tactieken</a><a href="#s3">3 · Combineren</a><a href="#s4">4 · Mutaties &amp; selectie</a>
+      <button id="top5">Kies Claude's top</button>
+    </nav>
+  </header>
+  <div id="root"></div>
+</div>
+<div class="bar"><div class="in">
+  <span class="count" id="count">0 gekozen</span>
+  <div class="chips" id="chips"><span class="empty">Nog niets gekozen — klik "Kies" op een kaart.</span></div>
+  <button id="clear">Wis</button>
+  <button class="main" id="copy">Kopieer keuze</button>
+</div></div>
+<div class="modal" id="modal"><canvas id="bigcv"></canvas><div class="cap" id="bigcap"></div></div>
+<div class="toast" id="toast">Gekopieerd — plak het in de chat</div>
+<script>
+'use strict';
+// ───────── basis ─────────
+const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+const PICK = '#6ad48a', ACC = '#ffb547', BLUE = '#5aa9ff', RED = '#ff6b6b', GREY = '#9aa5b1', PURP = '#b388ff', TEAL = '#2ec4b6';
+function rng(seed) { let s = (seed >>> 0) || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
+function gauss(r) { return Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(6.2832 * r()); }
+function hash(str) { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+const pickOf = (r, a) => a[(r() * a.length) | 0];
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+
+function makeMaze(W, H, r, o = {}) {
+  const n = W * H, open = new Uint8Array(n), seen = new Uint8Array(n);
+  const m = { W, H, n, open, s: 0, g: n - 1 };
+  m.inb = (c, d) => { const x = c % W + DX[d], y = ((c / W) | 0) + DY[d]; return x >= 0 && y >= 0 && x < W && y < H; };
+  m.to = (c, d) => c + DX[d] + DY[d] * W;
+  m.can = (c, d) => ((open[c] >> d) & 1) === 1 && m.inb(c, d);
+  m.link = (c, d) => { open[c] |= 1 << d; if (m.inb(c, d)) open[m.to(c, d)] |= 1 << ((d + 2) & 3); };
+  const st = [(r() * n) | 0]; seen[st[0]] = 1;
+  while (st.length) {
+    const c = st[st.length - 1], opts = [];
+    for (let d = 0; d < 4; d++) if (m.inb(c, d) && !seen[m.to(c, d)]) opts.push(d);
+    if (!opts.length) { st.pop(); continue; }
+    const d = pickOf(r, opts); m.link(c, d); seen[m.to(c, d)] = 1; st.push(m.to(c, d));
+  }
+  const pc = v => (v & 1) + (v >> 1 & 1) + (v >> 2 & 1) + (v >> 3 & 1);
+  if (o.braid) for (let c = 0; c < n; c++) if (pc(open[c]) === 1 && r() < o.braid) {
+    const opts = []; for (let d = 0; d < 4; d++) if (m.inb(c, d) && !(open[c] >> d & 1)) opts.push(d);
+    if (opts.length) m.link(c, pickOf(r, opts));
+  }
+  m.fin = () => {
+    m.dirs = []; m.adj = [];
+    for (let c = 0; c < n; c++) { const ds = []; for (let d = 0; d < 4; d++) if (m.can(c, d)) ds.push(d); m.dirs.push(ds); m.adj.push(ds.map(d => m.to(c, d))); }
+    m.deg = c => m.dirs[c].length;
+    return m;
+  };
+  return m.fin();
+}
+const man = (m, a, b) => Math.abs(a % m.W - b % m.W) + Math.abs(((a / m.W) | 0) - ((b / m.W) | 0));
+const center = m => ((m.H / 2) | 0) * m.W + ((m.W / 2) | 0);
+function bfsP(m, src, pass) {
+  const dist = new Int32Array(m.n).fill(-1), par = new Int32Array(m.n).fill(-1), q = [src]; dist[src] = 0;
+  for (let i = 0; i < q.length; i++) { const c = q[i]; for (let d = 0; d < 4; d++) { if (!m.inb(c, d) || !pass(c, d)) continue; const n = m.to(c, d); if (dist[n] < 0) { dist[n] = dist[c] + 1; par[n] = c; q.push(n); } } }
+  return { dist, par, order: q };
+}
+const openP = m => (c, d) => m.can(c, d);
+function trace(par, t) { const p = []; let k = 0; while (t >= 0 && k++ < 100000) { p.push(t); t = par[t]; } return p.reverse(); }
+function dirTo(m, a, b) { for (let d = 0; d < 4; d++) if (m.inb(a, d) && m.to(a, d) === b) return d; return -1; }
+function Explorer(m) {
+  const E = { known: new Uint8Array(m.n * 4), seen: new Uint8Array(m.n), vis: new Uint8Array(m.n) };
+  E.sense = c => { E.vis[c] = 1; E.seen[c] = 1; for (let d = 0; d < 4; d++) { const v = m.can(c, d) ? 2 : 1; E.known[c * 4 + d] = v; if (m.inb(c, d)) { const n = m.to(c, d); E.known[n * 4 + ((d + 2) & 3)] = v; if (v === 2) E.seen[n] = 1; } } };
+  E.pass = opt => (c, d) => { const k = E.known[c * 4 + d]; return k === 2 || (opt && k === 0); };
+  return E;
+}
+
+// ───────── tekenen: doolhof ─────────
+function rr(g, x, y, w, h, rad) { g.beginPath(); g.moveTo(x + rad, y); g.arcTo(x + w, y, x + w, y + h, rad); g.arcTo(x + w, y + h, x, y + h, rad); g.arcTo(x, y + h, x, y, rad); g.arcTo(x, y, x + w, y, rad); g.closePath(); }
+function overlayText(g, st, w, h) {
+  const fs = Math.max(10.5, Math.min(15, h * 0.05));
+  g.font = `600 ${fs}px system-ui, sans-serif`; g.textBaseline = 'middle';
+  const put = (txt, y, col) => { const tw = g.measureText(txt).width; g.fillStyle = 'rgba(10,9,8,.72)'; rr(g, 6, y - fs * .8, tw + 14, fs * 1.6, 6); g.fill(); g.fillStyle = col; g.fillText(txt, 13, y); };
+  if (st.text) put(st.text, 6 + fs * .8, '#efe9de');
+  if (st.text2) put(st.text2, h - 6 - fs * .8, st.text2col || ACC);
+  if (st.chart && st.chart.vals.length > 1) {
+    const cw = w * 0.3, ch = h * 0.2, x0 = w - cw - 8, y0 = 8, v = st.chart.vals, mx = st.chart.max || Math.max(...v), mn = st.chart.min ?? 0;
+    g.fillStyle = 'rgba(10,9,8,.72)'; rr(g, x0, y0, cw, ch, 6); g.fill();
+    g.strokeStyle = st.chart.col || ACC; g.lineWidth = 1.6; g.beginPath();
+    v.forEach((val, i) => { const x = x0 + 6 + (cw - 12) * i / Math.max(1, (st.chart.len || v.length) - 1), y = y0 + ch - 6 - (ch - 14) * (val - mn) / Math.max(1e-9, mx - mn); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.stroke();
+    if (st.chart.label) { g.font = `600 ${fs * .78}px system-ui`; g.fillStyle = '#a39b8c'; g.fillText(st.chart.label, x0 + 6, y0 + fs * .6); }
+  }
+}
+function drawMaze(g, st, w, h, now) {
+  g.fillStyle = '#151411'; g.fillRect(0, 0, w, h);
+  const m = st.m; if (!m) return;
+  const pad = Math.max(6, w * 0.018), cs = Math.min((w - 2 * pad) / m.W, (h - 2 * pad) / m.H);
+  const ox = (w - cs * m.W) / 2, oy = (h - cs * m.H) / 2;
+  const X = c => ox + (c % m.W + .5) * cs, Y = c => oy + (((c / m.W) | 0) + .5) * cs;
+  const cell = (c, col) => { g.fillStyle = col; g.fillRect(ox + (c % m.W) * cs, oy + ((c / m.W) | 0) * cs, cs + .6, cs + .6); };
+  g.fillStyle = '#25221d'; g.fillRect(ox, oy, cs * m.W, cs * m.H);
+  if (st.cellCol) for (let c = 0; c < m.n; c++) if (st.cellCol[c]) cell(c, st.cellCol[c]);
+  if (st.mud) for (let c = 0; c < m.n; c++) if (st.mud[c]) { cell(c, '#4a3620'); g.fillStyle = '#6b5030'; g.beginPath(); g.arc(X(c) - cs * .18, Y(c) + cs * .1, cs * .08, 0, 7); g.arc(X(c) + cs * .2, Y(c) - cs * .15, cs * .06, 0, 7); g.fill(); }
+  const heat = (arr, col, base) => { if (!arr) return; for (let c = 0; c < m.n; c++) { const v = arr[c]; if (v > 0.003) cell(c, `rgba(${col[0]},${col[1]},${col[2]},${(base + (0.8 - base) * Math.min(1, v)).toFixed(3)})`); } };
+  heat(st.heat2, st.heat2Col || [90, 169, 255], .12);
+  heat(st.heat, st.heatCol || [255, 181, 71], .1);
+  if (st.fog) for (let c = 0; c < m.n; c++) if (!st.fog[c]) cell(c, 'rgba(9,8,7,.86)');
+  // buizen / lijnen tussen cellen
+  if (st.tubes) for (const t of st.tubes) { if (t.w < 0.02) continue; g.strokeStyle = t.col || ACC; g.globalAlpha = t.a ?? Math.min(1, .35 + t.w); g.lineWidth = Math.max(1, cs * .7 * Math.min(1, t.w)); g.lineCap = 'round'; g.beginPath(); g.moveTo(X(t.a0), Y(t.a0)); g.lineTo(X(t.b0), Y(t.b0)); g.stroke(); }
+  g.globalAlpha = 1;
+  // krijtstreepjes
+  if (st.marks) { g.strokeStyle = '#f4efe4'; g.lineWidth = Math.max(1, cs * .07); for (let c = 0; c < m.n; c++) for (const d of [1, 2]) { const k = st.marks[c * 4 + d]; if (!k || !m.inb(c, d)) continue; const mx = X(c) + DX[d] * cs * .5, my = Y(c) + DY[d] * cs * .5; for (let i = 0; i < Math.min(k, 3); i++) { const off = (i - (Math.min(k, 3) - 1) / 2) * cs * .16; g.beginPath(); if (d === 1) { g.moveTo(mx - cs * .1, my + off); g.lineTo(mx + cs * .1, my + off); } else { g.moveTo(mx + off, my - cs * .1); g.lineTo(mx + off, my + cs * .1); } g.stroke(); } } }
+  // muren
+  const lw = Math.max(1.3, cs * .13); g.lineCap = 'round'; g.lineWidth = lw;
+  const solid = new Path2D(), faint = new Path2D();
+  const add = (c, d, x1, y1, x2, y2) => { const p = (st.known && st.known[c * 4 + d] !== 1) ? faint : solid; p.moveTo(x1, y1); p.lineTo(x2, y2); };
+  for (let c = 0; c < m.n; c++) {
+    const x0 = ox + (c % m.W) * cs, y0 = oy + ((c / m.W) | 0) * cs, o = m.open[c];
+    if (!(o & 1)) add(c, 0, x0, y0, x0 + cs, y0);
+    if (!(o & 8)) add(c, 3, x0, y0, x0, y0 + cs);
+    if (c % m.W === m.W - 1 && !(o & 2)) add(c, 1, x0 + cs, y0, x0 + cs, y0 + cs);
+    if (((c / m.W) | 0) === m.H - 1 && !(o & 4)) add(c, 2, x0, y0 + cs, x0 + cs, y0 + cs);
+  }
+  g.strokeStyle = 'rgba(217,201,166,.16)'; g.stroke(faint);
+  g.strokeStyle = '#d9c9a6'; g.stroke(solid);
+  if (st.broken) for (const b of st.broken) { const mx = X(b.c) + DX[b.d] * cs * .5, my = Y(b.c) + DY[b.d] * cs * .5; g.strokeStyle = '#25221d'; g.lineWidth = lw * 1.6; g.beginPath(); const hx = DY[b.d] !== 0 ? cs * .42 : 0, hy = DX[b.d] !== 0 ? cs * .42 : 0; g.moveTo(mx - hx, my - hy); g.lineTo(mx + hx, my + hy); g.stroke(); g.fillStyle = '#ff8a3d'; for (let i = 0; i < 5; i++) { const a = now / 300 + i * 1.3; g.beginPath(); g.arc(mx + Math.cos(a) * cs * .25, my + Math.sin(a * 1.3) * cs * .25, cs * .06, 0, 7); g.fill(); } }
+  if (st.doors) for (const dr of st.doors) { if (dr.open) continue; const mx = X(dr.c) + DX[dr.d] * cs * .5, my = Y(dr.c) + DY[dr.d] * cs * .5; const hx = DY[dr.d] !== 0 ? cs * .45 : 0, hy = DX[dr.d] !== 0 ? cs * .45 : 0; g.strokeStyle = dr.col || PURP; g.lineWidth = lw * 2; g.beginPath(); g.moveTo(mx - hx, my - hy); g.lineTo(mx + hx, my + hy); g.stroke(); }
+  if (st.keys) for (const k of st.keys) { if (k.taken) continue; g.strokeStyle = k.col || PURP; g.lineWidth = Math.max(1.4, cs * .1); g.beginPath(); g.arc(X(k.c) - cs * .12, Y(k.c), cs * .14, 0, 7); g.moveTo(X(k.c) + .02 * cs, Y(k.c)); g.lineTo(X(k.c) + cs * .3, Y(k.c)); g.lineTo(X(k.c) + cs * .3, Y(k.c) + cs * .12); g.stroke(); }
+  // start + doel
+  if (!st.noMarkers) {
+    g.strokeStyle = PICK; g.lineWidth = Math.max(1.5, cs * .1); g.beginPath(); g.arc(X(m.s), Y(m.s), cs * .3, 0, 7); g.stroke();
+    if (!st.hideGoal) { g.fillStyle = ACC; g.beginPath(); const gx = X(m.g), gy = Y(m.g), q = cs * .27; g.moveTo(gx, gy - q); g.lineTo(gx + q, gy); g.lineTo(gx, gy + q); g.lineTo(gx - q, gy); g.fill(); }
+  }
+  const poly = (cells, col, wd, a, dash) => { if (!cells || cells.length < 2) return; g.globalAlpha = a ?? 1; g.strokeStyle = col; g.lineWidth = wd; g.lineJoin = 'round'; g.setLineDash(dash ? [cs * .25, cs * .2] : []); g.beginPath(); cells.forEach((c, i) => i ? g.lineTo(X(c), Y(c)) : g.moveTo(X(c), Y(c))); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; };
+  if (st.polys) for (const p of st.polys) poly(p.cells, p.col || '#fff', p.w ? p.w * cs : Math.max(1, cs * .06), p.a ?? .5, p.dash);
+  if (st.paths) for (const p of st.paths) poly(p.cells, p.col || PICK, (p.w || .22) * cs, p.a ?? 1, p.dash);
+  if (st.path) poly(st.path, st.pathCol || PICK, cs * .26, 1);
+  if (st.flow) { g.fillStyle = '#fff1c9'; for (const f of st.flow) { if (f.cur < 0.02) continue; const k = (now / 1000 * f.cur * 3 + f.off) % 1; g.globalAlpha = Math.min(1, f.cur * 1.5); g.beginPath(); g.arc(X(f.a) + (X(f.b) - X(f.a)) * k, Y(f.a) + (Y(f.b) - Y(f.a)) * k, cs * .09, 0, 7); g.fill(); } g.globalAlpha = 1; }
+  if (st.arrows) for (let c = 0; c < m.n; c++) { const d = st.arrows[c]; if (d < 0) continue; const a = st.arrowA ? st.arrowA[c] : 1; if (a < .05) continue; g.globalAlpha = a; g.fillStyle = '#efe9de'; const x = X(c), y = Y(c), q = cs * .22; g.beginPath(); g.moveTo(x + DX[d] * q, y + DY[d] * q); g.lineTo(x - DX[d] * q * .6 + DY[d] * q * .6, y - DY[d] * q * .6 + DX[d] * q * .6); g.lineTo(x - DX[d] * q * .6 - DY[d] * q * .6, y - DY[d] * q * .6 - DX[d] * q * .6); g.fill(); } g.globalAlpha = 1;
+  if (st.votes) for (const v of st.votes) { const x = X(v.c), y = Y(v.c), L = cs * (.35 + .55 * v.len); g.strokeStyle = v.col; g.lineWidth = Math.max(1.5, cs * .1); g.beginPath(); g.moveTo(x + DY[v.d] * v.o * cs, y + DX[v.d] * v.o * cs); g.lineTo(x + DX[v.d] * L + DY[v.d] * v.o * cs, y + DY[v.d] * L + DX[v.d] * v.o * cs); g.stroke(); }
+  if (st.walkers) for (const wk of st.walkers) {
+    const x = X(wk.c) + (wk.dx || 0) * cs, y = Y(wk.c) + (wk.dy || 0) * cs, rad = cs * (wk.r || .3);
+    if (wk.ring) { g.strokeStyle = wk.col; g.lineWidth = Math.max(1.5, cs * .1); g.beginPath(); g.arc(x, y, rad * .85, 0, 7); g.stroke(); continue; }
+    g.fillStyle = 'rgba(0,0,0,.45)'; g.beginPath(); g.arc(x + cs * .05, y + cs * .07, rad, 0, 7); g.fill();
+    g.fillStyle = wk.col; g.beginPath(); g.arc(x, y, rad, 0, 7); g.fill();
+  }
+  overlayText(g, st, w, h);
+}
+
+// ───────── tekenen: landschap (mutaties) ─────────
+const HILLS = [{ x: .55, y: -.5, h: 1, s: .11 }, { x: -.45, y: .42, h: .7, s: .3 }, { x: .2, y: .35, h: .42, s: .14 }, { x: -.55, y: -.55, h: .45, s: .13 }];
+function F(x, y) { let v = 0; for (const k of HILLS) v += k.h * Math.exp(-((x - k.x) ** 2 + (y - k.y) ** 2) / (2 * k.s * k.s)); return v; }
+let LAND_IMG = null;
+function landImg() {
+  if (LAND_IMG) return LAND_IMG;
+  const W = 200, H = 125, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d'), im = g.createImageData(W, H);
+  const stops = [[24, 22, 19], [62, 44, 26], [140, 84, 34], [255, 181, 71], [255, 241, 201]];
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    const v = Math.min(1, F(i / (W - 1) * 2 - 1, 1 - j / (H - 1) * 2) / 1.02), q = Math.floor(v * 10) / 10 * .85 + v * .15;
+    const t = q * (stops.length - 1), k = Math.min(stops.length - 2, Math.floor(t)), f = t - k, o = (j * W + i) * 4;
+    for (let ch = 0; ch < 3; ch++) im.data[o + ch] = stops[k][ch] + (stops[k + 1][ch] - stops[k][ch]) * f;
+    im.data[o + 3] = 255;
+  }
+  g.putImageData(im, 0, 0); LAND_IMG = cv; return cv;
+}
+function drawLand(g, st, w, h) {
+  g.fillStyle = '#151411'; g.fillRect(0, 0, w, h);
+  const pad = 8, pw = w - 2 * pad, ph = h - 2 * pad;
+  g.imageSmoothingEnabled = true; g.drawImage(landImg(), pad, pad, pw, ph);
+  const LX = x => pad + (x + 1) / 2 * pw, LY = y => pad + (1 - (y + 1) / 2) * ph;
+  g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 1; g.setLineDash([4, 4]);
+  if (st.guides === 'axes' || st.guides === 'both') { g.beginPath(); g.moveTo(LX(0), pad); g.lineTo(LX(0), pad + ph); g.moveTo(pad, LY(0)); g.lineTo(pad + pw, LY(0)); g.stroke(); }
+  if (st.guides === 'diag' || st.guides === 'both') { g.beginPath(); g.moveTo(LX(-1), LY(-1)); g.lineTo(LX(1), LY(1)); g.stroke(); }
+  g.setLineDash([]);
+  if (st.niches) { const N = st.niches.N; for (let i = 0; i < N * N; i++) { const f = st.niches.f[i]; const x = i % N, y = (i / N) | 0; g.strokeStyle = 'rgba(0,0,0,.35)'; g.strokeRect(pad + x * pw / N, pad + y * ph / N, pw / N, ph / N); if (f < 0) continue; g.fillStyle = `rgba(106,212,138,${(.25 + .65 * Math.min(1, f)).toFixed(2)})`; g.fillRect(pad + x * pw / N + 1, pad + y * ph / N + 1, pw / N - 2, ph / N - 2); } }
+  if (st.archive) { g.fillStyle = 'rgba(200,220,255,.45)'; for (const p of st.archive) { g.beginPath(); g.arc(LX(p.x), LY(p.y), 1.8, 0, 7); g.fill(); } }
+  if (st.events) for (const e of st.events) { g.strokeStyle = e.col || '#fff'; g.globalAlpha = .85; g.lineWidth = 1.4; g.beginPath(); g.moveTo(LX(e.x1), LY(e.y1)); g.lineTo(LX(e.x2), LY(e.y2)); g.stroke(); g.globalAlpha = 1; }
+  if (st.trails) { g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 1; for (const t of st.trails) { g.beginPath(); g.moveTo(LX(t.x1), LY(t.y1)); g.lineTo(LX(t.x2), LY(t.y2)); g.stroke(); } }
+  if (st.pop) for (const p of st.pop) {
+    if (p.sig) { g.strokeStyle = 'rgba(255,255,255,.28)'; g.lineWidth = 1; g.beginPath(); g.arc(LX(p.x), LY(p.y), Math.max(2, p.sig * pw / 2), 0, 7); g.stroke(); }
+    g.fillStyle = 'rgba(0,0,0,.5)'; g.beginPath(); g.arc(LX(p.x) + 1, LY(p.y) + 1.5, 4, 0, 7); g.fill();
+    g.fillStyle = p.col || '#efe9de'; g.beginPath(); g.arc(LX(p.x), LY(p.y), 3.6, 0, 7); g.fill();
+  }
+  if (st.stars) for (const s of st.stars) { g.fillStyle = '#ffe08a'; g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? 3 : 7.5; g.lineTo(LX(s.x) + Math.cos(a) * rad, LY(s.y) + Math.sin(a) * rad); } g.fill(); }
+  overlayText(g, st, w, h);
+}
+
+// ───────── loper met genen ─────────
+const BASE = { fresh: 3, comp: .5, straight: .3, rev: 1.2, temp: .75 };
+function GW(m, col, o = {}) { const w = { c: m.s, h: 2, ph: 2, visits: new Uint16Array(m.n), steps: 0, t: 0, wait: 0, col, done: false, key: false, turn: 0, commit: 0, best: 1e9, since: 0, tempMul: 1, team: o.team || 0, marks: new Uint8Array(m.n * 4) }; w.visits[m.s] = 1; return w; }
+function gwStep(m, w, r, extra, env) {
+  if (w.done) return;
+  w.t++;
+  if (w.wait > 0) { w.wait--; return; }
+  const c = w.c, cand = [];
+  for (const d of m.dirs[c]) if (!(env.block && env.block(w, c, d))) cand.push(d);
+  if (!cand.length) return;
+  const W = env.weights ? env.weights(w, c) : BASE, tm = W.temp * w.tempMul, goal = env.goal ? env.goal(w) : m.g;
+  const sc = cand.map(d => { const n = m.to(c, d); let s = W.fresh * (w.visits[n] === 0 ? 1 : -Math.min(w.visits[n], 5) / 5) + W.comp * (man(m, c, goal) - man(m, n, goal)) + W.straight * (d === w.h ? 1 : 0) - W.rev * (d === ((w.h + 2) & 3) ? 1 : 0); if (extra) s += extra(w, c, d, n); return s; });
+  const mx = Math.max(...sc), ex = sc.map(s => Math.exp((s - mx) / tm)); let tot = ex.reduce((a, b) => a + b, 0), x = r() * tot, k = 0;
+  while (k < ex.length - 1 && (x -= ex[k]) > 0) k++;
+  const d = cand[k], n = m.to(c, d);
+  w.marks[c * 4 + d]++; w.marks[n * 4 + ((d + 2) & 3)]++;
+  w.ph = w.h; w.c = n; w.h = d; w.visits[n]++; w.steps++;
+  if (env.after) env.after(w, c, d, n);
+  if (n === m.g && (!env.goalOk || env.goalOk(w))) w.done = true;
+}
+// "zonder" (grijs) tegen "met" (kleur): zelfde doolhof, zelfde basis-DNA
+function geneDemo(o) {
+  return function* (st, r, I) {
+    const m = I.maze({ braid: o.braid ?? .2 });
+    const env = { m, st, r, block: o.block, weights: o.weights, goal: o.goal, goalOk: o.goalOk };
+    if (o.setup) o.setup(m, r, st, env);
+    const team = o.team || 1, A = [], B = [];
+    for (let i = 0; i < team; i++) { A.push(GW(m, GREY, { team: 0 })); B.push(GW(m, o.col || ACC, { team: 1 })); }
+    for (const w of B) w.gene = true;
+    const all = [...A, ...B]; env.all = all;
+    env.after = (w, c, d, n) => { if (o.after) o.after(w, c, d, n, env); };
+    if (o.init) for (const w of all) o.init(w, env);
+    st.heat = new Float32Array(m.n); st.heatCol = o.heatCol || [255, 181, 71];
+    const fin = [0, 0], cap = o.cap || 2400;
+    for (let k = 0; k < cap; k++) {
+      for (const w of all) { if (fin[w.team]) continue; gwStep(m, w, r, w.gene ? (w2, c, d, n) => o.extra(w2, c, d, n, env) : (o.baseExtra ? (w2, c, d, n) => o.baseExtra(w2, c, d, n, env) : null), env); if (w.done && !fin[w.team]) fin[w.team] = w.t; }
+      if (o.tick) o.tick(env);
+      for (const w of B) st.heat[w.c] = Math.min(1, st.heat[w.c] + .22);
+      st.walkers = all.map(w => ({ c: w.c, col: w.col, ring: !w.gene, r: team > 1 ? .24 : .3 }));
+      if (o.view) o.view(st, env, B, A);
+      const tA = fin[0] ? fin[0] : A[0].t, tB = fin[1] ? fin[1] : B[0].t;
+      st.text = `zonder: ${tA}${fin[0] ? ' ✓' : ''}  ·  met: ${tB}${fin[1] ? ' ✓' : ''}`;
+      yield;
+      if (fin[0] && fin[1]) break;
+    }
+    st.walkers = all.map(w => ({ c: w.c, col: w.col, ring: !w.gene }));
+    if (fin[0] && fin[1]) { st.text2 = fin[1] < fin[0] ? `met ${o.short || 'gen'}: ${Math.round((1 - fin[1] / fin[0]) * 100)}% sneller` : `deze keer geen winst (${fin[1]} vs ${fin[0]})`; st.text2col = fin[1] < fin[0] ? PICK : RED; }
+  };
+}
+function ray(m, c, d) { const out = []; let n = c; while (m.can(n, d) && out.length < 30) { n = m.to(n, d); out.push(n); } return out; }
+function corrLen(m, n, from) { let prev = from, cur = n, len = 1; while (m.deg(cur) === 2 && cur !== m.g && len < 20) { const nx = m.adj[cur][0] === prev ? m.adj[cur][1] : m.adj[cur][0]; prev = cur; cur = nx; len++; } return len; }
+
+// ───────── oplossers (bronnen) ─────────
+function rightHandStep(m, w) { for (const t of [1, 0, 3, 2]) { const d = (w.h + t) & 3; if (m.can(w.c, d)) { w.h = d; w.c = m.to(w.c, d); return t; } } return 0; }
+const RUN = {};
+RUN.cur1 = function* (st, r, I) {
+  const m = I.maze({ braid: .25 }); st.heat = new Float32Array(m.n);
+  const { dist, order } = bfsP(m, m.s, openP(m)); const md = dist[m.g];
+  const R = { c: m.s, h: 1 }; let lay = 0, rs = 0, seen = new Set();
+  for (let k = 0; k < 3000; k++) {
+    lay++; for (const c of order) if (dist[c] === lay) st.heat[c] = 1;
+    if (R.c !== m.g) { rightHandStep(m, R); rs++; const key = R.c * 4 + R.h; if (seen.has(key)) R.loop = true; seen.add(key); }
+    st.walkers = [{ c: R.c, col: RED }];
+    st.text = `BFS: laag ${Math.min(lay, md)}  ·  Rechterhand: ${R.loop ? 'draait rondjes' : rs}`;
+    if (lay >= md) st.path = trace(bfsP(m, m.s, openP(m)).par, m.g);
+    yield;
+    if (lay >= md && (R.c === m.g || R.loop)) break;
+  }
+};
+RUN.pledge = function* (st, r, I) {
+  const m = I.maze({ braid: .5 });
+  m.s = center(m); const gx = (r() * m.W) | 0; m.g = gx; m.open[gx] |= 1; m.fin();
+  st.heat = new Float32Array(m.n); st.heat2 = new Float32Array(m.n);
+  const P = { c: m.s, h: 0, cnt: 0, free: true, n: 0 }, R = { c: m.s, h: 0, n: 0 }, seen = new Set();
+  for (let k = 0; k < 4000; k++) {
+    if (P.c !== m.g) {
+      if (P.free && m.can(P.c, 0)) { P.c = m.to(P.c, 0); P.h = 0; }
+      else { P.free = false; const t = rightHandStep(m, P); P.cnt += t === 1 ? 1 : t === 3 ? -1 : t === 2 ? 2 : 0; if (P.cnt === 0) P.free = true; }
+      P.n++; st.heat[P.c] = Math.min(1, st.heat[P.c] + .3);
+    }
+    if (R.c !== m.g && !R.loop) { rightHandStep(m, R); R.n++; const key = R.c * 4 + R.h; if (seen.has(key)) R.loop = true; seen.add(key); st.heat2[R.c] = Math.min(1, st.heat2[R.c] + .2); }
+    st.heat2Col = [255, 107, 107];
+    st.walkers = [{ c: R.c, col: RED }, { c: P.c, col: PICK }];
+    st.text = `Pledge: ${P.n}${P.c === m.g ? ' ✓' : ''}  ·  teller ${P.cnt > 0 ? '+' : ''}${P.cnt}  ·  Rechterhand: ${R.loop ? '∞ rondjes' : R.n + (R.c === m.g ? ' ✓' : '')}`;
+    yield;
+    if (P.c === m.g && (R.c === m.g || R.loop)) break;
+  }
+  st.text2 = 'uitgang = gat in de bovenrand · start in het midden';
+};
+RUN.levy = function* (st, r, I) {
+  const m = I.maze({ braid: .35 }); st.heat = new Float32Array(m.n); st.heat2 = new Float32Array(m.n); st.heat2Col = [154, 165, 177];
+  const M = { c: m.s, h: 2, n: 0 }, L = { c: m.s, h: 2, n: 0, run: 0 };
+  const nb = w => { const back = (w.h + 2) & 3, o = m.dirs[w.c].filter(d => d !== back); return o.length ? o : m.dirs[w.c]; };
+  for (let k = 0; k < 5000; k++) {
+    if (M.c !== m.g) { const d = pickOf(r, nb(M)); M.h = d; M.c = m.to(M.c, d); M.n++; st.heat2[M.c] = Math.min(1, st.heat2[M.c] + .15); }
+    if (L.c !== m.g) {
+      if (L.run <= 0) L.run = Math.min(40, Math.floor(1 / Math.pow(r() + 1e-9, 1 / 1.3)));
+      const d = m.can(L.c, L.h) && L.run > 1 ? L.h : pickOf(r, nb(L));
+      L.h = d; L.c = m.to(L.c, d); L.run--; L.n++; st.heat[L.c] = Math.min(1, st.heat[L.c] + .2);
+    }
+    st.walkers = [{ c: M.c, col: GREY }, { c: L.c, col: ACC }];
+    st.text = `dronken muis: ${M.n}${M.c === m.g ? ' ✓' : ''}  ·  Lévy: ${L.n}${L.c === m.g ? ' ✓' : ''}`;
+    yield;
+    if (M.c === m.g && L.c === m.g) break;
+  }
+};
+RUN.micromouse = function* (st, r, I) {
+  const m = I.maze({ braid: .3 }); m.g = center(m);
+  const E = Explorer(m); st.known = E.known; st.heat = new Float32Array(m.n); st.heatCol = [90, 169, 255];
+  let c = m.s, n = 0, replans = 0, lastBest = -1;
+  for (let k = 0; k < 3000 && c !== m.g; k++) {
+    E.sense(c);
+    const { dist } = bfsP(m, m.g, E.pass(true)); let mxd = 1; for (const v of dist) if (v > mxd) mxd = v;
+    for (let i = 0; i < m.n; i++) st.heat[i] = dist[i] < 0 ? 0 : .9 * (1 - dist[i] / mxd);
+    let best = -1, bd = 1e9; for (const d of m.dirs[c]) { const v = dist[m.to(c, d)]; if (v >= 0 && v < bd) { bd = v; best = d; } }
+    if (bd >= dist[c]) replans++;
+    if (best < 0) break;
+    c = m.to(c, best); n++;
+    st.walkers = [{ c, col: PICK }];
+    st.text = `stappen ${n}  ·  afstand-schatting ${bd}  ·  muren ontdekt ${E.known.reduce((a, v) => a + (v === 1), 0) >> 1}`;
+    yield;
+  }
+  st.text2 = 'blauw = geschatte afstand · vage muren = nog niet gezien';
+};
+RUN.frontier = function* (st, r, I) {
+  const m = I.maze({ braid: .25 }); const E = Explorer(m); st.fog = E.seen; st.known = E.known; st.heat = new Float32Array(m.n); st.heatCol = [46, 196, 182];
+  let c = m.s, n = 0;
+  for (let k = 0; k < 3000 && c !== m.g; k++) {
+    E.sense(c); st.heat[c] = .5;
+    const bf = bfsP(m, c, E.pass(false)); let t = -1;
+    if (E.seen[m.g] && bf.dist[m.g] >= 0) t = m.g;
+    else { let bd = 1e9; for (const x of bf.order) if (!E.vis[x] && bf.dist[x] < bd) { bd = bf.dist[x]; t = x; } }
+    if (t < 0) break;
+    const p = trace(bf.par, t); st.paths = [{ cells: p, col: TEAL, w: .1, dash: true }];
+    c = p[1] ?? c; n++;
+    st.walkers = [{ c, col: TEAL }];
+    st.text = `stappen ${n}  ·  ${t === m.g ? 'doel gezien → erheen' : 'naar dichtstbijzijnde rand van het onbekende'}`;
+    yield;
+  }
+};
+RUN.vision = function* (st, r, I) {
+  const m = I.maze({ braid: .2 }); const seen = new Uint8Array(m.n), vis = new Uint8Array(m.n), kE = new Set(); st.fog = seen; st.heat = new Float32Array(m.n);
+  let c = m.s, n = 0; const stack = [c];
+  const look = c => { seen[c] = 1; const rays = []; for (const d of m.dirs[c]) { let p = c; const cells = [c]; for (const x of ray(m, c, d)) { seen[x] = 1; kE.add(p + ',' + x); kE.add(x + ',' + p); p = x; cells.push(x); } rays.push({ cells, col: '#fff1c9', a: .65, w: .08 }); } return rays; };
+  for (let k = 0; k < 3000 && c !== m.g; k++) {
+    vis[c] = 1; st.heat[c] = .45; st.polys = look(c);
+    if (seen[m.g]) {
+      const bf = bfsP(m, c, (a, d) => m.can(a, d) && kE.has(a + ',' + m.to(a, d))); if (bf.dist[m.g] > 0) { const p = trace(bf.par, m.g); st.paths = [{ cells: p, col: PICK, w: .14, dash: true }]; c = p[1]; n++; st.text = `stappen ${n}  ·  doel in zicht!`; st.walkers = [{ c, col: ACC }]; yield; continue; }
+    }
+    const opts = m.dirs[c].filter(d => !vis[m.to(c, d)]);
+    if (opts.length) { opts.sort((a, b) => ray(m, c, b).filter(x => !vis[x]).length - ray(m, c, a).filter(x => !vis[x]).length); c = m.to(c, opts[0]); stack.push(c); }
+    else { stack.pop(); c = stack[stack.length - 1] ?? m.s; }
+    n++; st.walkers = [{ c, col: ACC }]; st.text = `stappen ${n}  ·  kijkt elke gang tot het eind in`;
+    yield;
+  }
+};
+RUN.ida = function* (st, r, I) {
+  const m = I.maze({ braid: .12 }); const h = c => man(m, c, m.g);
+  st.heat = new Float32Array(m.n); st.heat2 = new Float32Array(m.n); st.heat2Col = [110, 100, 90];
+  let T = h(m.s), round = 0, total = 0;
+  while (round < 60) {
+    round++; for (let i = 0; i < m.n; i++) { st.heat2[i] = Math.max(st.heat2[i] * .6, st.heat[i] * .6); st.heat[i] = 0; }
+    let next = 1e9; const stack = [{ c: m.s, g: 0, i: 0 }], on = new Uint8Array(m.n); on[m.s] = 1;
+    while (stack.length) {
+      const top = stack[stack.length - 1];
+      if (top.c === m.g) { st.path = stack.map(s => s.c); st.text = `gevonden in ronde ${round}  ·  grens ${T}  ·  ${total} knopen`; return; }
+      const f = top.g + h(top.c);
+      if (f > T) { next = Math.min(next, f); on[top.c] = 0; stack.pop(); continue; }
+      st.heat[top.c] = 1;
+      const ds = m.dirs[top.c]; let pushed = false;
+      while (top.i < ds.length) { const n = m.to(top.c, ds[top.i++]); if (!on[n]) { on[n] = 1; stack.push({ c: n, g: top.g + 1, i: 0 }); pushed = true; break; } }
+      if (!pushed) { on[top.c] = 0; stack.pop(); }
+      total++; st.path = stack.map(s => s.c); st.pathCol = BLUE;
+      st.text = `ronde ${round}  ·  grens f ≤ ${T}  ·  ${total} knopen`;
+      yield;
+    }
+    T = next;
+  }
+};
+RUN.beam = function* (st, r, I) {
+  const m = I.maze({ braid: .18 }); const h = c => man(m, c, m.g); let K = 2;
+  st.heat2Col = [255, 107, 107];
+  while (K <= 64) {
+    st.heat = new Float32Array(m.n); st.heat2 = new Float32Array(m.n); st.path = null;
+    const par = new Int32Array(m.n).fill(-1), vis = new Uint8Array(m.n); let layer = [m.s]; vis[m.s] = 1; let depth = 0;
+    while (layer.length) {
+      const next = [];
+      for (const c of layer) for (const n of m.adj[c]) if (!vis[n]) { vis[n] = 1; par[n] = c; next.push(n); }
+      if (vis[m.g]) { st.heat[m.g] = 1; st.path = trace(par, m.g); st.text = `bundel ${K}: gevonden na ${depth + 1} lagen`; st.text2 = K > 2 ? 'smalle bundels misten het doel' : 'meteen raak'; return; }
+      next.sort((a, b) => h(a) - h(b));
+      const kept = next.slice(0, K); for (const c of next.slice(K)) st.heat2[c] = 1; for (const c of kept) st.heat[c] = 1;
+      layer = kept; depth++;
+      st.walkers = kept.map(c => ({ c, col: ACC, r: .18 }));
+      st.text = `bundel = ${K}  ·  laag ${depth}  ·  rood = weggegooid`;
+      yield;
+    }
+    st.text = `bundel ${K} te smal — doel gemist`; st.text2 = `opnieuw met bundel ${K * 2}`; st.text2col = RED;
+    for (let i = 0; i < 25; i++) yield;
+    st.text2 = null; K *= 2;
+  }
+};
+RUN.jps = function* (st, r, I) {
+  const m = I.maze({ braid: .25 }); const h = c => man(m, c, m.g);
+  const jump = (c, d) => { let n = c, len = 0; while (m.can(n, d)) { n = m.to(n, d); len++; if (n === m.g || m.deg(n) !== 2 || !m.can(n, d)) break; } return { n, len }; };
+  const g = new Map([[m.s, 0]]), par = new Map(), open = [m.s], closed = new Set(); st.tubes = []; st.heat = new Float32Array(m.n); let jumps = 0;
+  while (open.length) {
+    open.sort((a, b) => (g.get(a) + h(a)) - (g.get(b) + h(b)));
+    const c = open.shift(); if (closed.has(c)) continue; closed.add(c); st.heat[c] = .8;
+    if (c === m.g) break;
+    for (const d of m.dirs[c]) { const j = jump(c, d); jumps++; const ng = g.get(c) + j.len; st.tubes.push({ a0: c, b0: j.n, w: .14, col: BLUE, a: .8 }); if (!g.has(j.n) || ng < g.get(j.n)) { g.set(j.n, ng); par.set(j.n, c); open.push(j.n); } }
+    st.walkers = [{ c, col: ACC, r: .22 }];
+    st.text = `${closed.size} sprongpunten  ·  ${jumps} sprongen (i.p.v. ${m.n} cellen)`;
+    yield;
+  }
+  const nodes = []; let x = m.g; while (x !== undefined) { nodes.push(x); x = par.get(x); } nodes.reverse();
+  const cells = [m.s]; for (let i = 1; i < nodes.length; i++) { const d = dirTo(m, nodes[i - 1], m.to(nodes[i - 1], 0)) >= 0 ? null : null; let c = nodes[i - 1]; let dd = -1; for (const d2 of m.dirs[c]) if (jump(c, d2).n === nodes[i]) dd = d2; while (c !== nodes[i] && dd >= 0) { c = m.to(c, dd); cells.push(c); } }
+  st.path = cells;
+};
+RUN.junction = function* (st, r, I) {
+  const m = I.maze({ braid: .3 });
+  const isN = new Uint8Array(m.n); for (let c = 0; c < m.n; c++) if (m.deg(c) !== 2 || c === m.s || c === m.g) isN[c] = 1;
+  const edges = [], key = new Set(), adjN = new Map();
+  st.heat = new Float32Array(m.n); st.tubes = []; let nn = 0;
+  for (let c = 0; c < m.n; c++) if (isN[c]) { nn++; st.heat[c] = .9; }
+  for (let c = 0; c < m.n; c++) if (isN[c]) for (const d of m.dirs[c]) {
+    let prev = c, cur = m.to(c, d); const cells = [c, cur];
+    while (!isN[cur]) { const nx = m.adj[cur][0] === prev ? m.adj[cur][1] : m.adj[cur][0]; prev = cur; cur = nx; cells.push(cur); }
+    const k = Math.min(c, cur) + ':' + Math.max(c, cur) + ':' + cells.length; if (key.has(k)) continue; key.add(k);
+    const e = { a: c, b: cur, cells, len: cells.length - 1 }; edges.push(e);
+    for (const [u, v] of [[c, cur], [cur, c]]) { if (!adjN.has(u)) adjN.set(u, []); adjN.get(u).push({ v, e }); }
+    st.tubes.push({ a0: c, b0: cur, w: .1, col: TEAL, a: .9 });
+    st.text = `${m.n} cellen → ${nn} knooppunten, ${edges.length} gangen`;
+    yield;
+  }
+  const dist = new Map([[m.s, 0]]), par = new Map(), done = new Set();
+  while (true) {
+    let u = -1, bd = 1e9; for (const [k2, v] of dist) if (!done.has(k2) && v < bd) { bd = v; u = k2; }
+    if (u < 0) break; done.add(u); if (u === m.g) break;
+    for (const { v, e } of adjN.get(u) || []) { const nd = bd + e.len; if (!dist.has(v) || nd < dist.get(v)) { dist.set(v, nd); par.set(v, { u, e }); } }
+    st.walkers = [{ c: u, col: ACC, r: .24 }]; st.text = `zoeken over ${nn} knooppunten · ${done.size} bekeken`;
+    yield;
+  }
+  const cells = []; let x = m.g; while (par.has(x)) { const { u, e } = par.get(x); const seg = e.a === u ? e.cells : e.cells.slice().reverse(); cells.unshift(...seg.slice(1)); x = u; } cells.unshift(m.s);
+  st.path = cells; st.text = `${m.n} cellen → ${nn} knooppunten · route ${cells.length - 1} stappen`;
+};
+RUN.wallbreak = function* (st, r, I) {
+  const m = I.maze({ braid: 0 }); const K = 1;
+  const S = c => c, dist = new Int32Array(m.n * 2).fill(-1), par = new Int32Array(m.n * 2).fill(-1); const q = [m.s]; dist[m.s] = 0;
+  st.heat = new Float32Array(m.n); st.heat2 = new Float32Array(m.n); st.heat2Col = [255, 138, 61]; st.heat = new Float32Array(m.n); st.heatCol = [90, 169, 255];
+  const normal = trace(bfsP(m, m.s, openP(m)).par, m.g);
+  let qi = 0, lay = 0, goalS = -1;
+  while (qi < q.length && goalS < 0) {
+    const end = q.length; lay++;
+    for (; qi < end; qi++) { const s = q[qi], c = s % m.n, b = (s / m.n) | 0; for (let d = 0; d < 4; d++) { if (!m.inb(c, d)) continue; const n = m.to(c, d); let nb = b; if (!m.can(c, d)) { if (b >= K) continue; nb = b + 1; } const ns = nb * m.n + n; if (dist[ns] < 0) { dist[ns] = dist[s] + 1; par[ns] = s; q.push(ns); (nb ? st.heat2 : st.heat)[n] = 1; if (n === m.g) goalS = ns; } } }
+    st.paths = [{ cells: normal, col: GREY, w: .1, a: .6 }];
+    st.text = `laag ${lay}  ·  blauw = zonder slopen, oranje = 1 muur gesloopt`;
+    yield;
+  }
+  const states = []; let s = goalS; while (s >= 0) { states.push(s); s = par[s]; } states.reverse();
+  const cells = states.map(x => x % m.n); st.path = cells; st.broken = [];
+  for (let i = 1; i < cells.length; i++) { const d = dirTo(m, cells[i - 1], cells[i]); if (!m.can(cells[i - 1], d)) st.broken.push({ c: cells[i - 1], d }); }
+  st.text = `normaal ${normal.length - 1} stappen  ·  met 1 muur slopen ${cells.length - 1}`;
+};
+RUN.physarum = function* (st, r, I) {
+  const m = I.maze({ braid: .55 }); const E = [], inc = Array.from({ length: m.n }, () => []);
+  for (let c = 0; c < m.n; c++) for (const n of m.adj[c]) if (c < n) { inc[c].push(E.length); inc[n].push(E.length); E.push([c, n]); }
+  const D = new Float64Array(E.length).fill(1), p = new Float64Array(m.n);
+  st.tubes = E.map(([a, b]) => ({ a0: a, b0: b, w: 1, col: '#ffd34d' }));
+  // drukken oplossen met CG (gewogen Laplace, p[g] = 0, instroom 1 bij start)
+  const Ap = (x, out) => { out.fill(0); for (let e = 0; e < E.length; e++) { const [a, b] = E[e], f = D[e] * (x[a] - x[b]); out[a] += f; out[b] -= f; } out[m.g] = 0; };
+  const rv = new Float64Array(m.n), dv = new Float64Array(m.n), qv = new Float64Array(m.n);
+  const solve = () => {
+    p[m.g] = 0; Ap(p, qv); for (let i = 0; i < m.n; i++) rv[i] = (i === m.s ? 1 : 0) - qv[i]; rv[m.g] = 0; dv.set(rv);
+    let rr0 = 0; for (let i = 0; i < m.n; i++) rr0 += rv[i] * rv[i];
+    for (let k = 0; k < 600 && rr0 > 1e-14; k++) {
+      Ap(dv, qv); let dq = 0; for (let i = 0; i < m.n; i++) dq += dv[i] * qv[i]; if (dq <= 0) break;
+      const al = rr0 / dq; let rr1 = 0; for (let i = 0; i < m.n; i++) { p[i] += al * dv[i]; rv[i] -= al * qv[i]; rr1 += rv[i] * rv[i]; }
+      const be = rr1 / rr0; for (let i = 0; i < m.n; i++) dv[i] = rv[i] + be * dv[i]; dv[m.g] = 0; rr0 = rr1;
+    }
+  };
+  for (let it = 0; it < 120; it++) {
+    solve();
+    for (let e = 0; e < E.length; e++) { const Q = D[e] * (p[E[e][0]] - p[E[e][1]]); D[e] = Math.max(1e-4, D[e] + .3 * (Math.abs(Q) - D[e])); st.tubes[e].w = Math.min(1, D[e] * 1.2); }
+    st.text = `ronde ${it + 1}  ·  dikke buizen = veel stroming`;
+    yield;
+  }
+  const path = [m.s], used = new Set([m.s]); let c = m.s;
+  while (c !== m.g && path.length < m.n) { let be = -1, bw = -1; for (const e of inc[c]) { const j = E[e][0] === c ? E[e][1] : E[e][0]; if (!used.has(j) && D[e] > bw) { bw = D[e]; be = j; } } if (be < 0) break; used.add(be); path.push(be); c = be; }
+  st.path = path; st.text2 = `de slijmzwam koos een route van ${path.length - 1} stappen`;
+};
+RUN.water = function* (st, r, I) {
+  const m = I.maze({ braid: .3 }); let u = new Float64Array(m.n); u[m.s] = 1; st.heat = new Float32Array(m.n); st.heatCol = [90, 169, 255]; let it = 0;
+  while (u[m.g] < 1e-7 && it < 2000) {
+    for (let k = 0; k < 2; k++) { const nu = new Float64Array(m.n); for (let i = 0; i < m.n; i++) { let s = 0; for (const j of m.adj[i]) s += u[j] - u[i]; nu[i] = u[i] + .22 * s; } nu[m.s] = 1; u = nu; it++; }
+    for (let i = 0; i < m.n; i++) st.heat[i] = u[i] > 0 ? clamp((Math.log10(u[i]) + 9) / 9, 0, 1) : 0;
+    st.text = `tik ${it}  ·  water stroomt uit`; yield;
+  }
+  const path = [m.g]; let c = m.g; while (c !== m.s && path.length < m.n) { let b = c, bv = -1; for (const j of m.adj[c]) if (u[j] > bv) { bv = u[j]; b = j; } c = b; path.push(c); }
+  st.path = path.reverse(); st.text = `doel nat na ${it} tikken  ·  terug stroomopwaarts = route`;
+};
+RUN.current = function* (st, r, I) {
+  const m = I.maze({ braid: .5 }); const p = new Float64Array(m.n).fill(.5); p[m.s] = 1; p[m.g] = 0;
+  const E = []; for (let c = 0; c < m.n; c++) for (const n of m.adj[c]) if (c < n) E.push([c, n]);
+  st.flow = E.map(([a, b]) => ({ a, b, cur: 0, off: r() })); st.tubes = E.map(([a, b]) => ({ a0: a, b0: b, w: 0, col: '#5aa9ff' }));
+  for (let it = 0; it < 140; it++) {
+    for (let sw = 0; sw < Math.ceil(m.n / 25); sw++) for (let i = 0; i < m.n; i++) { if (i === m.s || i === m.g) continue; let s = 0; for (const j of m.adj[i]) s += p[j]; p[i] = s / m.adj[i].length; }
+    let mx = 1e-9; const cur = E.map(([a, b]) => p[a] - p[b]); for (const v of cur) mx = Math.max(mx, Math.abs(v));
+    E.forEach(([a, b], e) => { const v = cur[e] / mx; const f = st.flow[e]; if (v >= 0) { f.a = a; f.b = b; } else { f.a = b; f.b = a; } f.cur = Math.abs(v); st.tubes[e].w = Math.abs(v) * .5; });
+    st.text = `ronde ${it + 1}  ·  + bij start, − bij doel`; yield;
+  }
+  const path = [m.s]; let c = m.s; const used = new Set([c]);
+  while (c !== m.g && path.length < m.n) { let b = -1, bv = -1e9; for (const j of m.adj[c]) if (!used.has(j) && p[c] - p[j] > bv) { bv = p[c] - p[j]; b = j; } if (b < 0) break; used.add(b); path.push(b); c = b; }
+  st.path = path; st.text2 = 'de sterkste stroom wijst de route';
+  for (let i = 0; i < 40; i++) yield;
+};
+RUN.collision = function* (st, r, I) {
+  const m = I.maze({ braid: .35 }); const dA = new Int32Array(m.n).fill(-1), dB = new Int32Array(m.n).fill(-1), pA = new Int32Array(m.n).fill(-1), pB = new Int32Array(m.n).fill(-1);
+  dA[m.s] = 0; dB[m.g] = 0; let fA = [m.s], fB = [m.g], lay = 0; st.heat = new Float32Array(m.n); st.heat2 = new Float32Array(m.n); st.heatCol = [90, 169, 255]; st.heat2Col = [255, 107, 107];
+  const meets = []; st.heat[m.s] = 1; st.heat2[m.g] = 1;
+  const grow = (fr, d, p, other, H) => { const nx = []; for (const c of fr) for (const n of m.adj[c]) if (d[n] < 0) { d[n] = d[c] + 1; p[n] = c; nx.push(n); H[n] = 1; if (other[n] >= 0) meets.push(n); } return nx; };
+  while (!meets.length && (fA.length || fB.length)) {
+    lay++; fA = grow(fA, dA, pA, dB, st.heat); if (!meets.length) fB = grow(fB, dB, pB, dA, st.heat2);
+    st.text = `golf ${lay}  ·  blauw vanaf start, rood vanaf doel`; yield;
+  }
+  const x = meets[0]; st.path = [...trace(pA, x), ...trace(pB, x).reverse().slice(1)];
+  st.walkers = [{ c: x, col: '#fff', r: .34 }]; st.text = `botsing na ${lay} golven · route ${st.path.length - 1}`;
+};
+RUN.bees = function* (st, r, I) {
+  const m = I.maze({ braid: .3 }); st.heat = new Float32Array(m.n); st.heatCol = [255, 209, 102];
+  const B = Array.from({ length: 6 }, () => ({ c: m.s, path: [m.s], seen: new Set([m.s]), state: 'scout', h: 2 })); let best = null, finds = 0;
+  for (let k = 0; k < 4000; k++) {
+    for (const b of B) {
+      if (b.state === 'scout') {
+        const back = (b.h + 2) & 3; let opts = m.dirs[b.c].filter(d => !b.seen.has(m.to(b.c, d))); if (!opts.length) opts = m.dirs[b.c].filter(d => d !== back); if (!opts.length) opts = m.dirs[b.c];
+        const d = pickOf(r, opts); b.h = d; b.c = m.to(b.c, d); b.seen.add(b.c); st.heat[b.c] = Math.min(1, st.heat[b.c] + .08);
+        const ix = b.path.lastIndexOf(b.c); if (ix >= 0) b.path.length = ix + 1; else b.path.push(b.c);
+        if (b.c === m.g) { finds++; if (!best || b.path.length < best.length) best = b.path.slice(); b.state = 'home'; b.ret = b.path.slice().reverse(); }
+      } else if (b.state === 'home') { b.c = b.ret.shift(); if (!b.ret.length) { b.state = 'dance'; b.t = 18; } }
+      else if (b.state === 'dance') { b.t--; if (b.t <= 0) { b.state = 'scout'; b.path = [m.s]; b.seen = new Set([m.s]); } }
+    }
+    st.paths = best ? [{ cells: best, col: '#ffd166', w: .16, a: .9 }] : null;
+    st.walkers = B.map(b => ({ c: b.c, col: b.state === 'dance' ? '#fff' : '#ffd166', r: .22, dx: b.state === 'dance' ? Math.sin(k * .9) * .25 : 0, dy: b.state === 'dance' ? Math.cos(k * 1.7) * .12 : 0 }));
+    st.text = `${finds} vondsten  ·  beste dans: ${best ? best.length - 1 + ' stappen' : '—'}`;
+    yield;
+    if (finds >= 4) break;
+  }
+  if (!best) return;
+  const fl = Array.from({ length: 10 }, (_, i) => -i * 3);
+  for (let t = 0; t < best.length + 32; t++) { st.walkers = fl.map(o => ({ c: best[clamp(t + o, 0, best.length - 1)], col: '#ffd166', r: .2 })); st.text = `de zwerm vliegt de beste dans: ${best.length - 1} stappen`; yield; }
+};
+RUN.qlearn = function* (st, r, I) {
+  const m = I.maze({ braid: .15 }); const Q = new Float32Array(m.n * 4), seenC = new Float32Array(m.n);
+  st.arrows = new Int8Array(m.n).fill(-1); st.arrowA = new Float32Array(m.n); st.heat = new Float32Array(m.n); st.chart = { vals: [], col: PICK, label: 'stappen per ronde', len: 22 };
+  const argmax = c => { let bd = -1, bv = -1e9; for (const d of m.dirs[c]) { const v = Q[c * 4 + d] + r() * 1e-6; if (v > bv) { bv = v; bd = d; } } return bd; };
+  for (let ep = 1; ep <= 22; ep++) {
+    let c = m.s, n = 0; st.heat.fill(0); const eps = ep > 18 ? 0 : .12;
+    I.sps = ep < 4 ? 900 : ep < 15 ? 260 : 60;
+    while (c !== m.g && n < 4000) {
+      const d = r() < eps ? pickOf(r, m.dirs[c]) : argmax(c), nx = m.to(c, d);
+      let mq = -1e9; for (const d2 of m.dirs[nx]) mq = Math.max(mq, Q[nx * 4 + d2]); const tgt = -1 + (nx === m.g ? 0 : .97 * mq);
+      Q[c * 4 + d] += .6 * (tgt - Q[c * 4 + d]); seenC[c] = 1;
+      st.arrows[c] = argmax(c); st.arrowA[c] = .85;
+      c = nx; n++; st.heat[c] = Math.min(1, st.heat[c] + .3);
+      st.walkers = [{ c, col: PICK }]; st.text = `ronde ${ep}  ·  ${n} stappen${st.chart.vals.length ? '  ·  vorige ' + st.chart.vals[st.chart.vals.length - 1] : ''}`;
+      yield;
+    }
+    st.chart.vals.push(n);
+  }
+  st.text2 = `van ${st.chart.vals[0]} naar ${st.chart.vals[st.chart.vals.length - 1]} stappen`;
+};
+RUN.mcts = function* (st, r, I) {
+  const m = I.maze({ braid: .25 }); const vis = new Uint16Array(m.n); let c = m.s, n = 0; st.heat = new Float32Array(m.n); vis[c] = 1;
+  while (c !== m.g && n < 700) {
+    const polys = []; let bd = -1, bs = -1e9;
+    for (const d of m.dirs[c]) {
+      let tot = 0; const s0 = m.to(c, d);
+      for (let k = 0; k < 8; k++) { let x = s0, h = d, best = man(m, x, m.g), cells = [c, x]; for (let t = 0; t < 26 && x !== m.g; t++) { const back = (h + 2) & 3; let o = m.dirs[x].filter(q => q !== back); if (!o.length) o = m.dirs[x]; h = pickOf(r, o); x = m.to(x, h); cells.push(x); best = Math.min(best, man(m, x, m.g)); } tot += x === m.g ? 40 : -best; if (k < 3) polys.push({ cells, col: '#c9b8ff', a: .28, w: .05 }); }
+      const sc = tot / 8 - vis[s0] * 2.5; if (sc > bs) { bs = sc; bd = d; }
+    }
+    c = m.to(c, bd); vis[c]++; n++; st.heat[c] = Math.min(1, st.heat[c] + .3); st.polys = polys;
+    st.walkers = [{ c, col: PURP }]; st.text = `stap ${n}  ·  8 proefritten per richting`;
+    yield;
+  }
+  st.polys = null;
+};
+
+// ───────── tactieken (genen) ─────────
+RUN.cur2 = geneDemo({ short: 'genen', extra: () => 0, col: GREY, cap: 2400 });
+RUN.cur2 = function* (st, r, I) {
+  const m = I.maze({ braid: .2 }); const w = GW(m, ACC), env = { m }; st.heat = new Float32Array(m.n);
+  for (let k = 0; k < 2400 && !w.done; k++) { gwStep(m, w, r, null, env); st.heat[w.c] = Math.min(1, st.heat[w.c] + .22); st.walkers = [{ c: w.c, col: ACC }]; st.text = `huidige DNA-loper: ${w.steps} stappen${w.done ? ' ✓' : ''}`; yield; }
+  st.text2 = 'nieuwsgierig · kompas · rechtdoor · niet omkeren';
+};
+RUN.turn = geneDemo({ short: 'draaiteller', braid: .45, col: PICK, heatCol: [106, 212, 138],
+  extra: (w, c, d) => { const t = [0, 1, 2, -1][(d - w.h + 4) & 3]; return (Math.abs(w.turn) - Math.abs(w.turn + t)) * 1.2; },
+  after: (w, c, d) => { if (w.gene) w.turn += [0, 1, 2, -1][(d - w.ph + 4) & 3]; },
+  view: (st, env, B) => { st.text2 = `draaiteller ${B[0].turn > 0 ? '+' : ''}${B[0].turn}`; st.text2col = PICK; } });
+RUN.sight = geneDemo({ short: 'zichtveld', col: '#fff1c9', heatCol: [255, 241, 201],
+  init: (w, env) => { w.seen = new Uint8Array(env.m.n); },
+  extra: (w, c, d, n, env) => { const ry = ray(env.m, c, d); let u = 0, gB = 0; for (const x of ry) { if (!w.seen[x]) u++; if (x === env.m.g) gB = 9; } return u / 3 + gB; },
+  after: (w, c, d, n, env) => { if (!w.gene) return; for (const d2 of env.m.dirs[n]) for (const x of ray(env.m, n, d2)) w.seen[x] = 1; },
+  view: (st, env, B) => { const m = env.m, c = B[0].c; st.polys = m.dirs[c].map(d => ({ cells: [c, ...ray(m, c, d)], col: '#fff1c9', a: .7, w: .07 })); } });
+RUN.corridor = geneDemo({ short: 'gangvoorkeur', col: TEAL, heatCol: [46, 196, 182], extra: (w, c, d, n, env) => corrLen(env.m, n, c) / 4,
+  view: (st, env, B) => { const m = env.m, c = B[0].c; st.polys = m.dirs[c].map(d => { const cells = [c]; let prev = c, cur = m.to(c, d); cells.push(cur); while (m.deg(cur) === 2 && cells.length < 20) { const nx = m.adj[cur][0] === prev ? m.adj[cur][1] : m.adj[cur][0]; prev = cur; cur = nx; cells.push(cur); } return { cells, col: TEAL, a: .55, w: .07 }; }); } });
+RUN.fromstart = geneDemo({ short: 'afstand tot start', col: BLUE, heatCol: [90, 169, 255],
+  setup: (m, r, st, env) => { env.dS = bfsP(m, m.s, openP(m)).dist; },
+  extra: (w, c, d, n, env) => (env.dS[n] - env.dS[c]) * 1.3 });
+RUN.chalk = geneDemo({ short: 'krijtstreepjes', col: '#f4efe4', heatCol: [244, 239, 228], braid: .35,
+  extra: (w, c, d) => -w.marks[c * 4 + d] * 1.6, view: (st, env, B) => { st.marks = B[0].marks; } });
+RUN.boredom = geneDemo({ short: 'verveling', col: '#f72585', heatCol: [247, 37, 133], braid: .3,
+  extra: () => 0,
+  after: (w, c, d, n, env) => { if (!w.gene) return; const dd = man(env.m, n, env.m.g); if (dd < w.best) { w.best = dd; w.since = 0; } else w.since++; w.tempMul = 1 + Math.min(5, w.since / 10); },
+  view: (st, env, B) => { const v = Math.round((B[0].tempMul - 1) / 5 * 10); st.text2 = 'verveling ' + '▮'.repeat(v) + '▯'.repeat(10 - v); st.text2col = '#f72585'; } });
+RUN.persist = geneDemo({ short: 'doorzetten', col: '#f4a261', heatCol: [244, 162, 97], braid: .35,
+  extra: (w, c, d) => (w.commit > 0 && d === w.h) ? 4 : 0,
+  after: (w, c, d) => { if (!w.gene) return; if (d !== w.ph) w.commit = 3; else w.commit = Math.max(0, w.commit - 1); },
+  view: (st, env, B) => { st.text2 = `houdt nog ${B[0].commit} stappen koers`; st.text2col = '#f4a261'; } });
+RUN.crowd = geneDemo({ short: 'drukte mijden', team: 4, col: '#80ed99', heatCol: [128, 237, 153], braid: .3,
+  extra: (w, c, d, n, env) => { let k = 0; for (const o of env.all) if (o !== w && o.team === w.team && (o.c === n || env.m.adj[n].includes(o.c))) k++; return -k * 1.8; } });
+RUN.scent = geneDemo({ short: 'gedeelde geur', team: 4, col: '#a7c957', heatCol: [167, 201, 87], braid: .3,
+  setup: (m, r, st, env) => { env.sc = [new Float32Array(m.n), new Float32Array(m.n)]; },
+  after: (w, c, d, n, env) => { env.sc[w.team][n] += 1; },
+  extra: (w, c, d, n, env) => -env.sc[1][n] * 1.3, baseExtra: () => 0,
+  tick: env => { for (const a of env.sc) for (let i = 0; i < a.length; i++) a[i] *= .985; },
+  view: (st, env) => { for (let i = 0; i < st.heat.length; i++) st.heat[i] = Math.min(1, env.sc[1][i] * .4); } });
+RUN.keydrive = geneDemo({ short: 'puzzeldrang', col: PURP, heatCol: [179, 136, 255], braid: .1,
+  setup: (m, r, st, env) => {
+    const p = trace(bfsP(m, m.s, openP(m)).par, m.g), i = Math.floor(p.length * .7), a = p[i], b = p[i + 1], dd = dirTo(m, a, b);
+    env.door = { a, b, d: dd }; const reg = bfsP(m, m.s, (c, d) => m.can(c, d) && !((c === a && m.to(c, d) === b) || (c === b && m.to(c, d) === a)));
+    const onP = new Set(p); const dP = bfsP(m, a, openP(m)).dist; let kc = m.s, bv = -1; for (const c of reg.order) if (!onP.has(c) && dP[c] > bv) { bv = dP[c]; kc = c; }
+    env.key = kc; env.dK = bfsP(m, kc, openP(m)).dist; st.doors = [{ c: a, d: dd, col: PURP }]; st.keys = [{ c: kc, col: PURP }];
+  },
+  block: (w, c, d) => !w.key && false,
+  init: (w, env) => { const { a, b } = env.door, m = env.m; env.block = (w2, c, d) => !w2.key && ((c === a && m.to(c, d) === b) || (c === b && m.to(c, d) === a)); },
+  extra: (w, c, d, n, env) => w.key ? 0 : (env.dK[c] - env.dK[n]) * 2.2,
+  after: (w, c, d, n, env) => { if (n === env.key && !w.key) { w.key = true; w.visits.fill(0); } },
+  view: (st, env, B, A) => { st.text2 = `sleutel: zonder ${A[0].key ? '✓' : '—'} · met ${B[0].key ? '✓' : '—'}`; st.text2col = PURP; } });
+RUN.terrain = geneDemo({ short: 'terreinangst', col: '#c2a878', heatCol: [194, 168, 120], braid: .45,
+  setup: (m, r, st, env) => { env.mud = new Uint8Array(m.n); for (let i = 0; i < 7; i++) { let c = (r() * m.n) | 0; for (let k = 0; k < 9; k++) { if (c !== m.s && c !== m.g) env.mud[c] = 1; c = pickOf(r, m.adj[c]); } } st.mud = env.mud; },
+  extra: (w, c, d, n, env) => -env.mud[n] * 2.5,
+  after: (w, c, d, n, env) => { if (env.mud[n]) w.wait = 3; } });
+
+// ───────── combineren ─────────
+RUN.cur3 = RUN.cur2;
+RUN.phases = function* (st, r, I) {
+  const m = I.maze({ braid: .3 }); const E = Explorer(m); st.known = E.known; st.heat = new Float32Array(m.n);
+  const w = GW(m, ACC), env = { m }; let phase = 1;
+  for (let k = 0; k < 2500 && w.c !== m.g; k++) {
+    E.sense(w.c);
+    if (phase === 1) { gwStep(m, w, r, null, env); if (w.steps >= 70 || E.seen[m.g]) phase = 2; st.heatCol = [255, 181, 71]; }
+    else { const { dist } = bfsP(m, m.g, E.pass(true)); let bd = -1, bv = 1e9; for (const d of m.dirs[w.c]) { const v = dist[m.to(w.c, d)]; if (v >= 0 && v < bv) { bv = v; bd = d; } } w.c = m.to(w.c, bd); w.steps++; st.heatCol = [106, 212, 138]; }
+    st.heat[w.c] = Math.min(1, st.heat[w.c] + .3);
+    st.walkers = [{ c: w.c, col: phase === 1 ? ACC : PICK }];
+    st.text = `fase ${phase}: ${phase === 1 ? 'verkennen (70 stappen)' : 'benutten — plant over de kaart'}  ·  ${w.steps}`;
+    yield;
+  }
+};
+RUN.perplace = geneDemo({ short: 'genen per plek', col: PICK, heatCol: [106, 212, 138], braid: .3,
+  setup: (m, r, st) => { st.cellCol = []; for (let c = 0; c < m.n; c++) { const d = m.deg(c); st.cellCol[c] = d === 1 ? 'rgba(231,111,81,.22)' : d >= 3 ? 'rgba(46,196,182,.22)' : null; } },
+  weights: (w, c) => {
+    if (!w.gene) return BASE;
+    return w.ctxM.deg(c) >= 3 ? { fresh: 4, comp: 1.1, straight: 0, rev: 2.5, temp: .5 } : { fresh: 2, comp: .2, straight: 1.5, rev: 3, temp: .6 };
+  },
+  init: (w, env) => { w.ctxM = env.m; }, extra: () => 0,
+  view: (st, env, B) => { const d = env.m.deg(B[0].c); st.text2 = `nu actief: ${d === 1 ? 'doodloper-genen' : d >= 3 ? 'kruispunt-genen' : 'gang-genen'}`; st.text2col = d === 1 ? '#e76f51' : d >= 3 ? TEAL : '#efe9de'; } });
+RUN.roles = function* (st, r, I) {
+  const m = I.maze({ braid: .25 }); const E = Explorer(m); st.fog = E.seen; st.known = E.known; st.heat = new Float32Array(m.n); st.heatCol = [46, 196, 182];
+  let s = m.s, run = m.s, rp = null, t = 0;
+  for (let k = 0; k < 3000 && run !== m.g; k++) {
+    t++;
+    if (!rp) {
+      E.sense(s); st.heat[s] = .5;
+      const bf = bfsP(m, s, E.pass(false));
+      if (E.seen[m.g] && bf.dist[m.g] >= 0) { rp = trace(bfsP(m, m.s, E.pass(false)).par, m.g); st.paths = [{ cells: rp, col: PICK, w: .1, dash: true }]; }
+      else { let tt = -1, bd = 1e9; for (const x of bf.order) if (!E.vis[x] && bf.dist[x] < bd) { bd = bf.dist[x]; tt = x; } if (tt >= 0) s = trace(bf.par, tt)[1] ?? s; }
+    } else { const i = rp.indexOf(run); run = rp[Math.min(rp.length - 1, i + 1)]; }
+    st.walkers = [{ c: s, col: TEAL }, { c: run, col: PICK }];
+    st.text = rp ? `verkenner klaar → loper rent (${t})` : `verkenner tekent de kaart · loper wacht (${t})`;
+    yield;
+  }
+};
+RUN.vote = function* (st, r, I) {
+  const m = I.maze({ braid: .3 }); const w = { c: m.s, h: 1 }, vis = new Uint16Array(m.n); vis[m.s] = 1; st.heat = new Float32Array(m.n); let n = 0;
+  const WH = 1, WK = .9, WN = 1.3;
+  while (w.c !== m.g && n < 2500) {
+    const ds = m.dirs[w.c]; let hand = -1; for (const t of [1, 0, 3, 2]) { const d = (w.h + t) & 3; if (m.can(w.c, d)) { hand = d; break; } }
+    let komp = ds[0]; for (const d of ds) if (man(m, m.to(w.c, d), m.g) < man(m, m.to(w.c, komp), m.g)) komp = d;
+    let nieuw = ds[0]; for (const d of ds) if (vis[m.to(w.c, d)] < vis[m.to(w.c, nieuw)]) nieuw = d;
+    const sc = [0, 0, 0, 0]; sc[hand] += WH; sc[komp] += WK; sc[nieuw] += WN; for (const d of ds) sc[d] += r() * .3;
+    let best = ds[0]; for (const d of ds) if (sc[d] > sc[best]) best = d;
+    st.votes = [{ c: w.c, d: hand, col: RED, len: WH / 1.3, o: -.12 }, { c: w.c, d: komp, col: ACC, len: WK / 1.3, o: 0 }, { c: w.c, d: nieuw, col: BLUE, len: WN / 1.3, o: .12 }];
+    w.h = best; w.c = m.to(w.c, best); vis[w.c]++; n++; st.heat[w.c] = Math.min(1, st.heat[w.c] + .25);
+    st.walkers = [{ c: w.c, col: '#efe9de', r: .22 }];
+    st.text = `stap ${n}  ·  rood hand ${WH} · geel kompas ${WK} · blauw nieuw ${WN}`;
+    yield;
+  }
+  st.votes = null;
+};
+function tremauxStep(m, T, r) {
+  const c = T.c, back = T.prev >= 0 ? dirTo(m, c, T.prev) : -1, mk = d => T.marks[c * 4 + d];
+  let d;
+  if (m.deg(c) === 1 && back >= 0) d = back;
+  else {
+    const others = m.dirs[c].filter(x => x !== back);
+    if (back >= 0 && others.some(x => mk(x) > 0) && mk(back) < 2) d = back;
+    else { const z = others.filter(x => mk(x) === 0); if (z.length) d = pickOf(r, z); else { const one = m.dirs[c].filter(x => mk(x) < 2); d = one.length ? one.reduce((a, b) => mk(a) <= mk(b) ? a : b) : back; } }
+  }
+  const n = m.to(c, d); T.marks[c * 4 + d]++; T.marks[n * 4 + ((d + 2) & 3)]++; T.prev = c; T.c = n; T.n++;
+}
+RUN.relay = function* (st, r, I) {
+  const m = I.maze({ braid: .3 }); const T = { c: m.s, prev: -1, marks: new Uint8Array(m.n * 4), n: 0 }; st.marks = T.marks; st.heat = new Float32Array(m.n);
+  while (T.c !== m.g && T.n < 3000) { tremauxStep(m, T, r); st.heat[T.c] = Math.min(1, st.heat[T.c] + .2); st.walkers = [{ c: T.c, col: ACC }]; st.text = `loper A zet krijtstreepjes: ${T.n}`; yield; }
+  const p = trace(bfsP(m, m.s, (c, d) => m.can(c, d) && T.marks[c * 4 + d] === 1).par, m.g);
+  for (let i = 0; i < p.length; i++) { st.walkers = [{ c: m.g, col: ACC }, { c: p[i], col: PICK }]; st.paths = [{ cells: p.slice(0, i + 1), col: PICK, w: .18 }]; st.text = `loper B volgt de enkele streepjes: ${i} (A deed ${T.n})`; yield; }
+};
+
+// ───────── mutaties & selectie ─────────
+function tour(pop, r) { let b = pop[(r() * pop.length) | 0]; for (let i = 0; i < 2; i++) { const c = pop[(r() * pop.length) | 0]; if (c.f > b.f) b = c; } return b; }
+function baseChild(a, b, r, sig = .04) { const c = { x: r() < .5 ? a.x : b.x, y: r() < .5 ? a.y : b.y, sig: a.sig }; if (r() < .6) c.x += gauss(r) * sig; if (r() < .6) c.y += gauss(r) * sig; return c; }
+function landGA(op = {}) {
+  return function* (st, r) {
+    st.kind = 'land'; st.guides = op.guides || null; const N = 30; let pop = [];
+    for (let i = 0; i < N; i++) pop.push({ x: clamp(-.72 + gauss(r) * .12, -1, 1), y: clamp(.72 + gauss(r) * .12, -1, 1), sig: .12 });
+    const ctx = { r, best: -1, stall: 0, sig: .04, st, fame: [], hist: [] };
+    for (let gen = 1; gen <= (op.gens || 90); gen++) {
+      for (const p of pop) p.f = F(p.x, p.y);
+      pop.sort((a, b) => b.f - a.f);
+      if (pop[0].f > ctx.best + 1e-4) { ctx.best = pop[0].f; ctx.stall = 0; } else ctx.stall++;
+      if (op.gen) op.gen(ctx, pop);
+      const nx = pop.slice(0, 2).map(p => ({ ...p })), ev = [];
+      while (nx.length < N) { const a = tour(pop, r), b = tour(pop, r); const c = op.child ? op.child(a, b, ctx, ev) : baseChild(a, b, r); c.x = clamp(c.x, -1, 1); c.y = clamp(c.y, -1, 1); nx.push(c); }
+      st.pop = pop.map(p => ({ x: p.x, y: p.y, col: op.col || '#efe9de', sig: op.showSig ? p.sig : 0 })); st.events = ev;
+      st.text = `generatie ${gen}  ·  beste ${ctx.best.toFixed(2)}${ctx.best > .98 ? ' — top gevonden!' : ''}`;
+      if (op.view) op.view(st, ctx);
+      pop = nx; yield;
+    }
+  };
+}
+RUN.cur4 = landGA({ view: st => { st.text2 = 'normale mutatie + uniforme kruising'; st.text2col = '#a39b8c'; } });
+RUN.knockout = landGA({ guides: 'axes', col: '#ffcf7a', child: (a, b, ctx, ev) => { const c = baseChild(a, b, ctx.r); if (ctx.r() < .12) { const k = ctx.r() < .5 ? 'x' : 'y', o = { ...c }; c[k] = 0; ev.push({ x1: o.x, y1: o.y, x2: c.x, y2: c.y, col: '#ff8a3d' }); } return c; } });
+RUN.dupswap = landGA({ guides: 'diag', col: '#9ccfff', child: (a, b, ctx, ev) => { const c = baseChild(a, b, ctx.r); if (ctx.r() < .12) { const o = { ...c }; if (ctx.r() < .5) { const t = c.x; c.x = c.y; c.y = t; } else c.y = c.x; ev.push({ x1: o.x, y1: o.y, x2: c.x, y2: c.y, col: BLUE }); } return c; } });
+RUN.flip = landGA({ guides: 'axes', col: '#ffb3c7', child: (a, b, ctx, ev) => { const c = baseChild(a, b, ctx.r); if (ctx.r() < .1) { const o = { ...c }; if (ctx.r() < .5) c.x = -c.x; else c.y = -c.y; ev.push({ x1: o.x, y1: o.y, x2: c.x, y2: c.y, col: '#ff6b9a' }); } return c; } });
+RUN.cauchy = landGA({ col: '#ffe08a', child: (a, b, ctx, ev) => { const c = { x: ctx.r() < .5 ? a.x : b.x, y: ctx.r() < .5 ? a.y : b.y }, o = { ...c }; c.x += .025 * Math.tan(Math.PI * (ctx.r() - .5) * .98); c.y += .025 * Math.tan(Math.PI * (ctx.r() - .5) * .98); if (Math.hypot(c.x - o.x, c.y - o.y) > .3) ev.push({ x1: o.x, y1: o.y, x2: clamp(c.x, -1, 1), y2: clamp(c.y, -1, 1), col: '#ffe08a' }); return c; } });
+RUN.selfadapt = landGA({ showSig: true, col: '#c9f2d4', child: (a, b, ctx) => { const sig = clamp(a.sig * Math.exp(.35 * gauss(ctx.r)), .005, .5); const c = { x: ctx.r() < .5 ? a.x : b.x, y: ctx.r() < .5 ? a.y : b.y, sig }; c.x += gauss(ctx.r) * sig; c.y += gauss(ctx.r) * sig; return c; },
+  view: (st, ctx) => { st.text2 = 'cirkel = eigen mutatiesterkte'; st.text2col = PICK; } });
+RUN.hyper = landGA({ col: '#ff9a9a',
+  gen: (ctx) => { ctx.sig = ctx.stall >= 6 && ctx.stall < 9 ? .4 : .03; ctx.hist.push(ctx.sig); if (ctx.hist.length > 60) ctx.hist.shift(); },
+  child: (a, b, ctx) => baseChild(a, b, ctx.r, ctx.sig),
+  view: (st, ctx) => { st.chart = { vals: ctx.hist.slice(), col: RED, label: 'mutatiesterkte', max: .45, len: 60 }; st.text2 = ctx.sig > .1 ? 'vastgelopen → HYPERMUTATIE' : 'rustig verfijnen'; st.text2col = ctx.sig > .1 ? RED : '#a39b8c'; } });
+RUN.blx = landGA({ col: '#b8e1ff', child: (a, b, ctx, ev) => { const bl = (u, v) => { const lo = Math.min(u, v), I = Math.abs(u - v); return lo - .5 * I + ctx.r() * I * 2; }; const c = { x: bl(a.x, b.x), y: bl(a.y, b.y) }; c.x += gauss(ctx.r) * .01; c.y += gauss(ctx.r) * .01; if (ev.length < 4 && Math.hypot(a.x - b.x, a.y - b.y) > .05) ev.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, col: '#5aa9ff' }); return c; },
+  view: st => { st.text2 = 'blauwe lijn = ouders; kind ergens op of rond die lijn'; st.text2col = BLUE; } });
+RUN.borrow = landGA({ col: '#efe9de',
+  gen: (ctx, pop) => { for (const p of pop.slice(0, 3)) if (!ctx.fame.some(f => Math.hypot(f.x - p.x, f.y - p.y) < .1)) ctx.fame.push({ x: p.x, y: p.y, f: p.f }); ctx.fame.sort((a, b) => b.f - a.f); ctx.fame.length = Math.min(ctx.fame.length, 5); if (ctx.r() < .25) ctx.fame.push({ x: ctx.r() * 2 - 1, y: ctx.r() * 2 - 1, f: 0 }); },
+  child: (a, b, ctx, ev) => { const c = baseChild(a, b, ctx.r); if (ctx.fame.length && ctx.r() < .15) { const f = pickOf(ctx.r, ctx.fame), o = { ...c }; if (ctx.r() < .5) c.x = f.x; else c.y = f.y; ev.push({ x1: f.x, y1: f.y, x2: c.x, y2: c.y, col: '#ffe08a' }); } return c; },
+  view: (st, ctx) => { st.stars = ctx.fame.slice(0, 6); } });
+RUN.lamarck = function* (st, r) {
+  st.kind = 'land'; const N = 22, mk = () => ({ x: clamp(-.72 + gauss(r) * .12, -1, 1), y: clamp(.72 + gauss(r) * .12, -1, 1) });
+  let D = Array.from({ length: N }, mk), L = Array.from({ length: N }, mk); let bD = 0, bL = 0;
+  const learn = p => { let x = p.x, y = p.y, f = F(x, y); for (let k = 0; k < 6; k++) { const nx = clamp(x + gauss(r) * .05, -1, 1), ny = clamp(y + gauss(r) * .05, -1, 1), nf = F(nx, ny); if (nf > f) { x = nx; y = ny; f = nf; } } return { lx: x, ly: y, f }; };
+  for (let gen = 1; gen <= 80; gen++) {
+    const trails = [];
+    for (const P of [D, L]) for (const p of P) { Object.assign(p, learn(p)); if (P === L) trails.push({ x1: p.x, y1: p.y, x2: p.lx, y2: p.ly }); }
+    bD = Math.max(bD, ...D.map(p => p.f)); bL = Math.max(bL, ...L.map(p => p.f));
+    const breed = (P, lam) => { P.sort((a, b) => b.f - a.f); const nx = []; while (nx.length < N) { const a = tour(P, r), b = tour(P, r); const ax = lam ? a.lx : a.x, ay = lam ? a.ly : a.y, bx = lam ? b.lx : b.x, by = lam ? b.ly : b.y; nx.push({ x: clamp((r() < .5 ? ax : bx) + gauss(r) * .03, -1, 1), y: clamp((r() < .5 ? ay : by) + gauss(r) * .03, -1, 1) }); } return nx; };
+    st.pop = [...D.map(p => ({ x: p.lx, y: p.ly, col: GREY })), ...L.map(p => ({ x: p.lx, y: p.ly, col: '#ff8fd0' }))]; st.trails = trails;
+    st.text = `generatie ${gen}  ·  grijs Darwin ${bD.toFixed(2)}  ·  roze Lamarck ${bL.toFixed(2)}`;
+    D = breed(D, false); L = breed(L, true); yield;
+  }
+};
+RUN.novelty = function* (st, r) {
+  st.kind = 'land'; const N = 24; let pop = Array.from({ length: N }, () => ({ x: clamp(-.72 + gauss(r) * .1, -1, 1), y: clamp(.72 + gauss(r) * .1, -1, 1) })); const arch = []; let best = 0, bestP = null;
+  for (let gen = 1; gen <= 90; gen++) {
+    const all = [...pop, ...arch];
+    for (const p of pop) { const ds = all.map(q => Math.hypot(q.x - p.x, q.y - p.y)).sort((a, b) => a - b); p.nov = (ds[1] + ds[2] + ds[3] + ds[4] + ds[5]) / 5; p.f = F(p.x, p.y); if (p.f > best) { best = p.f; bestP = { x: p.x, y: p.y }; } }
+    pop.sort((a, b) => b.nov - a.nov); arch.push({ ...pop[0] }, { ...pop[1] });
+    st.pop = pop.map(p => ({ x: p.x, y: p.y, col: '#9ccfff' })); st.archive = arch.slice(); st.stars = bestP ? [bestP] : null;
+    st.text = `generatie ${gen}  ·  beloont "anders" · beste ooit ${best.toFixed(2)}`;
+    const nx = [];
+    while (nx.length < N) { let a = pop[(r() * N) | 0]; const b = pop[(r() * N) | 0]; if (b.nov > a.nov) a = b; nx.push({ x: clamp(a.x + gauss(r) * .08, -1, 1), y: clamp(a.y + gauss(r) * .08, -1, 1) }); }
+    pop = nx; yield;
+  }
+};
+RUN.mapelites = function* (st, r) {
+  st.kind = 'land'; const N = 10, f = new Float32Array(N * N).fill(-1), el = new Array(N * N).fill(null); st.niches = { N, f };
+  const cellOf = (x, y) => clamp(Math.floor((x + 1) / 2 * N), 0, N - 1) + clamp(Math.floor((1 - (y + 1) / 2) * N), 0, N - 1) * N;
+  const put = p => { const i = cellOf(p.x, p.y), v = F(p.x, p.y); if (v > f[i]) { f[i] = v; el[i] = p; return true; } return false; };
+  for (let i = 0; i < 6; i++) put({ x: clamp(-.72 + gauss(r) * .1, -1, 1), y: clamp(.72 + gauss(r) * .1, -1, 1) });
+  for (let it = 1; it <= 120; it++) {
+    const ev = []; for (let k = 0; k < 6; k++) { const ex = el.filter(Boolean), p = pickOf(r, ex), c = { x: clamp(p.x + gauss(r) * .12, -1, 1), y: clamp(p.y + gauss(r) * .12, -1, 1) }; if (put(c)) ev.push({ x1: p.x, y1: p.y, x2: c.x, y2: c.y, col: PICK }); }
+    st.events = ev; st.pop = el.filter(Boolean).map(p => ({ x: p.x, y: p.y, col: '#fff' }));
+    let filled = 0, best = 0; for (const v of f) if (v >= 0) { filled++; best = Math.max(best, v); }
+    st.text = `${filled}/${N * N} vakjes  ·  beste ${best.toFixed(2)}`; yield;
+  }
+};
+const GCOL = ['#4cc9f0', '#b388ff', '#80ed99', '#ffd166', '#ff6b6b', '#f4a261', '#e76f51', '#2ec4b6', '#f72585', '#a7c957', '#9aa5b1'];
+RUN.onepoint = function* (st, r) {
+  st.kind = 'custom';
+  for (let round = 0; round < 8; round++) {
+    const A = GCOL.map(() => r() * 2 - 1), B = GCOL.map(() => r() * 2 - 1), cut = 2 + ((r() * 8) | 0), U = GCOL.map(() => r() < .5 ? 0 : 1);
+    for (let t = 0; t <= 60; t++) { st.bars = { A, B, cut, U, t: Math.min(1, t / 30) }; yield; }
+  }
+};
+function drawBars(g, st, w, h) {
+  g.fillStyle = '#151411'; g.fillRect(0, 0, w, h); const b = st.bars; if (!b) return;
+  const rows = [['Ouder A', b.A.map(() => 0)], ['Ouder B', b.B.map(() => 1)], ['Kind: één knip', b.A.map((_, i) => i < b.cut ? 0 : 1)], ['Kind: uniform (nu)', b.U]];
+  const fs = Math.max(10, h * .045), lx = 10, gx = w * .3, gw = w - gx - 14, rh = (h - 20) / 4, bw = gw / 11;
+  g.font = `600 ${fs}px system-ui`; g.textBaseline = 'middle';
+  rows.forEach(([lab, src], ri) => {
+    const y0 = 10 + ri * rh, mid = y0 + rh / 2; g.fillStyle = ri === 2 ? PICK : '#a39b8c'; g.fillText(lab, lx, mid);
+    g.strokeStyle = 'rgba(255,255,255,.12)'; g.beginPath(); g.moveTo(gx, mid); g.lineTo(gx + gw, mid); g.stroke();
+    for (let i = 0; i < 11; i++) {
+      const v = ri === 0 ? b.A[i] : ri === 1 ? b.B[i] : (src[i] ? b.B[i] : b.A[i]), show = ri < 2 ? 1 : b.t;
+      g.globalAlpha = ri < 2 ? 1 : (src[i] ? .95 : .95) * show; g.fillStyle = GCOL[i];
+      const hh = v * rh * .42 * (ri < 2 ? 1 : show); g.fillRect(gx + i * bw + bw * .15, Math.min(mid, mid - hh), bw * .7, Math.abs(hh));
+      if (ri >= 2) { g.fillStyle = src[i] ? '#5aa9ff' : '#ffb547'; g.fillRect(gx + i * bw + bw * .15, y0 + rh - 5, bw * .7, 3); }
+      g.globalAlpha = 1;
+    }
+    if (ri === 2) { g.strokeStyle = '#fff'; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(gx + b.cut * bw, y0 + 2); g.lineTo(gx + b.cut * bw, y0 + rh - 2); g.stroke(); g.setLineDash([]); }
+  });
+  g.fillStyle = '#a39b8c'; g.font = `${fs * .85}px system-ui`; g.fillText('streepje onder = van A (geel) of B (blauw)', gx, h - 6 - fs * .2);
+}
+RUN.armsrace = function* (st, r) {
+  st.kind = 'custom'; let s = .1, d = .15; const S = [], Dd = [];
+  for (let gen = 0; gen < 160; gen++) {
+    if (d > s) s += (d - s) * (.04 + r() * .08) + .002; else d += (s - d) * (.05 + r() * .1) + .004 + r() * .01;
+    if (r() < .03) d += .08 * r();
+    S.push(s); Dd.push(d); st.race = { S: S.slice(), D: Dd.slice(), len: 160 }; yield;
+  }
+};
+function drawRace(g, st, w, h) {
+  g.fillStyle = '#151411'; g.fillRect(0, 0, w, h); const q = st.race; if (!q) return;
+  const px = 34, py = 30, pw = w - px - 14, ph = h - py - 30, mx = Math.max(...q.S, ...q.D, .5) * 1.08;
+  g.strokeStyle = 'rgba(255,255,255,.1)'; for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(px, py + ph * i / 4); g.lineTo(px + pw, py + ph * i / 4); g.stroke(); }
+  const line = (v, col) => { g.strokeStyle = col; g.lineWidth = 2.4; g.beginPath(); v.forEach((y, i) => { const X = px + pw * i / (q.len - 1), Y = py + ph - ph * y / mx; i ? g.lineTo(X, Y) : g.moveTo(X, Y); }); g.stroke(); };
+  line(q.D, RED); line(q.S, PICK);
+  const fs = Math.max(10.5, h * .05); g.font = `600 ${fs}px system-ui`; g.textBaseline = 'middle';
+  g.fillStyle = RED; g.fillText('makers: moeilijkheid', px, 14); g.fillStyle = PICK; g.fillText('oplossers: kunde', px + g.measureText('makers: moeilijkheid').width + 18, 14);
+  g.fillStyle = '#a39b8c'; g.fillText(`generatie ${q.S.length}`, px, h - 12);
+}
+
+// ───────── kaarten ─────────
+const T = (t, k = '') => [t, k];
+const SECS = [
+  { id: 's1', n: 1, title: 'Bronnen — nieuwe oplossers', lead: 'Nieuwe manieren om een doolhof op te lossen. Elk kan los als oplosser in Bouwen/Lab/Kijken, en levert bouwstenen voor tactieken en combinaties.' },
+  { id: 's2', n: 2, title: 'Tactieken — nieuwe genen', lead: 'Elk nieuw gen is een gewicht op iets wat de loper ter plekke ziet, net als de huidige 11. Elke demo: grijze ring = huidige loper, gekleurd = zelfde loper met het nieuwe gen. Zelfde doolhof, zelfde basis.' },
+  { id: 's3', n: 3, title: 'Combineren — bronnen samen laten werken', lead: 'Manieren om oplossers en genensets te stapelen. Dit is waar evolutie de meeste nieuwe vormen kan vinden.' },
+  { id: 's4', n: 4, title: 'Mutaties & selectie', lead: 'Heuvellandschap = twee genen; hoe lichter, hoe beter. De hoogste top zit rechtsonder, een brede valse top linksboven. Alle populaties starten bij de valse top: wie ontsnapt?' },
+];
+const CARDS = [
+  // 1 · bronnen
+  { sec: 's1', id: 'cur1', cur: true, name: 'Huidig: BFS + Rechterhand', line: 'Ter vergelijking: zo zien twee van de negen huidige oplossers eruit.', pts: ['BFS vult laag voor laag', 'Rechterhand loopt rondjes bij lussen'], tags: [T('huidig', 'info')], run: RUN.cur1, sps: 30 },
+  { sec: 's1', sub: 'A · Lopers die alleen om zich heen zien', id: 'pledge', name: 'Pledge', line: 'Hand aan de muur, maar telt zijn bochten — zo ontsnapt hij van eilanden waar Rechterhand eeuwig rondjes draait.', pts: ['vaste voorkeursrichting (noord)', 'muur loslaten zodra teller = 0', 'rood = Rechterhand ter vergelijking'], tags: [T('klein werk', 'ok'), T('mooi naast Rechterhand', 'info'), T('vierkant + zeshoek met hoeken', 'warn')], run: RUN.pledge, sps: 40 },
+  { sec: 's1', id: 'levy', name: 'Dronken muis & Lévy-vlucht', line: 'Willekeurig lopen als ondergrens; Lévy maakt af en toe een lange ren door de gangen.', pts: ['grijs = dronken muis', 'geel = Lévy (zware staart)', 'meetlat: "beter dan toeval?"'], tags: [T('klein werk', 'ok'), T('ondergrens voor ranglijst', 'info')], run: RUN.levy, sps: 70 },
+  { sec: 's1', id: 'micromouse', name: 'Micromouse-overstroming', line: 'Denkt dat alles open is, rekent afstanden, ontdekt muren en rekent opnieuw — zoals echte robotmuizen.', pts: ['doel in het midden (zoals de wedstrijd)', 'blauw = huidige afstandsschatting', 'vage muren = nog niet gezien'], tags: [T('middel', 'warn'), T('nieuw beeld: kaart groeit', 'ok'), T('geen sleutels/tijd', 'warn')], run: RUN.micromouse, sps: 18 },
+  { sec: 's1', id: 'frontier', name: 'Grenszoeker', line: 'Loopt steeds naar de dichtstbijzijnde rand van het onbekende (robotica).', pts: ['mist over onbekend gebied', 'stippellijn = huidig doel', 'doel gezien → rechtstreeks'], tags: [T('middel', 'warn'), T('mist-beeld herbruikbaar', 'ok')], run: RUN.frontier, sps: 18 },
+  { sec: 's1', id: 'vision', name: 'Zicht', line: 'Kijkt elke rechte gang tot het eind in voor hij erin loopt.', pts: ['lichtstralen tonen wat hij ziet', 'doel in zicht → rent erheen', 'kiest de gang met het meeste nieuwe zicht'], tags: [T('klein werk', 'ok'), T('ook als gen (2·2)', 'info')], run: RUN.vision, sps: 14 },
+  { sec: 's1', sub: 'B · Rekenaars die het hele doolhof kennen', id: 'ida', name: 'IDA* — stapsgewijs dieper', line: 'Duikt diepte-eerst tot een grens, en verhoogt die grens elke ronde.', pts: ['weinig geheugen', 'grijs = vorige rondes', 'blauw = huidige duik'], tags: [T('klein werk', 'ok'), T('lijkt op DFS', 'warn')], run: RUN.ida, sps: 90 },
+  { sec: 's1', id: 'beam', name: 'Bundelzoeken', line: 'Houdt per laag alleen de N beste kandidaten — snel, maar kan het doel missen.', pts: ['rood = weggegooid', 'mislukt → bundel ×2', 'laat zien waarom "gretig" gevaarlijk is'], tags: [T('klein werk', 'ok'), T('kan falen (bewust)', 'warn')], run: RUN.beam, sps: 10 },
+  { sec: 's1', id: 'jps', name: 'Jump Point Search', line: 'Springt over rechte gangen heen naar het volgende interessante punt.', pts: ['blauwe lijnen = sprongen', 'veel minder knopen dan A*', 'beste bij brede gangen'], tags: [T('middel', 'warn'), T('alleen vierkant', 'bad')], run: RUN.jps, sps: 8 },
+  { sec: 's1', id: 'junction', name: 'Knooppuntengraaf', line: 'Elke gang wordt één lijn tussen kruispunten; daarover zoeken.', pts: ['laat zien hoe klein het doolhof écht is', 'eerst tekenen, dan zoeken', 'werkt op elk raster'], tags: [T('klein werk', 'ok'), T('ook basis voor andere oplossers', 'info')], run: RUN.junction, sps: 14 },
+  { sec: 's1', id: 'wallbreak', name: 'Muur doorbreken', line: 'Kortste route als je één muur mag slopen.', pts: ['blauw = zonder slopen, oranje = na slopen', 'grijs = normale route', 'kan ook een spelregel worden ("1 hamer")'], tags: [T('klein werk', 'ok'), T('nieuwe puzzel-mogelijkheid', 'info')], run: RUN.wallbreak, sps: 12 },
+  { sec: 's1', sub: 'C · Natuurkunde & natuur', id: 'physarum', name: 'Slijmzwam (Physarum)', line: 'Buisjes met veel stroming worden dikker, de rest sterft af — de kortste route groeit vanzelf.', pts: ['echt slijmzwam-model (Tero)', 'doodlopers verdwijnen eerst', 'prachtig in maquette + 3D'], tags: [T('middel', 'warn'), T('nieuw beeld', 'ok'), T('geen sleutels/tijd', 'warn')], run: RUN.physarum, sps: 20 },
+  { sec: 's1', id: 'water', name: 'Water / warmte', line: 'Water stroomt vanaf de start; stroomopwaarts terug vanaf het doel = route.', pts: ['zacht vloeiend front', 'log-schaal: ook dunne laagjes zichtbaar', 'lijkt op BFS, voelt anders'], tags: [T('klein werk', 'ok'), T('nieuw beeld', 'ok')], run: RUN.water, sps: 25 },
+  { sec: 's1', id: 'current', name: 'Stroomnetwerk', line: 'Start is +, doel is −; de stroom laat de route oplichten.', pts: ['bolletjes = stroom', 'lussen delen de stroom', 'zelfde wiskunde als willekeurig lopen'], tags: [T('middel', 'warn'), T('nieuw beeld', 'ok')], run: RUN.current, sps: 20 },
+  { sec: 's1', id: 'collision', name: 'Botsingsoplosser', line: 'Twee vloeistoffen, vanaf start en doel; waar ze botsen ligt de route.', pts: ['blauw vs rood', 'witte stip = botsing', 'variant op Bidirectioneel, maar dan als vloeistof'], tags: [T('klein werk', 'ok'), T('lijkt op bidir', 'warn')], run: RUN.collision, sps: 10 },
+  { sec: 's1', id: 'bees', name: 'Bijen', line: 'Verkenners zoeken, vliegen terug en dansen; de zwerm volgt de beste dans.', pts: ['lussen worden uit de route geknipt', 'witte bij = dansend', 'tegenhanger van de mieren'], tags: [T('middel', 'warn'), T('past bij zwerm/mieren', 'ok')], run: RUN.bees, sps: 45 },
+  { sec: 's1', sub: 'D · Lerende oplossers', id: 'qlearn', name: 'Q-learning', line: 'Leert per cel welke kant het beste is; pijltjes worden ronde na ronde beter.', pts: ['grafiek: stappen per ronde', 'laatste rondes zonder toeval', 'goed in "leren zichtbaar maken"'], tags: [T('middel', 'warn'), T('meerdere rondes', 'info')], run: RUN.qlearn, sps: 300 },
+  { sec: 's1', id: 'mcts', name: 'Monte Carlo-boomzoeken', line: 'Speelt per richting een paar willekeurige proefritten uit en kiest de beste.', pts: ['paarse slierten = proefritten', 'geen kaart nodig', 'werkt ook met sleutels/tijd'], tags: [T('middel', 'warn'), T('rekent zwaar', 'bad')], run: RUN.mcts, sps: 8 },
+  // 2 · tactieken
+  { sec: 's2', id: 'cur2', cur: true, name: 'Huidig: DNA-loper', line: 'De bestaande loper met nieuwsgierig, kompas, rechtdoor en niet-omkeren.', pts: ['11 genen, gewichten per richting', 'basis voor elke demo hiernaast'], tags: [T('huidig', 'info')], run: RUN.cur2, sps: 40 },
+  { sec: 's2', id: 'turn', name: 'Draaiteller', line: 'De Pledge-gedachte als gen: wil zijn bochten-teller terug naar nul.', pts: ['helpt bij lussen en eilanden', 'teller onderin'], tags: [T('evo-gen', 'ok'), T('ENGINE_V +1', 'warn')], run: RUN.turn, sps: 40 },
+  { sec: 's2', id: 'sight', name: 'Zichtveld', line: 'Telt hoeveel nieuwe cellen hij in een rechte gang kan zien; doel in zicht = groot pluspunt.', pts: ['stralen = wat hij ziet', 'vaak flinke winst'], tags: [T('evo-gen', 'ok'), T('ENGINE_V +1', 'warn')], run: RUN.sight, sps: 40 },
+  { sec: 's2', id: 'corridor', name: 'Gangvoorkeur', line: 'Kiest lange (of, negatief, korte) gangen.', pts: ['lijnen = gang tot volgend kruispunt', 'goed in lange-gangen-makers'], tags: [T('evo-gen', 'ok')], run: RUN.corridor, sps: 40 },
+  { sec: 's2', id: 'fromstart', name: 'Afstand tot start', line: 'Trekt naar buiten (weg van huis) of blijft juist dichtbij.', pts: ['werkt als je het doel niet kent', 'combineert goed met Kompas'], tags: [T('evo-gen', 'ok'), T('klein werk', 'ok')], run: RUN.fromstart, sps: 40 },
+  { sec: 's2', id: 'chalk', name: 'Krijtstreepjes', line: 'Het aantal Trémaux-streepjes op een gang telt mee.', pts: ['streepjes zichtbaar', 'bijna gegarandeerde uitweg'], tags: [T('evo-gen', 'ok'), T('lijkt op Eigen spoor', 'warn')], run: RUN.chalk, sps: 40 },
+  { sec: 's2', id: 'boredom', name: 'Verveling', line: 'Hoe langer hij niet dichter bij het doel komt, hoe grilliger hij wordt.', pts: ['meter onderin', 'breekt vaste patronen'], tags: [T('evo-gen', 'ok'), T('kan ook slechter', 'warn')], run: RUN.boredom, sps: 40 },
+  { sec: 's2', id: 'persist', name: 'Doorzetten', line: 'Houdt een gekozen koers een paar stappen vast, ook op kruispunten.', pts: ['anders dan Rechtdoor: geheugen van zijn keuze', 'goed tegen pendelen'], tags: [T('evo-gen', 'ok')], run: RUN.persist, sps: 40 },
+  { sec: 's2', id: 'crowd', name: 'Drukte', line: 'Mijdt teamgenoten (of loopt ze juist achterna).', pts: ['team van 4 tegen team van 4', 'telt eerste aankomst', 'alleen zinvol bij zwerm'], tags: [T('evo-gen', 'ok'), T('alleen zwerm', 'warn')], run: RUN.crowd, sps: 30 },
+  { sec: 's2', id: 'scent', name: 'Geur van anderen', line: 'Gedeeld feromoon van het hele team; huidig feromoon = alleen eigen spoor.', pts: ['groen = teamgeur (vervliegt)', 'team verdeelt zich vanzelf'], tags: [T('evo-gen', 'ok'), T('alleen zwerm', 'warn')], run: RUN.scent, sps: 30 },
+  { sec: 's2', id: 'keydrive', name: 'Puzzeldrang', line: 'Trekt naar sleutels en hendels tot hij ze heeft.', pts: ['deur op de route, sleutel in een zijtak', 'lost de bekende zwakte van de doolhof-zoeker op'], tags: [T('evo-gen', 'ok'), T('grote winst bij puzzels', 'ok')], run: RUN.keydrive, sps: 40 },
+  { sec: 's2', id: 'terrain', name: 'Terreinangst', line: 'Hoeveel modder/zwaar terrein meetelt.', pts: ['modder kost 4 tikken', 'telt in tijd, niet in stappen'], tags: [T('evo-gen', 'ok'), T('klein werk', 'ok')], run: RUN.terrain, sps: 40 },
+  // 3 · combineren
+  { sec: 's3', id: 'cur3', cur: true, name: 'Huidig: één loper, één genenset', line: 'Nu is elke loper één vaste set gewichten, overal hetzelfde.', pts: ['Kijken wisselt oplossers, maar mengt ze niet'], tags: [T('huidig', 'info')], run: RUN.cur3, sps: 40 },
+  { sec: 's3', id: 'phases', name: 'Fases', line: 'Eerst verkennen (DNA-loper), daarna benutten (plannen over de kaart).', pts: ['wisselmoment = gen (stappen of "doel gezien")', 'kan elke twee bronnen koppelen'], tags: [T('middel', 'warn'), T('nieuw gen: wisselmoment', 'info')], run: RUN.phases, sps: 30 },
+  { sec: 's3', id: 'perplace', name: 'Genen per plek', line: 'Aparte genen voor gang, kruispunt en doodloper.', pts: ['×3 genen, veel rijker gedrag', 'cellen gekleurd per soort plek', 'demo: met de hand ingesteld'], tags: [T('groot werk', 'bad'), T('ENGINE_V +1, DNA ×3', 'warn'), T('meeste nieuwe vormen', 'ok')], run: RUN.perplace, sps: 40 },
+  { sec: 's3', id: 'roles', name: 'Rollen in een team', line: 'Een verkenner tekent de kaart; een loper wacht en rent zodra het doel bekend is.', pts: ['tijd = moment dat de loper aankomt', 'rollen kunnen evolueren'], tags: [T('middel', 'warn'), T('nieuwe race-vorm', 'info')], run: RUN.roles, sps: 20 },
+  { sec: 's3', id: 'vote', name: 'Stemmen', line: 'Drie adviseurs (hand, kompas, nieuwsgierig) stemmen; de genen wegen hun stem.', pts: ['pijltjes = stemmen', 'adviseurs = bestaande oplossers', 'gewichten evolueerbaar'], tags: [T('middel', 'warn'), T('hergebruikt oplossers', 'ok')], run: RUN.vote, sps: 30 },
+  { sec: 's3', id: 'relay', name: 'Estafette', line: 'Loper A zet krijtstreepjes (Trémaux); loper B loopt alleen de enkele streepjes.', pts: ['A dwaalt, B gaat rechtstreeks', 'kan met elke "tekenzetter"'], tags: [T('klein werk', 'ok'), T('nieuwe race-vorm', 'info')], run: RUN.relay, sps: 45 },
+  // 4 · mutaties
+  { sec: 's4', id: 'cur4', cur: true, name: 'Huidig: normaal + uniform', line: 'Toernooi, elite, uniforme kruising, normale mutatie.', pts: ['blijft vaak op de valse top hangen'], tags: [T('huidig', 'info')], run: RUN.cur4, sps: 8, kind: 'land' },
+  { sec: 's4', sub: 'Mutaties', id: 'knockout', name: 'Uitschakelen', line: 'Zet soms een gen op 0 — zo zie je welke genen echt tellen.', pts: ['oranje streep = knock-out', 'stippen springen naar de assen'], tags: [T('klein werk', 'ok'), T('ook als analyse-knop', 'info')], run: RUN.knockout, sps: 8, kind: 'land' },
+  { sec: 's4', id: 'dupswap', name: 'Verdubbelen / wisselen', line: 'Kopieert een gen naar een ander of wisselt er twee om.', pts: ['blauw = sprong over de diagonaal', 'nuttig bij gelijksoortige genen'], tags: [T('klein werk', 'ok')], run: RUN.dupswap, sps: 8, kind: 'land' },
+  { sec: 's4', id: 'flip', name: 'Teken omdraaien', line: 'Draait een gen om: rechterhand ↔ linkerhand, nieuwsgierig ↔ honkvast.', pts: ['roze = spiegeling', 'groot effect in één stap'], tags: [T('klein werk', 'ok')], run: RUN.flip, sps: 8, kind: 'land' },
+  { sec: 's4', id: 'cauchy', name: 'Grote sprongen (Cauchy)', line: 'Meestal klein, af en toe heel groot — ontsnapt van valse toppen.', pts: ['gele lijn = grote sprong', 'zelfde gemiddelde, langere staart'], tags: [T('klein werk', 'ok'), T('vaak raak', 'ok')], run: RUN.cauchy, sps: 8, kind: 'land' },
+  { sec: 's4', id: 'selfadapt', name: 'Zelfregelende staplengte', line: 'Elk DNA draagt zijn eigen mutatiesterkte mee, en die evolueert ook.', pts: ['cirkel = eigen sterkte', 'krimpt zodra hij een top heeft'], tags: [T('middel', 'warn'), T('DNA +1 waarde', 'warn')], run: RUN.selfadapt, sps: 8, kind: 'land' },
+  { sec: 's4', id: 'hyper', name: 'Hypermutatie', line: 'Vastgelopen? Even flink mutatie omhoog, daarna weer rustig.', pts: ['grafiek: mutatiesterkte', 'koppelt aan bestaande "stall"-detectie'], tags: [T('klein werk', 'ok'), T('past bij auto-stop', 'ok')], run: RUN.hyper, sps: 8, kind: 'land' },
+  { sec: 's4', sub: 'Kruisingen', id: 'blx', name: 'Vermengen (BLX)', line: 'Kind krijgt een waarde tussen (of net buiten) de ouders.', pts: ['blauw = ouderpaar', 'zoekt tussen goede oplossingen in'], tags: [T('klein werk', 'ok')], run: RUN.blx, sps: 8, kind: 'land' },
+  { sec: 's4', id: 'onepoint', name: 'Eén-punt-kruising', line: 'Eerste stuk van ouder A, rest van ouder B — genen die naast elkaar staan blijven samen.', pts: ['vergelijking met huidige uniforme kruising', 'volgorde van genen gaat ertoe doen'], tags: [T('klein werk', 'ok'), T('genvolgorde belangrijk', 'warn')], run: RUN.onepoint, sps: 30, kind: 'custom', draw: drawBars },
+  { sec: 's4', sub: 'Uitwisseling & leren', id: 'borrow', name: 'Genen lenen', line: 'Haalt soms een gen bij een lid van de eregalerij (of een vreemde).', pts: ['sterren = eregalerij', 'gele lijn = geleend gen'], tags: [T('klein werk', 'ok'), T('eregalerij bestaat al', 'ok')], run: RUN.borrow, sps: 8, kind: 'land' },
+  { sec: 's4', id: 'lamarck', name: 'Lamarck', line: 'Wat een loper tijdens zijn leven leert, geeft hij door aan zijn kinderen.', pts: ['grijs = Darwin, roze = Lamarck', 'witte streepjes = wat hij leerde'], tags: [T('middel', 'warn'), T('snelle winst, minder variatie', 'warn')], run: RUN.lamarck, sps: 8, kind: 'land' },
+  { sec: 's4', sub: 'Selectie', id: 'novelty', name: 'Nieuwheid zoeken', line: 'Beloont wie zich anders gedraagt, niet wie snel is.', pts: ['vage stippen = archief van gedrag', 'ster = beste ooit (bijvangst)'], tags: [T('middel', 'warn'), T('gedragsmaat nodig', 'warn')], run: RUN.novelty, sps: 8, kind: 'land' },
+  { sec: 's4', id: 'mapelites', name: 'MAP-Elites', line: 'Raster van nichevakjes; per vakje één kampioen.', pts: ['vakje = soort gedrag', 'eindresultaat = hele kaart van stijlen', 'mooi als collectie'], tags: [T('middel', 'warn'), T('nieuw scherm', 'info')], run: RUN.mapelites, sps: 8, kind: 'land' },
+  { sec: 's4', id: 'armsrace', name: 'Wapenwedloop', line: 'Makers evolueren mee en worden steeds lastiger voor de lopers.', pts: ['haasje-over van twee lijnen', 'doolhof-zoeker is al half gebouwd'], tags: [T('groot werk', 'bad'), T('hergebruikt doolhof-zoeker', 'ok')], run: RUN.armsrace, sps: 12, kind: 'custom', draw: drawRace },
+];
+const TOP = ['pledge', 'physarum', 'perplace', 'sight', 'boredom', 'keydrive', 'hyper', 'knockout', 'blx', 'armsrace'];
+
+// ───────── motor ─────────
+class Inst {
+  constructor(cv, spec, big) { this.cv = cv; this.g = cv.getContext('2d'); this.spec = spec; this.big = big; this.seed = hash(spec.id) % 9973; this.reset(); }
+  reset() {
+    this.seed++; const r = rng((this.seed * 2654435761) >>> 0 || 7);
+    const big = this.big;
+    this.st = {}; this.sps = this.spec.sps || 30; this.acc = 0; this.done = false; this.hold = 0;
+    const I = { maze: (o = {}) => { const W = big ? 31 : 17, H = big ? 19 : 10; const m = makeMaze(W, H, r, o); this.st.m = m; return m; }, get sps() { return 0; } };
+    const self = this; Object.defineProperty(I, 'sps', { get() { return self.sps; }, set(v) { self.sps = v; } });
+    try { this.it = this.spec.run(this.st, r, I); } catch (e) { console.error(this.spec.id, e); this.it = null; }
+  }
+  tick(dt) {
+    if (!this.it) return;
+    if (this.done) { this.hold -= dt; if (this.hold <= 0) this.reset(); return; }
+    this.acc += dt * this.sps; let k = 0;
+    while (this.acc >= 1 && k < 3000) {
+      this.acc--; k++;
+      let res; try { res = this.it.next(); } catch (e) { console.error(this.spec.id, e); res = { done: true }; }
+      if (res.done) { this.done = true; this.hold = 2.6; break; }
+    }
+  }
+  render(now) {
+    const cv = this.cv, dpr = Math.min(2, window.devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const g = this.g; g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const kind = this.spec.kind || 'maze';
+    if (kind === 'land') drawLand(g, this.st, w, h); else if (kind === 'custom') this.spec.draw(g, this.st, w, h, now); else drawMaze(g, this.st, w, h, now);
+  }
+}
+
+// ───────── pagina ─────────
+const root = document.getElementById('root'), insts = [], vis = new Set();
+let picked = new Set(); try { picked = new Set(JSON.parse(localStorage.getItem('mazelab.design.oplossen') || '[]')); } catch (e) { }
+const save = () => { try { localStorage.setItem('mazelab.design.oplossen', JSON.stringify([...picked])); } catch (e) { } };
+const io = new IntersectionObserver(es => { for (const e of es) { const ins = e.target._inst; if (e.isIntersecting) vis.add(ins); else vis.delete(ins); } }, { rootMargin: '100px' });
+const num = {};
+for (const s of SECS) {
+  const head = document.createElement('div'); head.className = 'sechead'; head.id = s.id;
+  head.innerHTML = `<h2>${s.n} · ${s.title}</h2><button data-all="${s.id}">Hele groep kiezen</button>`;
+  root.appendChild(head);
+  const lead = document.createElement('p'); lead.className = 'lead'; lead.textContent = s.lead; root.appendChild(lead);
+  let grid = null, k = 0;
+  const list = CARDS.filter(c => c.sec === s.id);
+  // "Huidig" hoort bij de eerste subgroep: neem diens kopje over
+  if (list[0].cur && list[1] && list[1].sub) { list[0].sub = list[1].sub; list[1].sub = null; }
+  for (const c of list) {
+    if (c.sub || !grid) { if (c.sub) { const h = document.createElement('h3'); h.className = 'sub'; h.textContent = c.sub; root.appendChild(h); } grid = document.createElement('div'); grid.className = 'grid'; root.appendChild(grid); }
+    const nr = c.cur ? `${s.n}.0` : `${s.n}.${++k}`; num[c.id] = nr;
+    const el = document.createElement('div'); el.className = 'card' + (c.cur ? ' cur' : ''); el.dataset.id = c.id;
+    el.innerHTML = `<canvas></canvas><div class="body"><h4><span class="num">${nr}</span>${c.name}</h4><p>${c.line}</p><ul>${c.pts.map(p => `<li>${p}</li>`).join('')}</ul><div class="tags">${c.tags.map(([t, kk]) => `<span class="tag ${kk}">${t}</span>`).join('')}</div>${c.cur ? '' : '<div class="foot"><button class="pick">Kies</button></div>'}</div>`;
+    grid.appendChild(el);
+    const cv = el.querySelector('canvas'), ins = new Inst(cv, c, false); cv._inst = ins; insts.push(ins); io.observe(cv);
+    cv.addEventListener('click', () => openBig(c));
+  }
+}
+function refresh() {
+  document.querySelectorAll('.card').forEach(el => el.classList.toggle('picked', picked.has(el.dataset.id)));
+  document.querySelectorAll('.card .pick').forEach(b => { b.textContent = picked.has(b.closest('.card').dataset.id) ? '✓ Gekozen' : 'Kies'; });
+  const list = CARDS.filter(c => picked.has(c.id));
+  document.getElementById('count').textContent = `${list.length} gekozen`;
+  document.getElementById('chips').innerHTML = list.length ? list.map(c => `<span class="chip" data-id="${c.id}" title="klik = weghalen">${num[c.id]} ${c.name}</span>`).join('') : '<span class="empty">Nog niets gekozen — klik "Kies" op een kaart.</span>';
+  save();
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('.pick'); if (b) { const id = b.closest('.card').dataset.id; picked.has(id) ? picked.delete(id) : picked.add(id); refresh(); return; }
+  const ch = e.target.closest('.chip'); if (ch) { picked.delete(ch.dataset.id); refresh(); return; }
+  const all = e.target.closest('[data-all]'); if (all) { const ids = CARDS.filter(c => c.sec === all.dataset.all && !c.cur).map(c => c.id); const on = ids.every(i => picked.has(i)); ids.forEach(i => on ? picked.delete(i) : picked.add(i)); refresh(); }
+});
+document.getElementById('clear').onclick = () => { picked.clear(); refresh(); };
+document.getElementById('top5').onclick = () => { TOP.forEach(i => picked.add(i)); refresh(); };
+document.getElementById('copy').onclick = () => {
+  const list = CARDS.filter(c => picked.has(c.id)); if (!list.length) return;
+  let txt = `Maze Lab — oplosvormen bouwen (${list.length}):\n`;
+  for (const s of SECS) { const l = list.filter(c => c.sec === s.id); if (l.length) txt += `${s.n} · ${s.title.split(' — ')[0]}: ${l.map(c => `${num[c.id]} ${c.name}`).join(', ')}\n`; }
+  const done = () => { const t = document.getElementById('toast'); t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 1600); };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(done, () => fb(txt, done)); else fb(txt, done);
+};
+function fb(txt, done) { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) { } ta.remove(); done(); }
+// groot bekijken
+const modal = document.getElementById('modal'), bigcv = document.getElementById('bigcv'); let bigInst = null;
+function openBig(c) { modal.classList.add('on'); document.getElementById('bigcap').textContent = `${num[c.id]} · ${c.name} — klik of Esc om te sluiten`; bigInst = new Inst(bigcv, c, true); }
+function closeBig() { modal.classList.remove('on'); bigInst = null; }
+modal.addEventListener('click', closeBig); document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBig(); });
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.1, (now - last) / 1000); last = now;
+  if (bigInst) { bigInst.tick(dt); bigInst.render(now); }
+  else for (const ins of vis) { ins.tick(dt); ins.render(now); }
+  requestAnimationFrame(frame);
+}
+refresh(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>
