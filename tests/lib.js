@@ -1,7 +1,7 @@
 // Gedeeld voor de tests: paden, Playwright zoeken, kern-bibliotheken in Node laden, browserpagina met foutenvanger.
 const fs = require('fs'), path = require('path'), os = require('os');
 const ROOT = path.resolve(__dirname, '..');
-const URL = 'file://' + path.join(ROOT, 'index.html');
+const URL = process.env.MAZE_URL || 'file://' + path.join(ROOT, 'index.html'); // MAZE_URL = andere pagina testen (bv. kopie met nieuwe script-tags)
 // kern zonder DOM (dezelfde zes die de worker krijgt)
 const CORE = ['rng', 'model', 'generators', 'puzzle', 'swarm', 'evo'];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
