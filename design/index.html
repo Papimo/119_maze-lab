@@ -60,6 +60,62 @@ button.pick.on { background: rgba(106, 212, 138, 0.16); border-color: var(--pick
 #bar .txt b { color: var(--text); font-weight: 600; }
 #bar button { background: var(--accent); color: #241703; border: none; font-weight: 600; }
 @media (max-width: 600px) { #bar .txt { white-space: normal; font-size: 13px; } }
+
+/* 4 · Workflow Evolutie (wireframes) */
+.fgrid { display: flex; flex-direction: column; gap: 22px; }
+.fcard { background: var(--card); border: 1px solid var(--line); border-radius: 14px; display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(280px, 1fr); overflow: hidden; }
+.fcard.picked { border-color: var(--pick); box-shadow: 0 0 0 2px rgba(106, 212, 138, 0.35); }
+@media (max-width: 900px) { .fcard { grid-template-columns: 1fr; } }
+.fcard .side { padding: 14px 16px 15px; display: flex; flex-direction: column; gap: 8px; border-left: 1px solid var(--line); }
+.fcard h3 { margin: 0; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+.fcard h3 .num { font: 600 12px/1 ui-monospace, monospace; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+.fcard p { margin: 0; color: var(--muted); font-size: 14px; }
+.fcard ul { margin: 0; padding-left: 18px; font-size: 14px; } .fcard ul li { margin: 2px 0; }
+.fcard .foot { display: flex; gap: 8px; margin-top: auto; padding-top: 6px; flex-wrap: wrap; }
+.fsteps { display: flex; flex-direction: column; gap: 4px; margin: 2px 0; }
+.fsteps button { text-align: left; padding: 5px 10px; font-size: 13px; display: flex; gap: 8px; align-items: baseline; }
+.fsteps button b { font: 600 11px ui-monospace, monospace; color: var(--muted); min-width: 16px; }
+.fsteps button.on { background: rgba(255, 181, 71, 0.16); border-color: var(--accent); color: #ffe2b3; }
+.fcap { font-size: 13.5px; color: var(--text); background: var(--card2); border-radius: 8px; padding: 8px 10px; min-height: 3.2em; }
+.fview { position: relative; background: #0c0b0a; cursor: zoom-in; overflow: hidden; }
+.fscale { position: absolute; left: 0; top: 0; width: 1280px; height: 800px; transform-origin: 0 0; }
+/* wireframe-onderdelen (1280×800 = ware grootte) */
+.wf { position: absolute; inset: 0; background: #e9e2d4; color: #3a342b; font: 15px/1.3 system-ui, sans-serif; overflow: hidden; }
+.wf .bx { position: absolute; box-sizing: border-box; border-radius: 6px; padding: 6px 9px; overflow: hidden; }
+.wf .p { background: #f6f1e7; border: 1.5px solid #c9bfae; }
+.wf .hd { background: #d8cfbf; border-radius: 0; font-weight: 600; display: flex; align-items: center; gap: 18px; }
+.wf .m { background-color: #f6f1e7; background-image: linear-gradient(90deg, transparent 0 22px, #d3c8b5 22px 25px, transparent 25px), linear-gradient(0deg, transparent 0 44px, #d3c8b5 44px 47px, transparent 47px), linear-gradient(0deg, transparent 0 22px, #ddd3c2 22px 25px, transparent 25px); background-size: 50px 100%, 100% 94px, 100px 50px; border: 1.5px solid #b9ad98; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 600; color: #6b604f; }
+.wf .m span { position: relative; background: rgba(246,241,231,.92); padding: 4px 10px; border-radius: 6px; }
+.wf .ch { background: #f6f1e7; border: 1.5px solid #c9bfae; }
+.wf .ch svg { position: absolute; left: 8px; right: 8px; bottom: 8px; width: calc(100% - 16px); height: 60%; }
+.wf .b, .wf .pr, .wf .tab, .wf .tabon { white-space: nowrap; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 13.5px; border-radius: 7px; padding: 2px 5px; }
+.wf .b { background: #fffaf0; border: 1.5px solid #b9ad98; }
+.wf .pr { background: #c8752b; color: #fff; font-weight: 600; border: none; }
+.wf .tab { background: transparent; border-bottom: 2px solid transparent; border-radius: 0; color: #6b604f; }
+.wf .tabon { background: #f6f1e7; border: 1.5px solid #c9bfae; border-bottom: none; border-radius: 7px 7px 0 0; font-weight: 600; }
+.wf .dr { background: #fbf7ef; border: 2px solid #8f826d; box-shadow: -10px 0 24px rgba(0,0,0,.18); }
+.wf .cd { background: #fffaf0; border: 1.5px solid #c9bfae; box-shadow: 0 2px 0 #d3c8b5; }
+.wf .cd h4 { margin: 0 0 4px; font-size: 16px; } .wf .cd small { color: #7d7262; display: block; }
+.wf .tx { color: #4c4437; padding: 0; } .wf .tx h4 { margin: 0 0 4px; font-size: 18px; }
+.wf .mu { color: #8b806f; font-size: 13px; padding: 0; }
+.wf .bar { background: #ddd3c2; border-radius: 99px; padding: 0; }
+.wf .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; background: #c8752b; animation: wfgrow 4s ease-in-out infinite; }
+@keyframes wfgrow { 0% { width: 8%; } 80%, 100% { width: 92%; } }
+.wf .n { background: rgba(255, 196, 64, .2); border: 2px dashed #c8752b; color: #7a420c; font-size: 13px; font-weight: 600; }
+.wf .x { background: #ffe1da; border: 2px solid #d4533b; color: #8a2412; font-size: 13px; font-weight: 600; border-radius: 10px; }
+.wf .rows div { padding: 3px 0; border-bottom: 1px solid #e4dccd; display: flex; justify-content: space-between; gap: 8px; }
+.wf .rows div:last-child { border-bottom: none; }
+.wf .go { cursor: pointer; } .wf .go:hover { outline: 3px solid #4e9cf5; outline-offset: 1px; }
+.wf .go::after { content: '▸'; margin-left: 4px; opacity: .7; }
+.wf .dots { display: flex; gap: 6px; flex-wrap: wrap; } .wf .dots i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.wf .stepper { display: flex; gap: 0; padding: 0; background: transparent; }
+.wf .stepper div { flex: 1; padding: 9px 0; text-align: center; background: #ddd3c2; color: #7d7262; font-weight: 600; clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%, 14px 50%); margin-right: -8px; }
+.wf .stepper div.on { background: #c8752b; color: #fff; } .wf .stepper div.done { background: #b9c99a; color: #33421c; }
+#fbig { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.9); display: none; z-index: 60; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px; }
+#fbig.on { display: flex; }
+#fbig .fview { cursor: default; border-radius: 8px; }
+#fbig .ctl { display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 14px; flex-wrap: wrap; justify-content: center; max-width: 1280px; }
+#fbig .ctl .cap { color: var(--text); flex: 1 1 420px; }
 </style>
 </head>
 <body>
@@ -67,7 +123,7 @@ button.pick.on { background: rgba(106, 212, 138, 0.16); border-color: var(--pick
   <header class="page">
     <h1>Maze Lab · kijkplezier</h1>
     <p>Alles draait live in de echte tekencode van de app (<code>src/render2d.js</code>, maquette-stijl) op een echt doolhof met een paar lussen. Klik een beeld om het groot te bekijken met een schuif tussen Huidig en die optie. Kies onderaan en plak de tekst in de chat. Eerdere keuzes (stijl, varianten): <a href="v03-stijl-varianten.html">v0.3-ontwerp</a>.</p>
-    <nav class="toc"><a href="#s1">1 · Zwerm</a><a href="#s2">2 · Voetstappen</a><a href="#s3">3 · Thema's met leven</a></nav>
+    <nav class="toc"><a href="#s1">1 · Zwerm</a><a href="#s2">2 · Voetstappen</a><a href="#s3">3 · Thema's met leven</a><a href="#s4">4 · Workflow Evolutie</a></nav>
   </header>
   <div class="row">
     <button id="reseed">Ander doolhof</button>
@@ -88,12 +144,18 @@ button.pick.on { background: rgba(106, 212, 138, 0.16); border-color: var(--pick
   <h2 class="sec" id="s3">3 · Thema's met leven</h2>
   <p class="lead">Nieuwe stijlen naast de maquette, elk met eigen rustig leven. Meerdere kiezen mag.</p>
   <div class="grid" id="g3"></div>
+
+  <h2 class="sec" id="s4">4 · Workflow Evolutie</h2>
+  <p class="lead">Alleen opbouw en volgorde: welk scherm wanneer, welke stap, wat je ziet tijdens en na een actie. Stijl blijft zoals hij is (de wireframes zijn bewust kaal). Elk voorstel is klikbaar: knoppen met ▸ gaan naar het volgende scherm, of kies een stap rechts. Groot bekijken = ware grootte (1280×800), pijltjestoetsen bladeren. Mengen mag (bv. tabs + tijdlijn). In alle richtingen behalve 0 krijgt het mutantenlab een stopregel (“stop zodra 3 binnen zijn of na 10 s, kansloze afkappen”) en een zichtbare “wacht op…”.</p>
+  <div class="row"><span class="label">Opmerking bij je keuze</span><input id="flowNote" placeholder="bv. tabs, maar mutanten als tijdlijnkaart" style="flex:1;min-width:240px;font:inherit;font-size:14px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card2);color:var(--text)"></div>
+  <div class="fgrid" id="g4"></div>
 </div>
 
 <div id="big">
   <div class="stage"><canvas id="bigA"></canvas><canvas id="bigB"></canvas><div class="knife" id="knife"><span class="l">Huidig</span><span class="r" id="knifeR"></span></div></div>
   <div class="ctl"><span>Huidig</span><input type="range" id="slider" min="0" max="100" value="50"><span id="bigName"></span><button id="bigClose">Sluiten (Esc)</button></div>
 </div>
+<div id="fbig"><div class="fview"><div class="fscale"></div></div><div class="ctl"><button id="fPrev">◀</button><span class="cap"></span><button id="fNext">▶</button><button id="fClose">Sluiten (Esc)</button></div></div>
 <div id="bar"><div class="txt" id="barTxt"></div><button id="copy">Kopieer</button></div>
 
 <script src="../src/rng.js"></script>
@@ -684,7 +746,7 @@ const nameOf = (sec, id) => SECTIONS[sec].opts.find(o => o.id === id).name;
 function marks() {
   for (const t of tiles) { const on = isPicked(t), b = t.el.querySelector('.pick'); t.el.classList.toggle('picked', on); b.classList.toggle('on', on); b.textContent = on ? 'Gekozen' : 'Kies deze'; }
   const th = [...PICK.s3].map(id => nameOf('s3', id));
-  document.getElementById('barTxt').innerHTML = `Zwerm: <b>${PICK.s1 ? nameOf('s1', PICK.s1) : '—'}</b> · Voetstappen: <b>${PICK.s2 ? nameOf('s2', PICK.s2) : '—'}</b>${PICK.s2 && PICK.s2 !== 'huidig' ? ` (kleur eronder ${OPT.under ? 'aan' : 'uit'})` : ''} · Thema's: <b>${th.length ? th.join(', ') : '—'}</b>`;
+  document.getElementById('barTxt').innerHTML = `Zwerm: <b>${PICK.s1 ? nameOf('s1', PICK.s1) : '—'}</b> · Voetstappen: <b>${PICK.s2 ? nameOf('s2', PICK.s2) : '—'}</b>${PICK.s2 && PICK.s2 !== 'huidig' ? ` (kleur eronder ${OPT.under ? 'aan' : 'uit'})` : ''} · Thema's: <b>${th.length ? th.join(', ') : '—'}</b>` + (window.flowTxt ? window.flowTxt() : '');
 }
 newMaze();
 for (const sec of ['s1', 's2', 's3']) SECTIONS[sec].opts.forEach((o, i) => card(sec, o, i));
@@ -733,6 +795,265 @@ function loop(ms) {
   if (now - statT > 0.5) { statT = now; for (const t of tiles) if (t.sim instanceof Colony) t.el.querySelector('.stats').textContent = t.sim.info(); }
 }
 requestAnimationFrame(loop);
+</script>
+<script>
+// 4 · Workflow Evolutie: klikbare wireframes (1280×800 = ware grootte). Alleen opbouw/volgorde, geen stijl.
+(() => {
+const B = (x, y, w, h, html, cls = 'p', go) => ({ x, y, w, h, html, cls, go });
+const TABS = ['Bouwen', 'Lab', 'Kijken', 'Vandaag', 'Evolutie'];
+const hdr = () => B(0, 0, 1280, 40, `<span>Maze Lab</span>${TABS.map(t => t === 'Evolutie' ? `<span style="border-bottom:3px solid #c8752b">${t}</span>` : `<span style="font-weight:400">${t}</span>`).join('')}`, 'hd');
+const line = (pts = '0,90 10,80 20,82 30,64 40,60 50,48 60,50 70,36 80,30 90,26 100,20', base = '0,58 100,58') =>
+  `<svg viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="${base}" fill="none" stroke="#9a8f7c" stroke-width="1.2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/><polyline points="${pts}" fill="none" stroke="#c8752b" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>`;
+const chart = (x, y, w, h, t = 'Testbaan per generatie · stippel = beste klassieker') => B(x, y, w, h, `<b>${t}</b>${line()}`, 'ch');
+const COLS = ['#c8752b', '#4f8a5b', '#3f6fb0', '#a24f8f', '#b8a03a', '#5aa3a3'];
+const dots = n => `<span class="dots">${COLS.slice(0, n).map(c => `<i style="background:${c}"></i>`).join('')}</span>`;
+const rows = (arr) => `<div class="rows">${arr.map(r => `<div><span>${r[0]}</span><b>${r[1] ?? ''}</b></div>`).join('')}</div>`;
+const step = (x, y, w, labels, on) => B(x, y, w, 40, labels.map((l, i) => `<div class="${i === on ? 'on' : i < on ? 'done' : ''}">${i + 1} · ${l}</div>`).join(''), 'stepper');
+const SET15 = 'Lopers · Raster · Makers · Grootte · Lussen · Puzzel · Mutatie · Snelheid · Kleur · Runs · Eilanden · Rekenkracht · Begin met klassiekers · Begin met bewaarde'.split(' · ');
+const RANK = rows([['1 · <span style="color:#c8752b">●</span> Kampioen g412', '61,8'], ['2 · Kompas', '53,7'], ['3 · Trémaux', '49,2'], ['4 · Speurneus v3', '48,0'], ['5 · Rechterhand', '31,5']]);
+
+// huidige app (basis voor optie 0)
+const nowBase = (extra = []) => [hdr(),
+  B(0, 40, 300, 760, `<b>Evolutie</b><div class="mu">uitleg DNA…</div>${SET15.map(s => `<div class="mu" style="padding:3px 0;border-bottom:1px solid #e4dccd">${s}</div>`).join('')}`),
+  B(14, 560, 150, 28, 'Opnieuw beginnen', 'b'),
+  B(10, 596, 280, 110, `<b>Ranglijst · testbaan</b>${RANK}`, 'p'),
+  B(10, 712, 88, 24, 'Bibliotheek', 'pr'), B(102, 712, 88, 24, 'Eregalerij', 'b'), B(194, 712, 50, 24, 'Duel', 'b'),
+  B(10, 740, 104, 24, '🧬 Mutantenlab', 'b', 1), B(118, 740, 62, 24, 'Zoeker', 'b'), B(184, 740, 70, 24, 'Stamboom', 'b'),
+  B(10, 768, 52, 24, 'Uitleg', 'b'), B(66, 768, 60, 24, 'Rapport', 'b'), B(130, 768, 66, 24, 'Exporteer', 'b'), B(200, 768, 66, 24, 'Importeer', 'b'),
+  B(300, 40, 980, 44, '', 'p'),
+  B(310, 48, 70, 28, 'Pauze', 'pr'), B(386, 48, 150, 28, 'Volgende generatie', 'b'), B(546, 48, 220, 28, 'Turbo ×25 ×100 ×1000 ∞', 'b'), B(776, 48, 130, 28, 'Bewaar kampioen', 'b'), B(914, 48, 360, 28, 'gen 412 · 40 lopers · spatie V T B L', 'mu'),
+  B(310, 90, 410, 30, 'Doolhof: Nieuw | Vast | Set van [4]', 'b'), B(728, 90, 100, 30, 'Panelen 1', 'b'), B(836, 90, 330, 30, `Soorten&nbsp;${dots(5)}`, 'b'), B(1172, 90, 100, 30, 'Bibliotheek', 'b'),
+  B(310, 126, 960, 468, '<span>Doolhof · 40 lopers in soortkleuren</span>', 'm'),
+  chart(310, 602, 620, 190), B(940, 602, 330, 190, `<b>Kampioen</b><div class="mu">DNA-balkjes · 9 genen</div><div class="mu">score 61,8 · ouders …</div>`),
+  ...extra];
+const nowDrawer = (tab, body, extra = []) => nowBase([
+  B(800, 126, 480, 674, '', 'dr'),
+  B(806, 132, 470, 30, ['Bibl.', 'Ere', 'Werkb.', 'Duel', 'Mutant', 'Zoeker', 'Stamb.', 'Uitleg', '✕'].map(t => `<span style="margin-right:9px;${t === tab ? 'font-weight:700;border-bottom:2px solid #c8752b' : 'color:#7d7262'}">${t}</span>`).join(''), 'tx'),
+  ...body, ...extra]);
+
+const FLOWS = [
+{ id: 'huidig', name: 'Huidig', line: 'Alles tegelijk op één scherm; extra gereedschap in een lade met 8 tabs.',
+  pts: ['Evolutie start meteen bij openen: niets te kiezen, direct beweging', '15 instellingen + 14 knoppen links, 4 knoppen + turbo boven', 'Lade schuift over grafiek en kampioen heen'],
+  tags: [['vergelijking', '']],
+  steps: [
+    { t: 'Openen', c: 'Je komt binnen en de evolutie loopt al. Links staan 15 instellingen en 14 knoppen, boven de turbo. Klik 🧬 Mutantenlab.',
+      b: nowBase([B(320, 140, 250, 54, '29 bedieningen tegelijk zichtbaar; geen volgorde', 'x'), B(780, 600, 260, 40, 'Bewaar kampioen / Bibliotheek staan er 2×', 'x')]) },
+    { t: 'Lade: mutantenlab', c: 'De lade opent rechts over grafiek en kampioen heen. Je kiest bron, aantal en sterkte en klikt Start.',
+      b: nowDrawer('Mutant', [B(814, 172, 452, 60, '<b>Bron: Kampioen g412</b> (testbaan 61,8)', 'tx'), B(814, 220, 452, 34, 'Mutanten [8] · Sterkte [middel] · Rondes [3] · ☐ zware testbaan', 'b'), B(814, 266, 80, 32, 'Start', 'pr', 2)],
+        [B(820, 560, 300, 50, 'Lade dekt grafiek + kampioen af', 'x')]) },
+    { t: 'Wachten…', c: 'De mutanten racen in het doolhof links; in de lade staat “racen…”. Je weet niet hoelang het duurt of waarop je wacht.',
+      b: nowDrawer('Mutant', [B(814, 172, 452, 40, '<b>Bron: Kampioen g412</b>', 'tx'), B(814, 220, 452, 30, 'Ronde 1/3: 8 mutanten + origineel racen…', 'tx'), B(814, 260, 80, 32, 'Stop', 'b')],
+        [B(330, 150, 300, 70, '1 mutant is binnen, 7 lopen door tot de stapgrens: waar wacht ik op?', 'x'), B(814, 320, 440, 54, 'Uitslag verschijnt straks hier in de lade, los van het doolhof', 'x')]) },
+  ] },
+
+{ id: 'wizard', name: 'Wizard in 4 stappen', line: 'Eén rechte lijn: kies een doel → evolueer → beoordeel → bewaar.',
+  pts: ['Nieuweling ziet steeds maar één beslissing', 'Duidelijk einde: “klaar” = je hebt een beter algoritme met naam', 'Labs (mutanten, duel, uitleg) zitten in stap 3 als beoordeling'],
+  tags: [['middel werk', 'mid'], ['experts klikken meer', 'warn'], ['nieuwe instellingen-groepering', 'mid']],
+  steps: [
+    { t: 'Kies een doel', c: 'Vier doelen in gewone taal; elk doel zet de 15 instellingen voor je. Meer instellingen zit ingeklapt.',
+      b: [hdr(), step(40, 56, 1200, ['Doel', 'Evolueer', 'Beoordeel', 'Bewaar'], 0),
+        B(40, 120, 1200, 40, '<h4>Wat moet je algoritme kunnen?</h4>', 'tx'),
+        B(40, 170, 285, 230, '<h4>Elk doolhof</h4><small>Nieuw per generatie, gemengde rasters. Algemeen sterk.</small>', 'cd', 1),
+        B(345, 170, 285, 230, '<h4>Eén doolhof meesteren</h4><small>Vast doolhof. Zie het leren.</small>', 'cd', 1),
+        B(650, 170, 285, 230, '<h4>Puzzels kraken</h4><small>Sleutels, teleporters, eenrichting, zware testbaan.</small>', 'cd', 1),
+        B(955, 170, 285, 230, '<h4>Verder met een bewaarde</h4><small>Kies uit je bibliotheek als zaadje.</small>', 'cd', 1),
+        B(40, 420, 1200, 40, '▸ Meer instellingen (lopers, mutatie, runs, eilanden, rekenkracht…)', 'b'),
+        B(40, 480, 600, 60, 'Doel = kant-en-klare set instellingen; het doolhof-voorbeeld rechts laat zien wat je krijgt', 'n'),
+        B(660, 480, 580, 300, '<span>Voorbeeld van het soort doolhof</span>', 'm')] },
+    { t: 'Evolueer', c: 'Groot doolhof + grafiek. Eén balk: pauze, turbo, en een stopregel. Bij de stopregel gaat de knop “Beoordelen” branden.',
+      b: [hdr(), step(40, 56, 1200, ['Doel', 'Evolueer', 'Beoordeel', 'Bewaar'], 1),
+        B(40, 110, 820, 520, '<span>Doolhof · lopers in soortkleuren</span>', 'm'),
+        B(880, 110, 360, 250, `<b>Nu</b>${rows([['Generatie', '412'], ['Beste testbaan', '61,8'], ['Beste klassieker', 'Kompas 53,7'], ['Soorten', dots(5)]])}`),
+        chart(880, 372, 360, 258),
+        B(40, 646, 90, 40, 'Pauze', 'b'), B(140, 646, 260, 40, 'Turbo ×25 ×100 ×1000 ∞', 'b'),
+        B(410, 646, 450, 40, 'Stop als: testbaan ≥ [60] of na [500] generaties', 'b'),
+        B(880, 646, 360, 40, 'Klaar → Beoordelen', 'pr', 2),
+        B(40, 700, 820, 60, 'Geen lade, geen labknoppen: tijdens evolueren alleen kijken en tempo kiezen', 'n')] },
+    { t: 'Beoordeel', c: 'Kampioen naast de beste klassieker: testbaan per soort doolhof. Drie knoppen om dieper te kijken; alles opent hier in plaats van in een lade.',
+      b: [hdr(), step(40, 56, 1200, ['Doel', 'Evolueer', 'Beoordeel', 'Bewaar'], 2),
+        B(40, 110, 590, 400, '<span>Kampioen loopt (replay)</span>', 'm'), B(650, 110, 590, 400, '<span>Kompas op hetzelfde doolhof</span>', 'm'),
+        B(40, 524, 800, 170, `<b>Testbaan per soort</b>${rows([['Vierkant · lussen', '72 vs 58'], ['Zeshoek', '64 vs 55'], ['Ringen', '49 vs 51'], ['Puzzels', '38 vs 30']])}`),
+        B(860, 524, 380, 50, '🧬 Nog beter maken (mutanten)', 'b'), B(860, 582, 380, 50, 'Uitleg: waarom deze keuzes?', 'b'), B(860, 640, 380, 50, 'Stamboom', 'b'),
+        B(40, 710, 160, 44, '← Verder evolueren', 'b', 1), B(1040, 710, 200, 44, 'Goed zo → Bewaar', 'pr', 3)] },
+    { t: 'Bewaar', c: 'Naam, map en notitie, en kiezen hoe verder: nieuwe ronde met dit als zaadje, of naar de bibliotheek.',
+      b: [hdr(), step(40, 56, 1200, ['Doel', 'Evolueer', 'Beoordeel', 'Bewaar'], 3),
+        B(340, 130, 600, 380, '<h4>Bewaar je algoritme</h4><div class="mu" style="margin:8px 0">Naam</div><div class="b" style="position:static;height:34px;justify-content:flex-start">Speurneus v4</div><div class="mu" style="margin:8px 0">Map · labels · notitie</div><div class="b" style="position:static;height:70px"></div><div class="mu" style="margin-top:10px">Deelcode MLDNA1:… (kopieer)</div>', 'cd'),
+        B(340, 530, 290, 50, 'Nieuwe ronde vanaf dit', 'b', 0), B(650, 530, 290, 50, 'Naar bibliotheek', 'pr'),
+        B(340, 600, 600, 50, 'Bibliotheek, eregalerij, duel en zoeker: los te openen via “Gereedschap” in de kop', 'n')] },
+  ] },
+
+{ id: 'tabs', name: 'Werkplaats-tabs', line: 'Vier vaste tabbladen bovenaan (Evolueren · Bibliotheek · Lab · Analyse) in plaats van één lade.',
+  pts: ['Elk gereedschap krijgt het hele scherm, niets schuift ergens overheen', 'Evolutie loopt door op de achtergrond (teller op het tabblad)', 'Linkerpaneel alleen nog instellingen, ingeklapt in 3 groepen'],
+  tags: [['middel werk', 'mid'], ['dicht bij huidig', 'low'], ['wisselen kost een klik', 'mid']],
+  steps: [
+    { t: 'Evolueren', c: 'Instellingen ingeklapt in 3 groepen; ranglijst rechts naast het doolhof. Geen labknoppen meer links.',
+      b: [hdr(), B(0, 40, 1280, 40, '', 'p'), B(10, 46, 150, 34, 'Evolueren · g412', 'tabon'), B(170, 46, 130, 34, 'Bibliotheek', 'tab', 1), B(310, 46, 90, 34, 'Lab', 'tab', 2), B(410, 46, 110, 34, 'Analyse', 'tab', 3),
+        B(0, 80, 260, 720, '<b>Instellingen</b><div class="b" style="position:static;margin:8px 0;height:34px">▸ Doolhof (raster, grootte, lussen, puzzel)</div><div class="b" style="position:static;margin:8px 0;height:34px">▸ Populatie (lopers, mutatie, runs, eilanden)</div><div class="b" style="position:static;margin:8px 0;height:34px">▸ Rekenen (snelheid, kracht)</div>'),
+        B(270, 88, 700, 34, 'Pauze · Volgende · Turbo ×25 ×100 ×1000 ∞ · Doolhof Nieuw|Vast|Set', 'b'),
+        B(270, 130, 700, 470, '<span>Doolhof</span>', 'm'), chart(270, 610, 700, 180),
+        B(980, 88, 290, 340, `<b>Ranglijst</b>${RANK}`), B(980, 440, 290, 200, `<b>Kampioen</b><div class="mu">DNA 9 genen</div>`), B(980, 650, 290, 40, 'Bewaar kampioen', 'pr'),
+        B(980, 700, 290, 80, 'Eén plek per actie: bewaren alleen hier', 'n')] },
+    { t: 'Bibliotheek', c: 'Lijst + detail over de hele breedte. Elke actie bij een algoritme springt naar het juiste tabblad (Lab of Analyse) met dat algoritme al gekozen.',
+      b: [hdr(), B(0, 40, 1280, 40, '', 'p'), B(10, 46, 150, 34, 'Evolueren · g418', 'tab', 0), B(170, 46, 130, 34, 'Bibliotheek', 'tabon'), B(310, 46, 90, 34, 'Lab', 'tab', 2), B(410, 46, 110, 34, 'Analyse', 'tab', 3),
+        B(10, 90, 300, 700, `<b>Mappen</b>${rows([['Alles', 24], ['Puzzelaars', 6], ['Snelle', 9], ['Eregalerij', 20]])}`),
+        B(320, 90, 420, 700, `<div class="b" style="position:static;height:34px;justify-content:flex-start">Zoek…</div>${rows([['Speurneus v4', '64,2'], ['Speurneus v3', '61,0'], ['Kampioen g412', '61,8'], ['Kompas', '53,7'], ['Mollen', '47,3']])}`),
+        B(750, 90, 520, 380, '<b>Speurneus v4</b><div class="mu">DNA · labels · notitie · scoregeschiedenis</div>', 'p'),
+        B(750, 480, 120, 44, 'Werkbank', 'b', 2), B(880, 480, 120, 44, 'Mutanten', 'b', 2), B(1010, 480, 120, 44, 'Duel', 'b', 2), B(1140, 480, 130, 44, 'Uitleg', 'b', 3),
+        B(750, 540, 520, 60, 'Import / export / plak code één keer, hier in de kop van de lijst', 'n')] },
+    { t: 'Lab', c: 'Vier werkplaatsen naast elkaar als knoppen. Links wat je gebruikt, midden het doolhof, rechts de uitkomst die blijft staan.',
+      b: [hdr(), B(0, 40, 1280, 40, '', 'p'), B(10, 46, 150, 34, 'Evolueren · g431', 'tab', 0), B(170, 46, 130, 34, 'Bibliotheek', 'tab', 1), B(310, 46, 90, 34, 'Lab', 'tabon'), B(410, 46, 110, 34, 'Analyse', 'tab', 3),
+        B(10, 90, 520, 40, 'Werkbank | <b>Mutanten</b> | Duel | Zoeker', 'b'),
+        B(10, 140, 260, 650, '<b>In</b><div class="mu">Bron: Speurneus v4</div><div class="mu">Mutanten 8 · sterkte middel</div><div class="mu">Stop zodra 3 binnen zijn</div>'), B(20, 330, 120, 40, 'Start', 'pr'),
+        B(280, 140, 640, 650, '<span>8 mutanten racen</span>', 'm'),
+        B(930, 140, 340, 650, `<b>Uit</b>${rows([['✓ m3 binnen', '214 st'], ['✓ m7 binnen', '231 st'], ['… 6 nog bezig', ''], ['Testbaan beste', '+2,1']])}`),
+        B(940, 400, 320, 60, 'Uitkomst staat vast naast het doolhof, niet in een lade', 'n')] },
+    { t: 'Analyse', c: 'Alles om te begrijpen: stamboom, uitleg-replay, eregalerij, rapport.',
+      b: [hdr(), B(0, 40, 1280, 40, '', 'p'), B(10, 46, 150, 34, 'Evolueren · g440', 'tab', 0), B(170, 46, 130, 34, 'Bibliotheek', 'tab', 1), B(310, 46, 90, 34, 'Lab', 'tab', 2), B(410, 46, 110, 34, 'Analyse', 'tabon'),
+        B(10, 90, 560, 40, '<b>Stamboom</b> | Uitleg | Eregalerij | Rapport', 'b'),
+        B(10, 140, 1260, 650, '<span>Stamboom (SVG) over de hele breedte · klik een knoop = algoritme</span>', 'm')] },
+  ] },
+
+{ id: 'kaart', name: 'Algoritme centraal', line: 'Begin bij een kaart per algoritme; alle acties (testen, muteren, duel, uitleg, evolueren) hangen aan die kaart.',
+  pts: ['Bibliotheek wordt de startpagina: je ziet wat je hebt', 'Elke actie heeft een vaste plek op de kaart; geen losse knoppenrij', 'Evolueren is ook een actie: “kweek verder vanaf deze”'],
+  tags: [['groot werk', 'warn'], ['evolutie niet meer meteen zichtbaar', 'warn'], ['logisch voor verzamelaars', 'low']],
+  steps: [
+    { t: 'Overzicht', c: 'Kaarten: lopende evolutie bovenaan, daarna bewaarde en klassiekers. Klik een kaart.',
+      b: [hdr(), B(40, 56, 900, 44, '<h4>Jouw algoritmes</h4>', 'tx'), B(1000, 56, 240, 44, '＋ Nieuwe evolutie', 'pr'),
+        B(40, 110, 1200, 150, '<h4>▶ Evolutie loopt · g412</h4><small>beste 61,8 · 5 soorten · klik om te kijken</small>', 'cd'),
+        ...['Speurneus v4|64,2', 'Speurneus v3|61,0', 'Mollen|47,3', 'Kompas (klassiek)|53,7', 'Trémaux (klassiek)|49,2', 'Rechterhand (klassiek)|31,5', 'Puzzelaar v2|44,0', 'Lange Gang|40,8'].map((s, i) => { const [n, v] = s.split('|'); return B(40 + (i % 4) * 305, 280 + Math.floor(i / 4) * 250, 290, 230, `<h4>${n}</h4><small>testbaan ${v}</small><div class="mu" style="margin-top:80px">DNA ▂▅▇▃▁▆▄▂▅</div>`, 'cd', i === 0 ? 1 : undefined); })] },
+    { t: 'Kaart open', c: 'Het algoritme loopt groot; rechts DNA en geschiedenis; onder één rij acties.',
+      b: [hdr(), B(40, 52, 200, 34, '← Alle algoritmes', 'b', 0), B(260, 52, 600, 34, '<h4>Speurneus v4</h4>', 'tx'),
+        B(40, 96, 800, 540, '<span>Speurneus v4 loopt (proefrit)</span>', 'm'),
+        B(860, 96, 380, 300, '<b>DNA</b><div class="mu">9 schuifjes (alleen-lezen, “bewerk” = werkbank)</div>'), B(860, 406, 380, 230, `<b>Geschiedenis</b>${rows([['v1 → v2', '+3,1'], ['v3 mutantenlab', '+1,4'], ['v4 werkbank', '+3,2']])}`),
+        B(40, 650, 190, 50, 'Test (testbaan)', 'b'), B(240, 650, 190, 50, '🧬 Muteer', 'b', 2), B(440, 650, 190, 50, 'Duel tegen…', 'b'), B(640, 650, 190, 50, 'Uitleg', 'b'), B(840, 650, 190, 50, 'Kweek verder', 'b'), B(1040, 650, 200, 50, 'Deel / export', 'b'),
+        B(40, 716, 1200, 50, 'Elke actie opent hier binnen de kaart; terug = weer bij deze kaart', 'n')] },
+    { t: 'Muteer', c: 'Mutanten racen in hetzelfde grote doolhof; de kinderen verschijnen als mini-kaartjes onder de ouder. Klik een kind om het te houden.',
+      b: [hdr(), B(40, 52, 200, 34, '← Speurneus v4', 'b', 1), B(260, 52, 600, 34, '<h4>Mutanten van Speurneus v4</h4>', 'tx'),
+        B(40, 96, 800, 480, '<span>8 mutanten racen</span>', 'm'),
+        B(860, 96, 380, 140, '<b>Bezig</b><div class="mu">3 van 8 binnen · 2 afgekapt (geen kans meer) · max 10 s</div>'), B(870, 200, 360, 14, '<i></i>', 'bar'),
+        ...[0, 1, 2, 3].map(i => B(40 + i * 205, 590, 190, 170, `<h4>m${[3, 7, 1, 5][i]}</h4><small>${['+2,1 ✓', '+1,0 ✓', '−0,4', 'afgekapt'][i]}</small>`, 'cd')),
+        B(860, 590, 380, 50, 'Houd m3 als Speurneus v5', 'pr', 1), B(860, 650, 380, 50, 'Nog een ronde vanaf m3', 'b')] },
+  ] },
+
+{ id: 'taak', name: 'Taak-gestuurd', line: 'Start met “Wat wil je doen?”: vijf klussen, elk een korte flow van 2–3 schermen met een duidelijk einde.',
+  pts: ['Elke klus vertelt vooraf wat hij doet en wat je straks krijgt', 'Wachten wordt zichtbaar: voortgang, wie binnen is, wanneer hij stopt', 'Laatste resultaten blijven als rij “Recent” op het startscherm'],
+  tags: [['middel werk', 'mid'], ['lost mutantenlab-klacht op', 'low'], ['vrij evolueren 1 klik verder', 'mid']],
+  steps: [
+    { t: 'Wat wil je doen?', c: 'Vijf klussen in gewone taal. Onder: recente uitkomsten. Klik “Verbeter er één”.',
+      b: [hdr(), B(40, 60, 1200, 50, '<h4>Wat wil je doen?</h4>', 'tx'),
+        B(40, 120, 230, 260, '<h4>Kweek een beter algoritme</h4><small>Evolutie draaien tot hij de klassiekers verslaat.</small>', 'cd'),
+        B(285, 120, 230, 260, '<h4>Verbeter er één</h4><small>Schuifjes of mutanten op een algoritme dat je al hebt.</small>', 'cd', 1),
+        B(530, 120, 230, 260, '<h4>Laat ze strijden</h4><small>Duel 2–4 op hetzelfde doolhof.</small>', 'cd'),
+        B(775, 120, 230, 260, '<h4>Begrijp waarom</h4><small>Uitleg per stap, stamboom.</small>', 'cd'),
+        B(1020, 120, 220, 260, '<h4>Zoek een lastig doolhof</h4><small>Waar faalt mijn kampioen?</small>', 'cd'),
+        B(40, 400, 1200, 34, '<b>Recent</b>', 'tx'),
+        B(40, 440, 380, 120, '<h4>Mutanten · 14:02</h4><small>m3 +2,1 → bewaard als v4</small>', 'cd'), B(440, 440, 380, 120, '<h4>Evolutie · 13:40</h4><small>500 gens · 53,7 → 61,8</small>', 'cd'), B(840, 440, 400, 120, '<h4>Duel · 13:20</h4><small>Speurneus wint 3/4</small>', 'cd'),
+        B(40, 590, 1200, 50, 'Bibliotheek en rapport via de kop; geen vaste knoppenrij', 'n')] },
+    { t: 'Kies wat en hoe', c: 'Klus “Verbeter er één”, scherm 1 van 3: kies algoritme en manier. Er staat bij wat er gaat gebeuren.',
+      b: [hdr(), step(40, 56, 900, ['Kies', 'Bezig', 'Uitkomst'], 0), B(960, 56, 280, 40, '✕ Terug naar start', 'b', 0),
+        B(40, 120, 560, 600, `<b>Welk algoritme?</b>${rows([['● Speurneus v4', '64,2'], ['Kampioen g412', '61,8'], ['Mollen', '47,3']])}`),
+        B(620, 120, 620, 270, '<h4>Schuifjes (werkbank)</h4><small>Jij draait aan de 9 genen, proefrit loopt direct mee.</small>', 'cd'),
+        B(620, 410, 620, 270, '<h4>Laat het lab muteren</h4><small>8 mutanten racen. Stopt zodra 3 binnen zijn of na 10 s; kansloze worden afgekapt. Je krijgt de beste 3.</small>', 'cd', 2)] },
+    { t: 'Bezig', c: 'Je ziet waarop je wacht: wie binnen is, wie is afgekapt, hoeveel tijd nog. Tussenuitslag groeit rechts mee.',
+      b: [hdr(), step(40, 56, 900, ['Kies', 'Bezig', 'Uitkomst'], 1), B(960, 56, 280, 40, 'Stop nu, toon wat er is', 'b', 3),
+        B(40, 110, 800, 620, '<span>8 mutanten racen · binnen = vlag, afgekapt = grijs</span>', 'm'),
+        B(860, 110, 380, 120, '<b>Wacht op 3 van 8 binnen</b><div class="mu">2 binnen · 3 afgekapt · nog max 6 s</div>'), B(870, 196, 360, 14, '<i></i>', 'bar'),
+        B(860, 240, 380, 260, `<b>Tussenstand</b>${rows([['✓ m3', '214 st'], ['✓ m7', '231 st'], ['✗ m2 afgekapt', ''], ['✗ m5 afgekapt', ''], ['… m1 m4 m6 m8', '']])}`),
+        B(860, 520, 380, 60, 'Klaar → gaat vanzelf door naar Uitkomst', 'n', 3)] },
+    { t: 'Uitkomst', c: 'Vaste uitkomst-pagina: winnaar vs origineel, testbaan, en drie duidelijke vervolgstappen. Komt ook in “Recent”.',
+      b: [hdr(), step(40, 56, 900, ['Kies', 'Bezig', 'Uitkomst'], 2),
+        B(40, 110, 590, 380, '<span>m3 loopt (replay)</span>', 'm'), B(650, 110, 590, 380, '<span>Speurneus v4 (origineel)</span>', 'm'),
+        B(40, 504, 800, 170, `<b>Testbaan</b>${rows([['m3', '66,3 (+2,1)'], ['m7', '65,2 (+1,0)'], ['Origineel', '64,2']])}`),
+        B(860, 504, 380, 50, 'Bewaar m3 als v5', 'pr', 0), B(860, 562, 380, 50, 'Nog een ronde vanaf m3', 'b', 2), B(860, 620, 380, 50, 'Klaar, terug naar start', 'b', 0)] },
+  ] },
+
+{ id: 'tijdlijn', name: 'Eén scherm + tijdlijn', line: 'Doolhof en grafiek blijven altijd staan; elke actie wordt een kaart in een tijdlijn rechts, met uitkomst die je later terugkijkt.',
+  pts: ['Niets verbergt het doolhof; wat bezig is staat bovenaan de tijdlijn met voortgang', 'Uitkomsten verdwijnen niet: oude kaart aanklikken = opnieuw afspelen', 'Acties onderin als één rij; instellingen achter één knop'],
+  tags: [['middel werk', 'mid'], ['rapport = tijdlijn exporteren', 'low'], ['tijdlijn bewaren (localStorage)', 'mid']],
+  steps: [
+    { t: 'Eén scherm', c: 'Links doolhof + grafiek, rechts de tijdlijn met wat je al gedaan hebt. Onder één rij acties. Klik 🧬 Mutanten.',
+      b: [hdr(), B(0, 40, 1280, 44, '', 'p'), B(10, 47, 70, 30, 'Pauze', 'pr'), B(90, 47, 230, 30, 'Turbo ×25 ×100 ×1000 ∞', 'b'), B(330, 47, 300, 30, 'Doolhof Nieuw | Vast | Set', 'b'), B(640, 47, 120, 30, '⚙ Instellingen', 'b'), B(770, 47, 140, 30, 'Bibliotheek', 'b'), B(920, 47, 340, 30, `g412 · ${dots(5)}`, 'mu'),
+        B(10, 92, 860, 470, '<span>Doolhof</span>', 'm'), chart(10, 570, 560, 160), B(580, 570, 290, 160, '<b>Kampioen</b><div class="mu">DNA · 61,8</div>'),
+        B(10, 740, 160, 48, '🧬 Mutanten', 'b', 1), B(180, 740, 130, 48, 'Duel', 'b'), B(320, 740, 130, 48, 'Zoeker', 'b'), B(460, 740, 130, 48, 'Uitleg', 'b'), B(600, 740, 130, 48, 'Werkbank', 'b'), B(740, 740, 130, 48, 'Bewaar', 'pr'),
+        B(880, 92, 390, 34, '<b>Tijdlijn</b>', 'tx'),
+        B(880, 130, 390, 110, '<h4>Evolutie g0–412</h4><small>testbaan 53,7 → 61,8 · 5 soorten</small>', 'cd'),
+        B(880, 250, 390, 110, '<h4>Duel · 13:20</h4><small>Speurneus wint 3/4</small>', 'cd', 3),
+        B(880, 370, 390, 110, '<h4>Bewaard · Speurneus v4</h4><small>64,2</small>', 'cd')] },
+    { t: 'Actie loopt', c: 'De mutantenronde wordt bovenaan de tijdlijn een kaart “bezig” met voortgang en waarop hij wacht. Het doolhof toont de race; evolutie pauzeert zolang.',
+      b: [hdr(), B(0, 40, 1280, 44, '', 'p'), B(10, 47, 400, 30, 'Evolutie gepauzeerd tijdens mutanten', 'mu'),
+        B(10, 92, 860, 640, '<span>8 mutanten van de kampioen racen</span>', 'm'),
+        B(880, 92, 390, 34, '<b>Tijdlijn</b>', 'tx'),
+        B(880, 130, 390, 200, '<h4>🧬 Mutanten · bezig</h4><small>wacht op 3 van 8 · 2 binnen · 3 afgekapt · max 6 s</small><div class="mu" style="margin-top:44px">m3 ✓ · m7 ✓ · m2 ✗ · m5 ✗ · …</div>', 'cd'), B(892, 222, 366, 12, '<i></i>', 'bar'),
+        B(880, 340, 390, 46, 'Stop nu', 'b', 2),
+        B(880, 400, 390, 90, '<h4>Evolutie g0–412</h4><small>53,7 → 61,8</small>', 'cd'),
+        B(10, 740, 860, 48, 'Je ziet steeds: wat er loopt, waarop het wacht, waar de uitkomst komt (deze kaart)', 'n')] },
+    { t: 'Uitkomst op de kaart', c: 'De kaart klapt om naar de uitslag met vervolgknoppen. Evolutie loopt weer door; de kaart blijft staan.',
+      b: [hdr(), B(0, 40, 1280, 44, '', 'p'), B(10, 47, 70, 30, 'Pauze', 'pr'), B(90, 47, 230, 30, 'Turbo ×25 ×100 ×1000 ∞', 'b'),
+        B(10, 92, 860, 640, '<span>Evolutie loopt weer</span>', 'm'),
+        B(880, 92, 390, 34, '<b>Tijdlijn</b>', 'tx'),
+        B(880, 130, 390, 300, `<h4>🧬 Mutanten · 14:02 ✓</h4>${rows([['m3', '+2,1'], ['m7', '+1,0'], ['5 anderen', 'slechter']])}`, 'cd'),
+        B(892, 300, 180, 40, 'Bewaar m3', 'pr'), B(1080, 300, 180, 40, 'Zaai in evolutie', 'b'), B(892, 348, 366, 40, '▶ Bekijk race opnieuw', 'b', 3),
+        B(880, 440, 390, 90, '<h4>Evolutie g0–412</h4><small>53,7 → 61,8</small>', 'cd')] },
+    { t: 'Terugkijken', c: 'Een oude kaart aanklikken speelt die actie opnieuw af in het grote doolhof. Een balk bovenin zegt waar je naar kijkt.',
+      b: [hdr(), B(0, 40, 1280, 44, '◀ Je kijkt terug: Duel 13:20 · <u>terug naar live</u>', 'n', 0),
+        B(10, 92, 860, 640, '<span>Duel 13:20 (opnieuw afgespeeld, zelfde zaadje)</span>', 'm'),
+        B(880, 92, 390, 34, '<b>Tijdlijn</b>', 'tx'),
+        B(880, 130, 390, 110, '<h4>🧬 Mutanten · 14:02 ✓</h4><small>m3 +2,1</small>', 'cd', 2),
+        B(880, 250, 390, 160, `<h4>Duel · 13:20 ▶</h4>${rows([['Speurneus', '3/4'], ['Kompas', '1/4']])}`, 'cd'),
+        B(880, 420, 390, 110, '<h4>Evolutie g0–412</h4><small>53,7 → 61,8</small>', 'cd')] },
+  ] },
+];
+
+// ---------- tekenen ----------
+const boxHtml = (b) => `<div class="bx ${b.cls}${b.go != null ? ' go' : ''}"${b.go != null ? ` data-go="${b.go}"` : ''} style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px">${b.html}</div>`;
+function paint(view, f, i) {
+  view.querySelector('.fscale').innerHTML = `<div class="wf">${f.steps[i].b.map(boxHtml).join('')}</div>`;
+}
+function fit(view) { const w = view.clientWidth; view.style.height = (w * 0.625) + 'px'; view.querySelector('.fscale').style.transform = `scale(${w / 1280})`; }
+const ro = new ResizeObserver(es => es.forEach(e => fit(e.target)));
+
+const PICKF = new Set();
+const cards = [];
+const tagsH = t => t.map(([s, c]) => `<span class="tag ${c}">${s}</span>`).join('');
+const g4 = document.getElementById('g4');
+FLOWS.forEach((f, n) => {
+  const el = document.createElement('div'); el.className = 'fcard';
+  el.innerHTML = `<div class="fview"><div class="fscale"></div></div><div class="side"><h3><span class="num">${n}</span>${f.name}</h3><p>${f.line}</p>
+    <div class="fsteps">${f.steps.map((s, i) => `<button data-i="${i}"><b>${i + 1}</b>${s.t}</button>`).join('')}</div>
+    <div class="fcap"></div><ul>${f.pts.map(p => `<li>${p}</li>`).join('')}</ul><div class="tags">${tagsH(f.tags)}</div>
+    <div class="foot"><button class="pick">Kies deze</button><button class="big">Groot bekijken</button></div></div>`;
+  g4.appendChild(el);
+  const view = el.querySelector('.fview'), c = { f, el, view, i: 0 };
+  c.set = (i) => { c.i = i; paint(view, f, i); el.querySelector('.fcap').textContent = f.steps[i].c; el.querySelectorAll('.fsteps button').forEach(b => b.classList.toggle('on', +b.dataset.i === i)); };
+  el.querySelector('.fsteps').onclick = e => { const b = e.target.closest('button'); if (b) c.set(+b.dataset.i); };
+  view.onclick = e => { const g = e.target.closest('[data-go]'); if (g) { e.stopPropagation(); c.set(+g.dataset.go); } else openF(c); };
+  el.querySelector('.big').onclick = () => openF(c);
+  el.querySelector('.pick').onclick = () => { PICKF.has(f.id) ? PICKF.delete(f.id) : PICKF.add(f.id); if (f.id === 'huidig' && PICKF.has('huidig')) [...PICKF].forEach(k => k !== 'huidig' && PICKF.delete(k)); else PICKF.delete('huidig'); markF(); };
+  fit(view); ro.observe(view); c.set(0); cards.push(c);
+});
+function markF() {
+  for (const c of cards) { const on = PICKF.has(c.f.id), b = c.el.querySelector('.pick'); c.el.classList.toggle('picked', on); b.classList.toggle('on', on); b.textContent = on ? 'Gekozen' : 'Kies deze'; }
+  if (typeof marks === 'function') marks();
+}
+window.flowTxt = () => { const ns = FLOWS.filter(f => PICKF.has(f.id)).map(f => f.name); const extra = (document.getElementById('flowNote') || {}).value || '';
+  return ` · Workflow Evolutie: <b>${ns.length ? ns.join(' + ') : '—'}</b>${extra.trim() ? ` (${extra.trim().replace(/</g, '&lt;')})` : ''}`; };
+document.getElementById('flowNote').oninput = () => typeof marks === 'function' && marks();
+
+// groot bekijken (ware grootte, geschaald naar scherm)
+const fb = document.getElementById('fbig'), fbv = fb.querySelector('.fview');
+let cur = null;
+function sizeBig() { const w = Math.min(1280, innerWidth - 24, (innerHeight - 120) * 1.6); fbv.style.width = w + 'px'; fit(fbv); }
+function showBig() { paint(fbv, cur.f, cur.i); fb.querySelector('.cap').innerHTML = `<b>${cur.f.name} · ${cur.i + 1}/${cur.f.steps.length} ${cur.f.steps[cur.i].t}</b> — ${cur.f.steps[cur.i].c}`; }
+function openF(c) { cur = c; fb.classList.add('on'); sizeBig(); showBig(); }
+const moveF = d => { cur.set(Math.max(0, Math.min(cur.f.steps.length - 1, cur.i + d))); showBig(); };
+fbv.onclick = e => { const g = e.target.closest('[data-go]'); if (g) { cur.set(+g.dataset.go); showBig(); } };
+document.getElementById('fPrev').onclick = () => moveF(-1);
+document.getElementById('fNext').onclick = () => moveF(1);
+document.getElementById('fClose').onclick = () => fb.classList.remove('on');
+addEventListener('resize', () => fb.classList.contains('on') && sizeBig());
+document.addEventListener('keydown', e => { if (!fb.classList.contains('on')) return; if (e.key === 'Escape') fb.classList.remove('on'); if (e.key === 'ArrowRight') moveF(1); if (e.key === 'ArrowLeft') moveF(-1); });
+markF();
+})();
 </script>
 </body>
 </html>

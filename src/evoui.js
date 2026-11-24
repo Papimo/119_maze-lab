@@ -1,7 +1,7 @@
-// Tab Evolutie (startscherm): zwerm waarin elke loper eigen DNA heeft, gekleurd per soort (familie).
-// Na elke generatie: selectie → kinderen → nieuwe generatie. Kampioen wordt getoetst op een vaste testbaan.
-// Lade rechts: Bibliotheek (versies, mappen, labels, notities, geschiedenis), Werkbank (genen tweaken + proefrit)
-// en Duel (2–4 algoritmes in hetzelfde doolhof + testbaan per doolhof-soort).
+// Tab Evolutie: vier vaste pagina's — Algoritmes (startscherm) · Evolueren · Taak · Analyse.
+// Twee "tonelen": V = de evolutie (loopt op de achtergrond door, ook op andere pagina's), T = de taak (eigen groot doolhof).
+// Kaart open → "Wat wil je doen?" → taak als volledig scherm: links In, midden doolhof, rechts Uit; stappen Kiezen → Bezig → Uitkomst.
+// Taken: Werkbank, Mutantenlab (stopregel), Duel, Uitleg, Zoeker. Analyse: stamboom, eregalerij, rapport.
 (function (ML) {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -12,15 +12,18 @@
   const SP_COLS = ['#4cc9f0', '#ffd166', '#ff6b6b', '#80ed99', '#b388ff', '#f4a261', '#2ec4b6', '#ff8fab', '#e9ff70', '#a0c4ff'];
   const DUEL_COLS = ['#ffd166', '#4cc9f0', '#ff6b6b', '#80ed99'];
   const SP_THR = 1.15, SP_MAX = 10; // begin-drempel soort (DNA-afstand; past zich aan → 3–7 soorten) en maximaal aantal soorten
+  const TASKS = { bench: { name: 'Werkbank', icon: '🔧' }, mut: { name: 'Mutantenlab', icon: '🧬' }, duel: { name: 'Duel', icon: 'vs' }, why: { name: 'Uitleg', icon: '❔' }, hunt: { name: 'Zoeker', icon: '🎯' } };
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   let A = null; // { Runner, S, save, pal }
 
-  // E = toestand van de evolutie
+  // E = evolutie + pagina-toestand
   const E = { pop: [], gen: 0, hist: [], base: '', champ: null, species: [], spSeq: 0, spMap: new Map(), spThr: SP_THR,
-    mazes: [], panes: [], runs: null, running: true, show: null, salt: 0,
-    phase: 'idle', firstT: null, endT: 0, lastT: 0, turbo: 0, turboN: 0, turboDone: 0, turboT0: 0, uiT: 0, rankT: 0, saveT: 0,
-    msg: '', msgT: 0, seen: new Set(), drawer: null, libOpen: null, libQ: '', libFolder: '', libSort: 'score', duelSel: new Map(), duel: null, bench: null,
-    mut: null, hunt: null, forced: null, heatSel: null, xp: null };
+    turbo: 0, turboN: 0, turboDone: 0, turboT0: 0, uiT: 0, rankT: 0, saveT: 0, lastT: 0, pend: null,
+    msg: '', msgT: 0, seen: new Set(), page: 'algos', sel: null, libQ: '', libFolder: '', libSort: 'score',
+    task: null, bench: null, mut: null, duel: null, hunt: null, xp: null, treeSel: null };
+  // toneel: panelen + lopers in doolhoven
+  const mkView = name => ({ name, panes: [], runs: null, mazes: [], show: null, phase: 'idle', running: true, firstT: null, endT: 0, t0: 0, forced: null, salt: 0, heatSel: null, champId: null, aspect: 0 });
+  const V = mkView('evo'), T = mkView('task');
 
   const opts = () => ({ grid: A.S.evoGrid, size: A.S.evoSize, braid: A.S.evoBraid, puzzle: A.S.evoPuzzle, makers: A.S.evoMakers });
   const rng = () => ML.makeRng(E.base + '|ga|' + E.gen);
@@ -32,7 +35,7 @@
   const isl = () => Number(A.S.evoIslands) || 1;        // aantal eilanden
   const huntSet = () => Array.isArray(A.S.evoHunt) ? A.S.evoHunt : [];
   const HUNT_ASP = 0.66;                                 // doolhof-zoeker: vaste verhouding → zelfde doolhof overal
-  const mazeSeed = (i, gen) => (mm() === 'new' ? `${E.base}|g${gen}|${i}` : `${E.base}|vast|${i}`) + (E.show && E.salt ? `|x${E.salt}` : '');
+  const mazeSeed = (i, gen) => mm() === 'new' ? `${E.base}|g${gen}|${i}` : `${E.base}|vast|${i}`;
 
   // ---- opslag van de lopende evolutie ----
   function persist() {
@@ -96,7 +99,7 @@
   function makePanes() {
     const grid = $('#evo-grid'), n = nPanes();
     grid.innerHTML = ''; grid.dataset.n = n;
-    E.panes = [];
+    V.panes = [];
     for (let i = 0; i < n; i++) {
       const el = document.createElement('div');
       el.className = 'pane';
@@ -104,99 +107,129 @@
       grid.appendChild(el);
       const r = new A.Runner(el.querySelector('canvas'));
       r.el = el; r.setPalette(A.pal());
-      E.panes.push(r);
+      V.panes.push(r);
     }
+  }
+  function ensureTaskPane() {
+    if (T.panes.length) return;
+    const el = $('#task-pane'), r = new A.Runner(el.querySelector('canvas'));
+    r.el = el; r.setPalette(A.pal()); T.panes = [r];
+  }
+  // verhouding van het paneel; verborgen pagina → laatst bekende
+  function viewAspect(v) {
+    const r = v.panes[0], cv = r && r.cv;
+    if (cv && cv.clientWidth && cv.clientHeight) v.aspect = r.aspect();
+    return v.aspect || 0.66;
   }
   function mazesFor(gen) { // turbo: zonder panelen
     if (mm() === 'hunt') return huntMazes();
-    const asp = E.aspect || 0.66, out = [];
+    const asp = V.aspect || 0.66, out = [];
     for (let i = 0; i < nEval(); i++) { const sd = mazeSeed(i, gen); E.seen.add(sd + '|' + i); out.push(EV().buildMaze(opts(), sd, i, asp)); }
     return out;
   }
   // zelfde doolhoven als mazesFor, maar als beschrijving: de workers bouwen ze zelf
   function specsFor(gen, look) { // look = alleen vooruitkijken (niet als gezien tellen)
-    const asp = E.aspect || 0.66, o = opts(), out = [];
+    const asp = V.aspect || 0.66, o = opts(), out = [];
     for (let i = 0; i < nEval(); i++) { const sd = mazeSeed(i, gen); if (!look) E.seen.add(sd + '|' + i); out.push({ o, sd, i, asp }); }
     return out;
   }
   function huntMazes() { const l = huntSet().map(sp => EV().specMaze(sp, HUNT_ASP)); l.forEach(mz => E.seen.add(mz.key)); return l; }
 
-  // ---- generatie (of kijk/duel) zichtbaar laten lopen ----
-  function startGen() {
-    if (!E.panes.length) return;
-    const asp = E.panes[0].aspect(), show = E.show, cnt = show ? E.panes.length : nEval();
-    E.aspect = asp; E.mazes = [];
-    if (show && E.forced) E.mazes = [E.forced];
-    else if (mm() === 'hunt' && huntSet().length) E.mazes = huntMazes().slice(0, cnt);
-    else for (let i = 0; i < cnt; i++) { const sd = mazeSeed(i, E.gen); if (!show) E.seen.add(sd + '|' + i); E.mazes.push(EV().buildMaze(opts(), sd, i, asp)); }
-    const list = show ? show.list : E.pop;
-    E.runs = E.mazes.slice(0, E.panes.length).map((mz, i) => {
-      const r = E.panes[i], P = mz.ctx.P;
+  // lopers in de doolhoven van een toneel zetten
+  function loadRuns(v, list, seedOf, colOf, hkOf) {
+    v.runs = v.mazes.slice(0, v.panes.length).map((mz, i) => {
+      const r = v.panes[i], P = mz.ctx.P;
       r.s = mz.s; r.genId = mz.gen; r.m = mz.m; r.P = P; r.phase = 'evo'; r.racers = null; r.sw = null; r.fx.length = 0;
-      const run = { mz, heat: new Float32Array(mz.m.cells.length), heatBy: new Map(), flash: [], order: [],
+      const run = { v, mz, heat: new Float32Array(mz.m.cells.length), heatBy: new Map(), flash: [], order: [], cut: 0,
         ws: list.map((ge, k) => {
-          const seed = show ? `${ge.id}|show|${E.salt}|${i}` : `${ge.id}|${E.gen}|${i}`;
-          const w = new (EV().Walker)(mz.ctx, ge.genes, seed);
-          w.seed = seed; w.ge = ge; w.col = show ? ge.col : colorFor(ge); w.hk = show ? 'w' + k : ge.sp; return w;
+          const seed = seedOf(ge, i, k), w = new (EV().Walker)(mz.ctx, ge.genes, seed);
+          w.seed = seed; w.ge = ge; w.col = colOf(ge, k); w.hk = hkOf(ge, k); return w;
         }) };
       run.heat[mz.ctx.cellOf[P.start]] = list.length;
-      if (E.xp && i === 0) E.xp.last = null;
       r.vs = { cur: -1, readyT: performance.now() / 1000, floorFx: (g, rr, now) => drawRun(run, g, rr, now) };
       r.dirty = true;
-      const gd = ML.GENERATORS.find(x => x.id === mz.gen);
-      r.el.querySelector('.ev-lab').textContent = `${GRID_NAMES[mz.s.grid] || mz.s.grid} · ${gd ? gd.name : mz.gen} · kortste ${mz.ctx.opt}`;
+      const gd = ML.GENERATORS.find(x => x.id === mz.gen), lab = r.el.querySelector('.ev-lab');
+      if (lab) lab.textContent = `${GRID_NAMES[mz.s.grid] || mz.s.grid} · ${gd ? gd.name : mz.gen} · kortste ${mz.ctx.opt}`;
       return run;
     });
-    E.phase = 'run'; E.firstT = null;
-    E.champId = !show && E.pop.length ? E.pop.slice().sort((a, b) => (b.fit || 0) - (a.fit || 0))[0].id : null;
-    if (E.heatSel != null && !legendKeys().includes(E.heatSel)) E.heatSel = null;
-    paneStats(); status(); legend();
   }
-  const rate = v => 2 * Math.pow(10, v / 33); // stappen per seconde per loper
+
+  // ---- evolutie: generatie zichtbaar laten lopen ----
+  function startGen() {
+    if (!V.panes.length) return;
+    const asp = viewAspect(V), cnt = nEval();
+    V.mazes = [];
+    if (mm() === 'hunt' && huntSet().length) V.mazes = huntMazes().slice(0, cnt);
+    else for (let i = 0; i < cnt; i++) { const sd = mazeSeed(i, E.gen); E.seen.add(sd + '|' + i); V.mazes.push(EV().buildMaze(opts(), sd, i, asp)); }
+    loadRuns(V, E.pop, (ge, i) => `${ge.id}|${E.gen}|${i}`, ge => colorFor(ge), ge => ge.sp);
+    V.phase = 'run'; V.firstT = null;
+    V.champId = E.pop.length ? E.pop.slice().sort((a, b) => (b.fit || 0) - (a.fit || 0))[0].id : null;
+    if (V.heatSel != null && !E.species.some(s => s.id === V.heatSel)) V.heatSel = null;
+    paneStats(V); status(); legend();
+  }
+  // ---- taak: één groot doolhof met 1–41 lopers ----
+  // kind: solo (werkbank/uitleg/zoeker), duel, mut, preview (voorproefje vóór de start)
+  function startShow(kind, list, keep) {
+    ensureTaskPane();
+    if (!keep || !T.mazes.length) T.mazes = [T.forced || EV().buildMaze(opts(), `${E.base}|taak|${T.salt}`, T.salt, viewAspect(T))];
+    T.show = { kind, list };
+    loadRuns(T, list, (ge, i) => `${ge.id}|show|${T.salt}|${i}`, ge => ge.col, (ge, k) => 'w' + k);
+    T.phase = 'run'; T.firstT = null; T.running = true; T.t0 = performance.now() / 1000; T.champId = null; T.heatSel = null;
+    if (E.xp) E.xp.last = null;
+    paneStats(T); taskLegend();
+  }
+  const rate = v => 2 * Math.pow(10, v / 33); // stappen per seconde per loper (max 133 → ~21 000/s)
   function frame(t) {
     const dt = E.lastT ? Math.min(0.05, t - E.lastT) : 0;
     E.lastT = t;
-    if (E.phase === 'run' && E.running && E.runs) {
-      let u = rate(A.S.evoSpeed) * dt;
-      if (E.firstT != null) u *= 1 + Math.max(0, t - E.firstT) * 0.9; // na de eerste aankomst versnellen
+    stepView(V, t, dt, rate(A.S.evoSpeed));
+    stepView(T, t, dt, rate(A.S.evoTaskSpeed == null ? 75 : A.S.evoTaskSpeed));
+    const vis = E.page === 'evolve' ? V : E.page === 'task' && E.task ? T : null;
+    if (vis) vis.panes.forEach(r => { if (vis.phase === 'run') r.dirty = true; r.draw(t); });
+    if (E.msg && t - E.msgT > 6) { E.msg = ''; toast(); }
+  }
+  function stepView(v, t, dt, spd) {
+    if (v.phase === 'run' && v.running && v.runs) {
+      let u = spd * dt;
+      if (v.firstT != null) u *= 1 + Math.max(0, t - v.firstT) * 0.9; // na de eerste aankomst versnellen
       let alive = 0;
-      for (const run of E.runs) {
+      for (const run of v.runs) {
         for (const w of run.ws) {
           if (w.done) continue;
           w.p += u;
           let k = 0;
-          while (w.p >= 1 && !w.done && k++ < 600) {
+          while (w.p >= 1 && !w.done && k++ < 2000) {
             w.p -= 1; w.step(); run.heat[w.nc]++; heatAdd(run, w);
-            if (w.done && w.reached) { run.order.push(w); run.flash.push({ t, col: w.col }); if (E.firstT == null) E.firstT = t; }
+            if (w.done && w.reached) { run.order.push(w); run.flash.push({ t, col: w.col }); if (v.firstT == null) v.firstT = t; }
           }
           if (w.done) w.p = 1; else alive++;
         }
       }
-      if (!alive) endGen(t); else if (Math.floor(t * 4) !== Math.floor((t - dt) * 4)) { paneStats(); if (E.drawer === 'why') whyTable(); }
-    } else if (E.phase === 'pause' && E.running && t > E.endT) {
-      if (E.show) { E.phase = 'idle'; E.running = false; toolbar(); } else startGen();
+      if (v === T && v.show && v.show.kind === 'mut') alive = mutCheck(t, alive);
+      if (!alive) endView(v, t);
+      else if (Math.floor(t * 4) !== Math.floor((t - dt) * 4)) { paneStats(v); if (v === T) taskTick(); }
+    } else if (v.phase === 'pause' && v.running && t > v.endT) {
+      if (v === V) startGen(); else { v.phase = 'idle'; v.running = false; }
     }
-    E.panes.forEach(r => { if (E.phase === 'run') r.dirty = true; r.draw(t); });
-    if (E.msg && t - E.msgT > 6) { E.msg = ''; champCard(); }
   }
   function finishNow() { // "volgende generatie": rest direct uitrekenen
-    if (E.phase !== 'run' || !E.runs) return;
+    if (V.phase !== 'run' || !V.runs) return;
     const t = performance.now() / 1000;
-    for (const run of E.runs) for (const w of run.ws) { while (!w.done) { w.step(); run.heat[w.nc]++; heatAdd(run, w); } w.p = 1; if (w.reached && !run.order.includes(w)) run.order.push(w); }
-    endGen(t);
+    for (const run of V.runs) for (const w of run.ws) { while (!w.done) { w.step(); run.heat[w.nc]++; heatAdd(run, w); } w.p = 1; if (w.reached && !run.order.includes(w)) run.order.push(w); }
+    endView(V, t);
   }
-  function endGen(t) {
-    E.phase = 'pause'; E.endT = t + (E.show ? 0.1 : 1.1);
-    paneStats(true);
-    if (E.show) { if (E.show.kind === 'duel') duelDone(); else if (E.show.kind === 'mut') mutDone(); if (E.drawer === 'why') whyRender(); status(); return; }
+  function endView(v, t) {
+    v.phase = 'pause'; v.endT = t + (v === T ? 0.1 : 1.1);
+    paneStats(v, true);
+    if (v === T) { taskEnded(); return; }
     // fitness = gemiddelde score over alle doolhoven × runs (zichtbare + verborgen; zelfde zaadjes als turbo/evalList)
-    const vis = E.runs.length, hidden = E.mazes.slice(vis), R = runs();
+    const vis = V.runs.length, hidden = V.mazes.slice(vis), R = runs();
     E.pop.forEach((ge, j) => {
       let s = 0, ok = 0, st = 0;
       const add = w => { s += w.score(); if (w.reached) ok++; st += w.steps; };
-      E.runs.forEach((run, i) => { add(run.ws[j]); for (let r = 1; r < R; r++) add(EV().evalOne(run.mz.ctx, ge.genes, `${ge.id}|${E.gen}|${i}|r${r}`)); });
+      V.runs.forEach((run, i) => { add(run.ws[j]); for (let r = 1; r < R; r++) add(EV().evalOne(run.mz.ctx, ge.genes, `${ge.id}|${E.gen}|${i}|r${r}`)); });
       hidden.forEach((mz, k) => { for (let r = 0; r < R; r++) add(EV().evalOne(mz.ctx, ge.genes, `${ge.id}|${E.gen}|${vis + k}` + (r ? '|r' + r : ''))); });
-      ge.fit = s / (E.mazes.length * R); ge.ok = ok; ge.steps = st;
+      ge.fit = s / (V.mazes.length * R); ge.ok = ok; ge.steps = st;
     });
     advance();
   }
@@ -228,19 +261,23 @@
       if (!best.from) {
         const pos = Ev.addFame({ ...E.champ, run: E.base });
         if (pos && pos <= 3 && !beat) note(`🏅 ${best.name} staat op plek ${pos} in de eregalerij (${tb.score}).`);
-        if (pos && E.drawer === 'fame' && !quiet) famRender();
+        if (pos && E.page === 'ana' && !quiet) famRender();
       }
     }
   }
-  function refreshUI(rank) { drawChart(); champCard(); legend(); status(); if (rank) { rankList(); if (E.drawer === 'lib') libList(); else if (E.drawer === 'fame') famRender(); } }
-  function note(s) { E.msg = s; E.msgT = performance.now() / 1000; }
+  function refreshUI(rank) {
+    drawChart(); champCard(); legend(); status(); tabsInfo(); liveCard();
+    if (rank) { rankList(); if (E.page === 'ana') famRender(); }
+  }
+  function note(s) { E.msg = s; E.msgT = performance.now() / 1000; toast(); }
+  function toast() { const el = $('#evo-toast'); if (!el) return; if (E.msg) el.textContent = E.msg; el.classList.toggle('show', !!E.msg); }
 
   // ---- turbo: generaties zonder animatie (×25 / ×100 / ×1000 / tot ik stop) ----
   async function turbo(n) {
     if (E.turbo) { E.turbo = 0; return; }
-    E.show = null; E.phase = 'idle'; E.turbo = n || Infinity; E.turboN = n || 0; E.turboDone = 0; E.turboT0 = performance.now();
-    if (E.panes[0]) E.aspect = E.panes[0].aspect();
-    toolbar();
+    V.phase = 'idle'; E.turbo = n || Infinity; E.turboN = n || 0; E.turboDone = 0; E.turboT0 = performance.now();
+    viewAspect(V);
+    evoBar();
     const pool = A.S.evoFast === 'max' && EV().Pool.ensure();
     while (E.turbo && A.S.mode === 'evo') {
       const t0 = performance.now();
@@ -264,25 +301,26 @@
       if (now - E.uiT > 250) { E.uiT = now; refreshUI(now - E.rankT > 1200); if (now - E.rankT > 1200) E.rankT = now; }
       if (now - E.saveT > 2000) persist();
     }
-    flushPend(); E.turbo = 0; persist(); refreshUI(true); toolbar(); startGen();
+    flushPend(); E.turbo = 0; persist(); refreshUI(true); evoBar(); startGen();
   }
 
   // ---- tekenen in een paneel ----
-  // hittekaart per soort (zwerm) of per deelnemer (kijken/duel/mutanten): sleutel w.hk
+  // hittekaart per soort (evolutie) of per deelnemer (taak): sleutel w.hk
   function heatAdd(run, w) {
     let h = run.heatBy.get(w.hk);
     if (!h) { h = new Float32Array(run.heat.length); h[run.mz.ctx.cellOf[run.mz.ctx.start]] = 1; run.heatBy.set(w.hk, h); }
     h[w.nc]++;
   }
   function drawRun(run, g, r, now) {
-    const m = run.mz.m, C = m.cells, s = r.s, show = E.show, rad = Math.max(1.6, s * (show ? 0.17 : 0.1)), hs = E.heatSel;
+    const v = run.v, m = run.mz.m, C = m.cells, s = r.s, show = v.show, many = show && run.ws.length > 4;
+    const rad = Math.max(1.6, s * (show && !many ? 0.17 : show ? 0.13 : 0.1)), hs = v.heatSel;
     ML.drawHeat(g, r, m, hs != null ? run.heatBy.get(hs) || new Float32Array(run.heat.length) : run.heat, show ? 0.4 : 0.5);
     const by = new Map();
     let lead = null, ld = 1e9, champ = null;
     for (const w of run.ws) {
       if (w.done && !w.reached) continue;
       if (hs != null && w.hk !== hs) continue; // alleen de gekozen soort
-      if (w.ge.id === E.champId) champ = w;
+      if (w.ge.id === v.champId) champ = w;
       if (w.reached) continue;
       const d = run.mz.ctx.dist[w.nc]; if (d < ld) { ld = d; lead = w; }
       const p = posOf(w, C), X = r.X(p[0]), Y = r.Y(p[1]);
@@ -290,11 +328,12 @@
       path.moveTo(X + rad, Y); path.arc(X, Y, rad, 0, TAU);
     }
     g.save();
-    // kijken/duel: het pad dat elke loper nu "denkt" (stapel), elk in eigen kleur, iets verschoven
-    if (show && run.ws.length <= 4) {
+    // taak: het pad dat elke loper nu "denkt" (stapel), elk in eigen kleur, iets verschoven
+    if (show && !many) {
       const cellOf = run.mz.ctx.cellOf, k0 = (run.ws.length - 1) / 2;
       g.lineCap = g.lineJoin = 'round'; g.lineWidth = Math.max(2, s * (run.ws.length > 1 ? 0.1 : 0.14));
       run.ws.forEach((w, k) => {
+        if (hs != null && w.hk !== hs) return;
         const o = (k - k0) * s * 0.12, pl = new Path2D();
         let first = true, pc = -1;
         for (const st of w.st) { const c = cellOf[st]; if (c === pc) continue; const ce = C[c].center; const X = r.X(ce[0]) + o, Y = r.Y(ce[1]) + o; if (first) pl.moveTo(X, Y); else pl.lineTo(X, Y); first = false; pc = c; }
@@ -307,16 +346,16 @@
       const p = w.reached ? C[m.goal].center : posOf(w, C), X = r.X(p[0]), Y = r.Y(p[1]);
       g.beginPath(); g.arc(X, Y, rad * k * (1 + Math.sin(now * 6) * 0.12), 0, TAU); g.strokeStyle = colr; g.lineWidth = Math.max(1.5, s * 0.04); g.stroke();
     };
-    if (lead && !show) ring(lead, 'rgba(255,243,176,0.9)', 2.2);
+    if (lead && (!show || many)) ring(lead, 'rgba(255,243,176,0.9)', 2.2);
     if (champ && !show && !champ.reached) ring(champ, '#ffffff', 1.7);
     // aankomst-flitsen bij het doel
     const gc = C[m.goal].center, gx = r.X(gc[0]), gy = r.Y(gc[1]);
     run.flash = run.flash.filter(f => now - f.t < 0.9);
     for (const f of run.flash) { const e = (now - f.t) / 0.9; g.globalAlpha = 0.8 * (1 - e); g.strokeStyle = f.col; g.lineWidth = Math.max(1.5, s * 0.07); g.beginPath(); g.arc(gx, gy, s * (0.3 + e * 1.6), 0, TAU); g.stroke(); }
     g.globalAlpha = 1;
-    if (E.drawer === 'why' && show && show.kind === 'solo' && run === E.runs[0]) drawWhy(run, g, r);
+    if (v === T && E.task && E.task.kind === 'why' && show && show.kind === 'solo' && run === v.runs[0]) drawWhy(run, g, r);
     g.restore();
-    return E.phase === 'run' || run.flash.length > 0;
+    return v.phase === 'run' || run.flash.length > 0;
   }
   function posOf(w, C) {
     const a = C[w.c].center, b = C[w.nc].center;
@@ -324,16 +363,16 @@
     if (w.jump) e = e < 0.5 ? 0 : 1;
     return [a[0] + (b[0] - a[0]) * e, a[1] + (b[1] - a[1]) * e];
   }
-  function paneStats(final) {
-    if (!E.runs) return;
-    E.runs.forEach((run, i) => {
-      const el = E.panes[i] && E.panes[i].el; if (!el) return;
-      const n = run.ws.length, ok = run.order.length, f = run.order[0], show = E.show;
+  function paneStats(v, final) {
+    if (!v.runs) return;
+    v.runs.forEach((run, i) => {
+      const el = v.panes[i] && v.panes[i].el; if (!el) return;
+      const n = run.ws.length, ok = run.order.length, f = run.order[0], show = v.show;
       let txt;
-      if (show && show.kind === 'mut') txt = `${ok}/${n} gehaald` + (f ? ` · eerste: ${f.ge.name} (${f.steps} st.)` : '');
+      if (show && show.kind === 'mut') txt = `${ok}/${n} binnen` + (run.cut ? ` · ${run.cut} niet afgewacht` : '') + (f ? ` · eerste: ${f.ge.name} (${f.steps} st.)` : '');
       else if (show && show.kind === 'duel') txt = run.ws.map(w => `${w.ge.name}: ${w.reached ? w.steps + ' ✓' : w.done ? '✗' : w.steps + '…'}`).join(' · ');
-      else if (show) { const w = run.ws[0]; txt = w.reached ? `Gehaald in ${w.steps} stappen (kortste ${run.mz.ctx.opt}) · score ${Math.round(w.score() * 100)}` : final ? 'Niet gehaald binnen de limiet' : `${w.steps} stappen…`; }
-      else txt = `${ok}/${n} gehaald` + (f ? ` · eerste: ${f.ge.name} (${f.steps} st.)` : '') + (i === 0 && E.mazes.length > E.runs.length ? ` · +${E.mazes.length - E.runs.length} doolhoven op de achtergrond` : '');
+      else if (show) { const w = run.ws[0]; txt = (show.kind === 'preview' ? 'Voorproefje · ' : '') + (w.reached ? `Gehaald in ${w.steps} stappen (kortste ${run.mz.ctx.opt}) · score ${Math.round(w.score() * 100)}` : final ? 'Niet gehaald binnen de limiet' : `${w.steps} stappen…`); }
+      else txt = `${ok}/${n} gehaald` + (f ? ` · eerste: ${f.ge.name} (${f.steps} st.)` : '') + (i === 0 && V.mazes.length > V.runs.length ? ` · +${V.mazes.length - V.runs.length} doolhoven op de achtergrond` : '');
       el.querySelector('.pane-stats').textContent = txt;
       el.classList.toggle('winner', !!final && ok > 0 && !show && ok === n);
     });
@@ -345,10 +384,10 @@
     const d = window.devicePixelRatio || 1, W = cv.width = Math.round(cv.clientWidth * d), H = cv.height = Math.round(cv.clientHeight * d);
     const g = cv.getContext('2d'), css = getComputedStyle(document.body), muted = css.getPropertyValue('--muted').trim() || '#8b98a8', line = css.getPropertyValue('--line').trim() || '#263040';
     g.clearRect(0, 0, W, H);
-    const L = 34 * d, R = 10 * d, T = 22 * d, B = 20 * d, hs = E.hist, bc = EV().bestClassic();
+    const L = 34 * d, R = 10 * d, T_ = 22 * d, B = 20 * d, hs = E.hist, bc = EV().bestClassic();
     let top = bc.t.score; for (const h of hs) { if (h.best > top) top = h.best; if (h.test > top) top = h.test; }
     const ymax = Math.min(100, Math.max(40, Math.ceil(top / 10) * 10 + 5));
-    const n = Math.max(2, hs.length), X = i => L + (W - L - R) * i / (n - 1), Y = v => T + (H - T - B) * (1 - v / ymax);
+    const n = Math.max(2, hs.length), X = i => L + (W - L - R) * i / (n - 1), Y = v => T_ + (H - T_ - B) * (1 - v / ymax);
     g.font = `${11 * d}px system-ui, sans-serif`; g.fillStyle = muted; g.strokeStyle = line; g.lineWidth = d;
     for (let v = 0; v <= ymax; v += ymax > 60 ? 20 : 10) { g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(W - R, Y(v)); g.stroke(); g.fillText(v, 6 * d, Y(v) + 4 * d); }
     // klassieker-lat
@@ -378,26 +417,20 @@
   }
 
   // ---- DNA-balkjes ----
+  const geneZ = (G, v) => G.k === 'chaos' ? (v - G.lo) / (G.hi - G.lo) : v / G.hi;
   function dnaHtml(genes) {
     return '<div class="dna">' + EV().GENES.map((G, i) => {
-      const v = genes[i], z = G.k === 'chaos' ? (v - G.lo) / (G.hi - G.lo) : v / G.hi, w = Math.abs(z) * 50;
+      const v = genes[i], z = geneZ(G, v), w = Math.abs(z) * 50;
       const st = G.k === 'chaos' ? `left:0;width:${z * 100}%` : z >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`;
       return `<div class="gene" title="${esc(G.name)}: ${v.toFixed(2)}"><span>${esc(G.name)}</span><b><i style="${st};background:${G.col}"></i></b></div>`;
     }).join('') + '</div>';
   }
-  const isSaved = genes => EV().loadAlgos().some(a => a.genes.join() === genes.join());
-  function champCard() {
-    const el = $('#evo-champ'); if (!el) return;
-    const c = E.champ, bc = EV().bestClassic();
-    if (!c) { el.innerHTML = `${E.msg ? `<div class="evo-msg">${esc(E.msg)}</div>` : ''}<h4>Kampioen</h4><p class="hint">Nog geen generatie klaar. Kijk mee, of druk op een Turbo-knop.</p>`; return; }
-    const saved = isSaved(c.genes), diff = Math.round((c.test - bc.t.score) * 10) / 10;
-    el.innerHTML = `${E.msg ? `<div class="evo-msg">${esc(E.msg)}</div>` : ''}
-      <h4><i class="sw" style="background:${EV().colorOf(c.genes)}"></i>${esc(c.name)} <small>${c.from ? 'klassieker ' + esc(c.from) : 'geboren in generatie ' + c.born}${c.parents && c.parents.length ? ' · ouders ' + c.parents.map(esc).join(' × ') : ''}</small></h4>
-      <div class="evo-score"><b>${c.test}</b><span>testbaan<br>${diff >= 0 ? `<em class="up">+${diff}</em>` : `<em class="down">${diff}</em>`} t.o.v. ${esc(bc.p.name)}</span>${c.heavy != null ? `<b class="hv">${c.heavy}</b><span>zware<br>testbaan</span>` : ''}</div>
-      <p class="desc">${esc(EV().describe(c.genes))}</p>
-      ${dnaHtml(c.genes)}
-      <div class="btns"><button class="btn${saved ? '' : ' primary'}" data-ev="save-champ"${saved ? ' disabled' : ''}>${saved ? 'Bewaard ✓' : 'Bewaar'}</button><button class="btn" data-ev="bench" data-id="${esc(c.id)}">Werkbank</button><button class="btn" data-ev="watch" data-id="${esc(c.id)}">Kijk alleen</button><button class="btn" data-ev="mut-src" data-id="${esc(c.id)}" title="Mutantenlab">🧬</button><button class="btn" data-ev="hunt-src" data-id="${esc(c.id)}" title="Doolhof-zoeker">🎯</button></div>`;
+  // mini-versie voor kaarten: 9 staafjes (doorschijnend = negatief)
+  function dnaStrip(genes) {
+    return '<div class="dstrip">' + EV().GENES.map((G, i) => { const z = geneZ(G, genes[i]);
+      return `<i style="height:${Math.max(8, Math.abs(z) * 100)}%;background:${G.col};opacity:${z < 0 ? 0.4 : 1}" title="${esc(G.name)} ${genes[i].toFixed(1)}"></i>`; }).join('') + '</div>';
   }
+  const isSaved = genes => EV().loadAlgos().some(a => a.genes.join() === genes.join());
 
   // ---- alle algoritmes (klassiekers + bibliotheek + kampioen) ----
   function entries() {
@@ -408,75 +441,69 @@
     list.forEach(a => { a.t = Ev.testScore(a.genes); a.h = hv ? Ev.heavyScore(a.genes) : null; });
     return list.sort((a, b) => b.t.score - a.t.score || (b.t.solved - a.t.solved));
   }
-  const entryById = id => entries().find(a => a.id === id) || (E.champ && E.champ.id === id ? E.champ : null) || (E.bench && E.bench.src.id === id ? E.bench.src : null)
-    || EV().loadFame().find(a => a.id === id) || null;
+  const entryById = id => entries().find(a => a.id === id) || (E.champ && E.champ.id === id ? E.champ : null)
+    || (E.task && E.task.algo.id === id ? E.task.algo : null) || EV().loadFame().find(a => a.id === id) || null;
   function subOf(a) {
     if (a.classic) return a.desc;
     if (a.live) return 'kampioen, nog niet bewaard';
-    return [a.ver > 1 ? 'v' + a.ver : '', a.folder, `gen ${a.born}`, a.created].filter(Boolean).join(' · ');
+    return [a.ver > 1 ? 'v' + a.ver : '', a.folder, a.born != null ? `gen ${a.born}` : '', a.created].filter(Boolean).join(' · ');
   }
-  // ---- ranglijst (links, compact) ----
-  function rankList() {
-    const el = $('#evo-rank'); if (!el) return;
-    const list = entries(), bc = EV().bestClassic(), top = list.length ? list[0].t.score : 1;
-    el.innerHTML = list.slice(0, 12).map((a, i) => {
-      const beat = !a.classic && a.t.score > bc.t.score, inDuel = E.duelSel.has(a.id);
-      const acts = `<button title="Kijk alleen" data-ev="watch" data-id="${esc(a.id)}">▶</button><button title="Zaai in de populatie" data-ev="seed" data-id="${esc(a.id)}">＋</button>`
-        + `<button title="Werkbank: genen tweaken" data-ev="bench" data-id="${esc(a.id)}">🔧</button><button title="Mutantenlab" data-ev="mut-src" data-id="${esc(a.id)}">🧬</button><button title="Doolhof-zoeker: moeilijkste doolhoven" data-ev="hunt-src" data-id="${esc(a.id)}">🎯</button><button title="Kies voor duel" data-ev="duel-tog" data-id="${esc(a.id)}"${inDuel ? ' class="on"' : ''}>vs</button>`
-        + (a.live ? `<button title="Bewaar" data-ev="save-champ">💾</button>` : '');
-      return `<div class="erow${a.classic ? ' classic' : ''}${a.live ? ' live' : ''}" title="${esc(EV().describe(a.genes))}">
-        <b class="pos">${i + 1}</b><i class="sw" style="background:${EV().colorOf(a.genes)}"></i>
-        <span class="nm">${beat ? '🏆 ' : ''}${esc(a.name)}<small>${esc(subOf(a))}</small></span>
-        <span class="sc">${a.t.score}<small title="zware testbaan">${a.h ? 'zwaar ' + a.h.score : a.t.solved + '/' + a.t.of}</small></span>
-        <span class="bar"><i style="width:${Math.max(2, a.t.score / Math.max(1, top) * 100)}%"></i></span>
-        <span class="acts">${acts}</span></div>`;
-    }).join('') + (list.length > 12 ? `<p class="hint">+${list.length - 12} meer in de bibliotheek</p>` : '');
+  const pick = a => ({ id: a.id, name: a.name, genes: a.genes.slice(), ver: a.ver || 1, mine: !!a.mine || isSaved(a.genes), classic: !!a.classic, folder: a.folder || '', tags: a.tags || [] });
+
+  // ======================= pagina's =======================
+  function setPage(p) {
+    E.page = p;
+    document.querySelectorAll('#evo-tabs [data-page]').forEach(b => b.classList.toggle('on', b.dataset.page === p));
+    document.querySelectorAll('#view-evo .evo-page').forEach(el => { el.hidden = el.dataset.page !== p; });
+    if (p === 'algos') algosRender();
+    else if (p === 'evolve') { evoBar(); champCard(); rankList(); legend(); requestAnimationFrame(() => { drawChart(); V.panes.forEach(r => { r.dirty = true; }); }); }
+    else if (p === 'task') { ensureTaskPane(); taskRender(); T.panes.forEach(r => { r.dirty = true; }); }
+    else if (p === 'ana') anaRender();
+    tabsInfo();
+  }
+  function tabsInfo() {
+    const g = $('#evo-gen'); if (g) g.textContent = `gen ${E.gen}`;
+    const d = $('#evo-dot'); if (d) { d.className = 'dot ' + (E.turbo ? 'turbo' : V.running ? 'on' : 'off'); d.title = E.turbo ? 'turbo' : V.running ? 'loopt' : 'gepauzeerd'; }
+    const tn = $('#evo-tname'); if (tn) tn.textContent = E.task ? `${TASKS[E.task.kind].name} · ${E.task.algo.name}` : '';
+  }
+  const dotCls = () => 'dot ' + (E.turbo ? 'turbo' : V.running ? 'on' : 'off');
+
+  // "Wat wil je doen?" met het algoritme al gekozen
+  function todoHtml(a) {
+    const id = esc(a.id), b = (ev, t, s) => `<button class="todo-b" data-ev="${ev}" data-id="${id}"><b>${t}</b><small>${s}</small></button>`;
+    return `<div class="todo"><h4>Wat wil je doen met ${esc(a.name)}?</h4>
+      <div class="todo-g"><span>Verbeteren</span>${b('task-bench', '🔧 Werkbank', 'genen zelf bijschuiven + proefrit')}${b('task-mut', '🧬 Mutanten', 'varianten racen, de beste gaat door')}</div>
+      <div class="todo-g"><span>Laten strijden</span>${b('task-duel', 'vs Duel', '2–4 algoritmes in hetzelfde doolhof')}</div>
+      <div class="todo-g"><span>Begrijpen</span>${b('task-why', '❔ Uitleg', 'stap voor stap: waarom die kant op?')}${b('tree', '🌳 Stamboom', 'versies en ouders (Analyse)')}</div>
+      <div class="todo-g"><span>Zwakte zoeken</span>${b('task-hunt', '🎯 Zoeker', 'de moeilijkste doolhoven voor dit algoritme')}</div>
+      <div class="todo-g"><span>Verder kweken</span>${b('seed', '＋ Zaai in evolutie', 'doet mee vanaf de volgende generatie')}</div></div>`;
   }
 
-  // ======================= Lade: Bibliotheek / Werkbank / Duel =======================
-  function openDrawer(tab) {
-    if (tab !== 'why') E.xp = null;
-    E.drawer = tab;
-    $('#view-evo').classList.add('drawer');
-    document.querySelectorAll('#evo-drawer [data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
-    renderDrawer();
-  }
-  function closeDrawer() { E.drawer = null; E.xp = null; $('#view-evo').classList.remove('drawer'); E.panes.forEach(r => { r.dirty = true; }); }
-  function renderDrawer() {
-    const body = $('#evo-dbody'); if (!body || !E.drawer) return;
-    if (E.drawer === 'lib') libRender();
-    else if (E.drawer === 'bench') benchRender();
-    else if (E.drawer === 'duel') duelRender();
-    else if (E.drawer === 'fame') famRender();
-    else if (E.drawer === 'mut') mutRender();
-    else if (E.drawer === 'hunt') huntRender();
-    else if (E.drawer === 'tree') treeRender();
-    else if (E.drawer === 'why') whyRender();
-  }
-
-  // ---- Bibliotheek ----
-  function libRender() {
+  // ---------------- Algoritmes (startscherm) ----------------
+  function algosRender() {
     const algos = EV().loadAlgos();
     let dirty = false; algos.forEach(a => { if (EV().stampHist(a)) dirty = true; });
     if (dirty) EV().saveAlgos(algos);
     const folders = [...new Set(algos.map(a => a.folder).filter(Boolean))].sort();
-    $('#evo-dbody').innerHTML = `
-      <div class="lib-tools">
-        <input type="search" id="lib-q" placeholder="Zoek op naam, label of notitie" value="${esc(E.libQ)}">
-        <select id="lib-folder"><option value="">Alles</option><option value="*mine">Alleen eigen</option><option value="*classic">Klassiekers</option>${folders.map(f => `<option value="${esc(f)}">📁 ${esc(f)}</option>`).join('')}</select>
-        <select id="lib-sort"><option value="score">Beste eerst</option><option value="new">Nieuwste eerst</option><option value="name">Naam</option></select>
-      </div>
-      <datalist id="lib-folders">${folders.map(f => `<option value="${esc(f)}">`).join('')}</datalist>
-      <div class="lib-list" id="lib-list"></div>
-      <div class="lib-foot" id="lib-foot"></div>`;
-    $('#lib-folder').value = folders.includes(E.libFolder) || E.libFolder.startsWith('*') ? E.libFolder : '';
+    const fs = $('#lib-folder');
+    fs.innerHTML = `<option value="">Alles</option><option value="*mine">Alleen eigen</option><option value="*classic">Alleen klassiekers</option>${folders.map(f => `<option value="${esc(f)}">📁 ${esc(f)}</option>`).join('')}`;
+    fs.value = folders.includes(E.libFolder) || E.libFolder.startsWith('*') ? E.libFolder : '';
+    $('#lib-folders').innerHTML = folders.map(f => `<option value="${esc(f)}">`).join('');
     $('#lib-sort').value = E.libSort;
-    libList();
+    if (document.activeElement !== $('#lib-q')) $('#lib-q').value = E.libQ;
+    algoGrid(); algoDetail();
   }
-  function libList() {
-    const el = $('#lib-list'); if (!el) return;
+  function algoCard(a) {
+    const tags = (a.tags || []).slice(0, 3).map(t => `<em class="tag">${esc(t)}</em>`).join('');
+    return `<div class="acard${a.classic ? ' classic' : ''}${E.sel === a.id ? ' sel' : ''}" data-ev="sel" data-id="${esc(a.id)}" title="${esc(EV().describe(a.genes))}">
+      <div class="ac-top"><i class="sw" style="background:${EV().colorOf(a.genes)}"></i><b>${esc(a.name)}</b>${a.ver > 1 && !/ v\d+$/.test(a.name) ? `<em class="ver">v${a.ver}</em>` : ''}</div>
+      <div class="ac-sc"><b>${a.t.score}</b><span>testbaan · ${a.t.solved}/${a.t.of}${a.h ? `<br>zwaar ${a.h.score}` : ''}</span></div>
+      <small class="ac-sub">${esc(subOf(a))}</small>${tags ? `<div class="ac-tags">${tags}</div>` : ''}${dnaStrip(a.genes)}</div>`;
+  }
+  function algoGrid() {
+    const el = $('#algo-grid'); if (!el) return;
     const q = E.libQ.trim().toLowerCase(), f = E.libFolder;
-    let list = entries().filter(a => {
+    const list = entries().filter(a => !a.live).filter(a => {
       if (f === '*mine' && !a.mine) return false;
       if (f === '*classic' && !a.classic) return false;
       if (f && !f.startsWith('*') && a.folder !== f) return false;
@@ -484,24 +511,70 @@
       return [a.name, a.note, a.folder, (a.tags || []).join(' '), a.desc].join(' ').toLowerCase().includes(q);
     });
     if (E.libSort === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
-    else if (E.libSort === 'new') list.sort((a, b) => (b.live ? 1 : 0) - (a.live ? 1 : 0) || String(b.created || '').localeCompare(String(a.created || '')) || (a.classic ? 1 : 0) - (b.classic ? 1 : 0));
-    el.innerHTML = list.length ? list.map(a => libRow(a)).join('') : '<p class="hint">Niets gevonden.</p>';
-    const sel = [...E.duelSel.values()];
-    $('#lib-foot').innerHTML = `
-      <div class="duelbar"><b>Duel</b> <span>${sel.length ? sel.map(s => esc(s.name)).join(', ') : 'kies 2–4 algoritmes met vs'}</span>
-        <button class="btn primary" data-ev="duel-start"${sel.length < 2 ? ' disabled' : ''}>Start duel</button>${sel.length ? '<button class="btn" data-ev="duel-clear">Wis</button>' : ''}</div>
-      <div class="btns"><button class="btn" data-ev="export">Exporteer</button><button class="btn" data-ev="import">Importeer</button><button class="btn" data-ev="paste">Plak code</button></div>`;
+    else if (E.libSort === 'new') list.sort((a, b) => String(b.created || '').localeCompare(String(a.created || '')));
+    const mine = list.filter(a => a.mine), cls = list.filter(a => a.classic);
+    el.innerHTML = `<div class="ag-h">Lopende evolutie</div><div class="acards"><div class="acard live${E.sel === '*evo' ? ' sel' : ''}" id="ac-live" data-ev="sel" data-id="*evo"></div></div>`
+      + (f === '*classic' ? '' : `<div class="ag-h">Mijn algoritmes <small>${mine.length}</small></div>` + (mine.length ? `<div class="acards">${mine.map(algoCard).join('')}</div>`
+        : `<p class="hint">${q || f ? 'Niets gevonden.' : 'Nog niets bewaard. Bewaar een kampioen bij Evolueren, of importeer / plak een deelcode (rechtsboven).'}</p>`))
+      + (f === '*mine' || (f && !f.startsWith('*')) ? '' : `<div class="ag-h">Klassiekers <small>${cls.length}</small></div>` + (cls.length ? `<div class="acards">${cls.map(algoCard).join('')}</div>` : '<p class="hint">Niets gevonden.</p>'));
+    liveCard();
   }
-  function libRow(a) {
-    const open = E.libOpen === a.id, inDuel = E.duelSel.has(a.id);
-    const tags = (a.tags || []).map(t => `<em class="tag">${esc(t)}</em>`).join('');
-    const h = a.hist || [], prev = h.length > 1 ? h[h.length - 2].s : null;
-    let html = `<div class="lrow${open ? ' open' : ''}${a.classic ? ' classic' : ''}${a.live ? ' live' : ''}" data-ev="lib-open" data-id="${esc(a.id)}">
-      <i class="sw" style="background:${EV().colorOf(a.genes)}"></i>
-      <span class="nm">${esc(a.name)}${a.ver > 1 && !/ v\d+$/.test(a.name) ? ` <em class="ver">v${a.ver}</em>` : ''}${tags}<small>${esc(subOf(a))}</small></span>
-      <span class="sc">${a.t.score}<small>${a.h ? 'zwaar ' + a.h.score + ' · ' : ''}${a.t.solved}/${a.t.of}${prev != null && prev !== a.t.score ? ` · was ${prev}` : ''}</small></span>
-      <button class="duel-tog${inDuel ? ' on' : ''}" data-ev="duel-tog" data-id="${esc(a.id)}" title="Kies voor duel">vs</button></div>`;
-    if (open) html += libDetail(a);
+  function spark() {
+    const hs = E.hist; if (hs.length < 2) return '';
+    const n = hs.length, st = Math.max(1, Math.floor(n / 120)), pts = [];
+    let rec = -1, mx = 1;
+    hs.forEach(h => { if (h.test > mx) mx = h.test; });
+    for (let i = 0; i < n; i++) { if (hs[i].test > rec) rec = hs[i].test; if (i % st === 0 || i === n - 1) pts.push(`${(i / (n - 1) * 200).toFixed(1)},${(38 - rec / mx * 34).toFixed(1)}`); }
+    return `<svg class="spark" viewBox="0 0 200 40" preserveAspectRatio="none"><polyline points="${pts.join(' ')}"/></svg>`;
+  }
+  function liveCard() {
+    const el = $('#ac-live'); if (!el) return;
+    const c = E.champ, bc = EV().bestClassic();
+    el.innerHTML = `<div class="ac-top"><i class="${dotCls()}"></i><b>Generatie ${E.gen}</b><small>${E.pop.length} lopers · ${E.species.length} soorten${E.turbo ? ' · turbo' : V.running ? '' : ' · gepauzeerd'}</small></div>
+      ${c ? `<div class="ac-sc"><b>${c.test}</b><span>kampioen <b>${esc(c.name)}</b><br>${c.test > bc.t.score ? '🏆 boven' : 'nog onder'} ${esc(bc.p.name)} (${bc.t.score})</span></div>` : '<p class="hint">Nog geen generatie klaar.</p>'}
+      ${spark()}`;
+  }
+  function markSel() { document.querySelectorAll('#algo-grid .acard').forEach(c => c.classList.toggle('sel', c.dataset.id === E.sel)); }
+  function algoDetail() {
+    const el = $('#algo-det'); if (!el) return;
+    if (E.sel === '*evo') { el.innerHTML = evoDetail(); return; }
+    const a = E.sel ? entryById(E.sel) : null;
+    if (!a) { el.innerHTML = '<div class="det-empty"><h3>Kies een algoritme</h3><p class="hint">Klik een kaart. Daarna kies je wat je ermee wilt: verbeteren, laten strijden, begrijpen, een zwakte zoeken of verder kweken in de evolutie. De evolutie loopt intussen gewoon door.</p></div>'; return; }
+    const Ev = EV(), t = a.t || Ev.testScore(a.genes), h = Ev.heavyReady() ? Ev.heavyScore(a.genes) : null, id = esc(a.id);
+    const mine = a.mine ? a : null, saved = !!mine || isSaved(a.genes);
+    const cats = Ev.TEST_CATS.map(c => `<span>${esc(c.name)} <b>${t.cats[c.k]}</b></span>`).join('') + (h ? `<span>Zware testbaan <b>${h.score}</b> (${h.solved}/${h.of})</span>` : '')
+      + (mine ? '<span>🧬 ook als oplosser in Bouwen, Lab en Kijken</span>' : '');
+    let html = `<div class="det-head"><i class="sw" style="background:${Ev.colorOf(a.genes)}"></i><h3>${esc(a.name)}</h3><button class="btn x" data-ev="unsel" title="Sluiten (Esc)">✕</button></div>
+      <small class="det-sub0">${esc(a.classic ? 'klassieker · ' + a.desc : mine ? subOf(a) : a.live ? 'kampioen van de lopende evolutie, nog niet bewaard' : 'uit de eregalerij')}</small>
+      <div class="evo-score"><b>${t.score}</b><span>testbaan<br>${t.solved}/${t.of} gehaald</span>${h ? `<b class="hv">${h.score}</b><span>zware<br>testbaan</span>` : ''}</div>
+      <p class="desc">${esc(Ev.describe(a.genes))}</p>${dnaHtml(a.genes)}<div class="cats">${cats}</div>`;
+    if (!saved) html += `<div class="btns"><button class="btn primary" data-ev="save-any" data-id="${id}">Bewaar in mijn algoritmes</button></div>`;
+    html += todoHtml(a);
+    if (mine) {
+      const { chain, kids } = lineage(a);
+      html += `<h4 class="det-sub">Gegevens</h4><div class="det-fields" data-id="${id}">
+        <label class="frow"><span>Naam</span><input data-f="name" value="${esc(a.name)}" maxlength="40"></label>
+        <label class="frow"><span>Map</span><input data-f="folder" list="lib-folders" value="${esc(a.folder)}" placeholder="bv. Snelle lopers"></label>
+        <label class="frow"><span>Labels</span><input data-f="tags" value="${esc((a.tags || []).join(', '))}" placeholder="komma's ertussen"></label>
+        <label class="frow"><span>Notitie</span><textarea data-f="note" rows="2" placeholder="Wat is er bijzonder aan?">${esc(a.note)}</textarea></label></div>
+        <div class="tree"><b>Stamboom</b> ${chain.length ? chain.map(p => esc(p.name) + (p.ver > 1 ? ' v' + p.ver : '')).join(' → ') + ' → ' : ''}<u>${esc(a.name)}</u>${kids.length ? ` · nieuwere versies: ${kids.map(k => esc(k.name)).join(', ')}` : ''}${a.parents && a.parents.length && !a.parent ? ` · ouders ${a.parents.map(esc).join(' × ')}` : ''}</div>
+        <div class="tree"><b>Testscore</b> ${(a.hist || []).slice(-6).map(x => `${esc(x.d)}: ${x.s}`).join(' · ') || '—'}</div>
+        <div class="btns"><button class="btn" data-ev="code" data-id="${id}">Deelcode kopiëren</button><button class="btn" data-ev="del" data-id="${id}">Verwijder</button></div>`;
+    }
+    el.innerHTML = html;
+  }
+  function evoDetail() {
+    const c = E.champ;
+    let html = `<div class="det-head"><i class="${dotCls()}"></i><h3>Lopende evolutie</h3><button class="btn x" data-ev="unsel" title="Sluiten (Esc)">✕</button></div>
+      <small class="det-sub0">generatie ${E.gen} · ${E.pop.length} lopers · ${E.species.length} soorten</small>
+      <p class="hint">Loopt op de achtergrond door, ook als je hier of met een taak bezig bent. Instellingen, turbo en de ranglijst staan bij Evolueren.</p>
+      <div class="btns"><button class="btn primary" data-ev="page" data-page="evolve">Naar Evolueren →</button></div>`;
+    if (c) {
+      const saved = !!c.from || isSaved(c.genes);
+      html += `<h4 class="det-sub">Kampioen: ${esc(c.name)}</h4><div class="evo-score"><b>${c.test}</b><span>testbaan${c.heavy != null ? `<br>zwaar ${c.heavy}` : ''}</span></div>
+        <p class="desc">${esc(EV().describe(c.genes))}</p>${dnaHtml(c.genes)}
+        ${saved ? '' : '<div class="btns"><button class="btn primary" data-ev="save-champ">Bewaar kampioen</button></div>'}${todoHtml(c)}`;
+    }
     return html;
   }
   function lineage(a) {
@@ -511,28 +584,8 @@
     const kids = a.id ? algos.filter(x => x.parent === a.id) : [];
     return { chain, kids };
   }
-  function libDetail(a) {
-    const id = esc(a.id), common = `<button class="btn" data-ev="bench" data-id="${id}">Werkbank</button><button class="btn" data-ev="watch" data-id="${id}">Kijk alleen</button><button class="btn" data-ev="seed" data-id="${id}">Zaai</button>`
-      + `<button class="btn" data-ev="mut-src" data-id="${id}">🧬 Mutanten</button><button class="btn" data-ev="hunt-src" data-id="${id}">🎯 Zoeker</button><button class="btn" data-ev="why-of" data-id="${id}">Uitleg</button>`;
-    const cats = EV().TEST_CATS.map(c => `<span>${esc(c.name)} <b>${a.t.cats[c.k]}</b></span>`).join('') + (a.h ? `<span>Zware testbaan <b>${a.h.score}</b> (${a.h.solved}/${a.h.of})</span>` : '')
-      + (a.mine ? '<span>🧬 ook als oplosser in Bouwen, Lab en Kijken</span>' : '');
-    let html = `<div class="ldet" data-id="${id}"><p class="desc">${esc(EV().describe(a.genes))}</p>${dnaHtml(a.genes)}<div class="cats">${cats}</div>`;
-    if (a.mine) {
-      const { chain, kids } = lineage(a);
-      html += `
-        <label class="frow"><span>Naam</span><input data-f="name" value="${esc(a.name)}" maxlength="40"></label>
-        <label class="frow"><span>Map</span><input data-f="folder" list="lib-folders" value="${esc(a.folder)}" placeholder="bv. Snelle lopers"></label>
-        <label class="frow"><span>Labels</span><input data-f="tags" value="${esc((a.tags || []).join(', '))}" placeholder="komma's ertussen"></label>
-        <label class="frow"><span>Notitie</span><textarea data-f="note" rows="2" placeholder="Wat is er bijzonder aan?">${esc(a.note)}</textarea></label>
-        <div class="tree"><b>Stamboom</b> ${chain.length ? chain.map(p => esc(p.name) + (p.ver > 1 ? ' v' + p.ver : '')).join(' → ') + ' → ' : ''}<u>${esc(a.name)}</u>${kids.length ? ` · nieuwere versies: ${kids.map(k => esc(k.name)).join(', ')}` : ''}${a.parents && a.parents.length && !a.parent ? ` · ouders ${a.parents.map(esc).join(' × ')}` : ''}</div>
-        <div class="tree"><b>Testscore</b> ${(a.hist || []).slice(-6).map(h => `${esc(h.d)}: ${h.s}`).join(' · ') || '—'}</div>
-        <div class="btns">${common}<button class="btn" data-ev="code" data-id="${id}">Deelcode</button><button class="btn" data-ev="del" data-id="${id}">Verwijder</button></div>`;
-    } else if (a.live) html += `<div class="btns"><button class="btn primary" data-ev="save-champ">Bewaar</button>${common}</div>`;
-    else html += `<div class="btns">${common}</div>`;
-    return html + '</div>';
-  }
   function libField(el) {
-    const det = el.closest('.ldet'); if (!det) return;
+    const det = el.closest('.det-fields'); if (!det) return;
     const algos = EV().loadAlgos(), a = algos.find(x => x.id === det.dataset.id); if (!a) return;
     const f = el.dataset.f, v = el.value;
     if (f === 'name') { if (!v.trim()) return; a.name = v.trim().slice(0, 40); }
@@ -540,38 +593,204 @@
     else if (f === 'tags') a.tags = v.split(',').map(s => s.trim()).filter(Boolean).slice(0, 8).map(s => s.slice(0, 20));
     else if (f === 'note') a.note = v.slice(0, 500);
     EV().saveAlgos(algos);
-    if (f === 'folder') libRender(); else libList();
+    if (f === 'folder') algosRender(); else algoGrid();
     rankList();
   }
 
-  // ---- Werkbank ----
-  function openBench(a) {
-    if (!a) return;
-    E.turbo = 0;
-    const src = { id: a.id, name: a.name, genes: a.genes.slice(), mine: !!a.mine, classic: !!a.classic, ver: a.ver || 1, folder: a.folder || '', tags: a.tags || [] };
-    E.bench = { src, genes: a.genes.slice(), name: `${a.name.replace(/ v\d+$/, '')} v${src.ver + 1}` };
-    openDrawer('bench'); benchRide();
+  // ---------------- Evolueren ----------------
+  function champCard() {
+    const el = $('#evo-champ'); if (!el) return;
+    const c = E.champ, bc = EV().bestClassic();
+    if (!c) { el.innerHTML = '<h4>Kampioen</h4><p class="hint">Nog geen generatie klaar. Kijk mee, of druk op een Turbo-knop.</p>'; return; }
+    const saved = !!c.from || isSaved(c.genes), diff = Math.round((c.test - bc.t.score) * 10) / 10;
+    el.innerHTML = `<h4><i class="sw" style="background:${EV().colorOf(c.genes)}"></i>${esc(c.name)} <small>${c.from ? 'klassieker ' + esc(c.from) : 'geboren in generatie ' + c.born}${c.parents && c.parents.length ? ' · ouders ' + c.parents.map(esc).join(' × ') : ''}</small></h4>
+      <div class="evo-score"><b>${c.test}</b><span>testbaan<br>${diff >= 0 ? `<em class="up">+${diff}</em>` : `<em class="down">${diff}</em>`} t.o.v. ${esc(bc.p.name)}</span>${c.heavy != null ? `<b class="hv">${c.heavy}</b><span>zware<br>testbaan</span>` : ''}</div>
+      <p class="desc">${esc(EV().describe(c.genes))}</p>
+      ${dnaHtml(c.genes)}
+      <div class="btns"><button class="btn${saved ? '' : ' primary'}" data-ev="save-champ"${saved ? ' disabled' : ''}>${c.from ? 'Klassieker' : saved ? 'Bewaard ✓' : 'Bewaar kampioen'}</button><button class="btn" data-ev="sel-go" data-id="${esc(c.id)}">Wat wil je doen? →</button></div>`;
   }
-  function benchRender() {
-    const el = $('#evo-dbody'), B = E.bench;
-    if (!B) { el.innerHTML = '<p class="hint">Open een algoritme in de werkbank via 🔧 in de ranglijst of bibliotheek, of met de knop Werkbank bij de kampioen.</p>'; return; }
-    el.innerHTML = `
-      <p class="hint" style="margin-top:0">Schuif aan de genen van <b>${esc(B.src.name)}</b>. Elke wijziging start meteen een proefrit op het doolhof links; de testbaan rekent mee.</p>
+  function rankList() {
+    const el = $('#evo-rank'); if (!el) return;
+    const list = entries(), bc = EV().bestClassic(), top = list.length ? list[0].t.score : 1;
+    el.innerHTML = list.slice(0, 12).map((a, i) => {
+      const beat = !a.classic && a.t.score > bc.t.score;
+      return `<div class="erow${a.classic ? ' classic' : ''}${a.live ? ' live' : ''}" data-ev="sel-go" data-id="${esc(a.id)}" title="${esc(EV().describe(a.genes))} · klik: openen in Algoritmes">
+        <b class="pos">${i + 1}</b><i class="sw" style="background:${EV().colorOf(a.genes)}"></i>
+        <span class="nm">${beat ? '🏆 ' : ''}${esc(a.name)}<small>${esc(subOf(a))}</small></span>
+        <span class="sc">${a.t.score}<small title="zware testbaan">${a.h ? 'zwaar ' + a.h.score : a.t.solved + '/' + a.t.of}</small></span>
+        <span class="bar"><i style="width:${Math.max(2, a.t.score / Math.max(1, top) * 100)}%"></i></span></div>`;
+    }).join('') + (list.length > 12 ? `<p class="hint">+${list.length - 12} meer bij Algoritmes</p>` : '');
+  }
+  function status() {
+    const el = $('#evo-status'); if (!el) return;
+    if (E.turbo) {
+      const sec = (performance.now() - E.turboT0) / 1000, gps = sec > 0.3 ? Math.round(E.turboDone / sec) : 0;
+      el.textContent = `Turbo${A.S.evoFast === 'max' && !EV().Pool.broken ? ` (${EV().Pool.size()} kernen${EV().Pool.canBuild && mm() !== 'hunt' ? ', bouwen in workers' : ''})` : ''}: ${E.turboDone}${E.turboN ? '/' + E.turboN : ''} generaties · ${gps}/s · generatie ${E.gen} · ${E.seen.size} verschillende doolhoven`;
+      return;
+    }
+    const nm = V.mazes.length || nEval(), dz = nm > 1 ? 'doolhoven' : 'doolhof', h = E.hist[E.hist.length - 1];
+    el.textContent = `Generatie ${E.gen} · ${E.pop.length} lopers × ${nm} ${dz}${runs() > 1 ? ' × ' + runs() + ' runs' : ''}${mm() === 'hunt' ? ' (zoeker-set)' : ''} · ${E.species.length} ${E.species.length === 1 ? 'soort' : 'soorten'}${isl() > 1 ? ' op ' + isl() + ' eilanden' : ''} · ${E.seen.size} verschillende doolhoven`
+      + (h ? ` · vorige: beste ${h.best}, gem. ${h.mean}` : '');
+  }
+  function evoBar() {
+    const run = $('#evo-run');
+    if (run) run.textContent = E.turbo ? 'Stop turbo' : V.running ? 'Pauze' : 'Start';
+    document.querySelectorAll('[data-turbo]').forEach(b => {
+      const n = +b.dataset.turbo, on = E.turbo && E.turboN === n;
+      b.classList.toggle('on', !!on); b.textContent = on ? 'Stop' : n ? '×' + n : '∞';
+    });
+    document.querySelectorAll('#evo-mm [data-mm]').forEach(b => b.classList.toggle('on', b.dataset.mm === mm()));
+    const sn = $('#row-setn'); if (sn) sn.hidden = mm() !== 'set';
+    const hb = $('#evo-mm [data-mm="hunt"]'); if (hb) { hb.hidden = !huntSet().length; hb.title = `Train op de ${huntSet().length} moeilijkste doolhoven uit de doolhof-zoeker`; }
+    status(); tabsInfo(); liveCard();
+  }
+  function outputs() {
+    const S = A.S, set = (k, v) => { const o = document.querySelector(`[data-out="${k}"]`); if (o) o.textContent = v; };
+    const sp = v => { const r = rate(v); return r < 10 ? r.toFixed(1) + '/s' : Math.round(r) + '/s'; };
+    set('evoSize', S.evoSize); set('evoBraid', S.evoBraid + '%'); set('evoMut', S.evoMut + '%');
+    set('evoSpeed', sp(S.evoSpeed)); set('evoTaskSpeed', sp(S.evoTaskSpeed == null ? 75 : S.evoTaskSpeed));
+  }
+  // legenda evolutie: soorten (klik = hittekaart van alleen die soort)
+  function legend() {
+    const el = $('#evo-species'); if (!el) return;
+    let items;
+    const hs = V.heatSel, on = k => hs === k ? ' class="on"' : '', tip = 'klik: hittekaart van alleen deze soort';
+    if (A.S.evoColor === 'gene') items = EV().GENES.slice(0, -1).map(G => `<span><i class="sw" style="background:${G.col}"></i>${esc(G.name)}</span>`);
+    else items = E.species.slice(0, 8).map(s => `<span data-heat="${s.id}"${on(s.id)} title="${s.n} lopers · beste fitness ${Math.round((s.best || 0) * 100)} · ${tip}"><i class="sw" style="background:${s.col}"></i>${esc(s.name)} <small>${s.n}</small></span>`)
+      .concat(E.species.length > 8 ? [`<span><small>+${E.species.length - 8}</small></span>`] : []);
+    if (hs != null) items.unshift('<span data-heat="" class="all" title="Hittekaart van iedereen">✕ alle</span>');
+    el.innerHTML = items.join('');
+  }
+  // legenda taak: deelnemers
+  function taskLegend() {
+    const el = $('#task-legend'); if (!el) return;
+    const L = T.show ? T.show.list : [], hs = T.heatSel;
+    const items = L.slice(0, 10).map((a, k) => `<span data-heat="w${k}"${hs === 'w' + k ? ' class="on"' : ''} title="klik: hittekaart van alleen deze"><i class="sw" style="background:${a.col}"></i>${esc(a.name)}</span>`);
+    if (L.length > 10) items.push(`<span><small>+${L.length - 10}</small></span>`);
+    if (hs != null) items.unshift('<span data-heat="" class="all">✕ alle</span>');
+    el.innerHTML = items.join('');
+  }
+
+  // ======================= Taak =======================
+  function stopTask() {
+    if (E.mut) E.mut.busy = false;
+    if (E.hunt) E.hunt.running = false;
+    T.phase = 'idle'; T.running = false;
+  }
+  function openTask(kind, a) {
+    if (!a) return;
+    const algo = pick(a);
+    stopTask();
+    E.task = { kind, algo, step: 'pick' }; E.sel = algo.id;
+    T.forced = null; T.mazes = []; T.show = null; T.runs = null;
+    setPage('task'); // eerst zichtbaar: dan heeft het doolhof een maat
+    const preview = () => startShow('preview', [{ id: 'prev', name: algo.name, genes: algo.genes.slice(), col: '#ffd34d' }]);
+    if (kind === 'bench') {
+      E.bench = { src: algo, genes: algo.genes.slice(), name: `${algo.name.replace(/ v\d+$/, '')} v${algo.ver + 1}` };
+      benchRide();
+    } else if (kind === 'mut') {
+      const o = E.mut || {};
+      E.mut = { src: { ...algo, name: algo.name.replace(/ M\d+\.\d+$/, '') }, orig: algo.genes.slice(), orig0: algo.genes.slice(), origName: algo.name,
+        n: o.n || 16, str: o.str || 'middel', rounds: o.rounds || 3, heavy: !!o.heavy, need: o.need != null ? o.need : 3, maxT: o.maxT || 8,
+        round: 0, res: null, log: [], busy: false, bestName: null };
+      preview();
+    } else if (kind === 'duel') {
+      const Ev = EV(), bc = Ev.bestClassic().p, other = bc.genes.join() !== algo.genes.join() ? bc : Ev.PRESETS.find(p => p.genes.join() !== algo.genes.join());
+      E.duel = { pick: [algo, pick(other)], list: null, done: false, res: null };
+      preview();
+    } else if (kind === 'why') {
+      E.xp = { last: null };
+      startShow('solo', [{ id: 'why', name: algo.name, genes: algo.genes.slice(), col: '#ffd34d' }]); T.running = false;
+    } else if (kind === 'hunt') {
+      E.hunt = { target: algo, found: [], tried: 0, running: false, grids: A.S.evoGrid === 'mix' ? 'all' : A.S.evoGrid };
+      preview();
+    }
+    taskRender();
+  }
+  // direct een duel starten vanuit een andere taak (zelfde doolhof)
+  function duelNow(list) {
+    stopTask();
+    E.task = { kind: 'duel', algo: pick(list[0]), step: 'pick' };
+    E.duel = { pick: list.map(pick), list: null, done: false, res: null };
+    taskRender(); startDuel(E.duel.pick, true);
+  }
+  function taskRender() {
+    const K = E.task, page = $('#ep-task');
+    tabsInfo();
+    page.classList.toggle('none', !K);
+    if (!K) {
+      const a = (E.sel && E.sel !== '*evo' && entryById(E.sel)) || E.champ || EV().bestClassic().p;
+      $('#task-empty').innerHTML = `<h3>Kies een taak</h3><p class="hint">Een taak werkt altijd met één algoritme. Kies er een in <a href="#" data-ev="page" data-page="algos">Algoritmes</a>, of begin hier meteen met <b>${esc(a.name)}</b>:</p>` + todoHtml(a);
+      return;
+    }
+    stepsRender(); taskIn(); taskOut();
+  }
+  function stepsRender() {
+    const K = E.task, el = $('#task-steps'); if (!K || !el) return;
+    const cur = ['pick', 'busy', 'done'].indexOf(K.step);
+    el.innerHTML = `<b class="tk-name">${TASKS[K.kind].icon} ${TASKS[K.kind].name} <small>· ${esc(K.algo.name)}</small></b>
+      <ol>${['Kiezen', 'Bezig', 'Uitkomst'].map((n, i) => `<li class="${i < cur ? 'past' : i === cur ? 'on' : ''}">${i + 1} · ${n}</li>`).join('')}</ol><span class="sp"></span>
+      <button class="btn" data-ev="task-maze" title="Zelfde taak op een ander doolhof">Ander doolhof</button><button class="btn" data-ev="next-task">Andere taak</button><button class="btn" data-ev="page" data-page="algos">← Overzicht</button>`;
+  }
+  function setStep(s) { const K = E.task; if (!K) return; if (K.step !== s) { K.step = s; stepsRender(); } taskOut(); }
+  function taskIn() {
+    const el = $('#task-in'), K = E.task; if (!el || !K) return;
+    el.innerHTML = '<h4 class="col-h">In</h4>' + ({ bench: benchIn, mut: mutIn, duel: duelIn, why: whyIn, hunt: huntIn }[K.kind])();
+  }
+  function taskOut() {
+    const el = $('#task-out'), K = E.task; if (!el || !K) return;
+    el.innerHTML = '<h4 class="col-h">Uit</h4>' + ({ bench: benchOut, mut: mutOut, duel: duelOut, why: whyOut, hunt: huntOut }[K.kind])() + afterHtml();
+  }
+  function taskTick() { // 4×/s tijdens het lopen
+    const K = E.task; if (!K || E.page !== 'task') return;
+    if (K.kind === 'mut' && E.mut && E.mut.busy) taskOut();
+    else if (K.kind === 'why') whyTable();
+  }
+  function taskEnded() {
+    const K = E.task, k = T.show && T.show.kind; if (!K || k === 'preview') return;
+    if (K.kind === 'duel' && k === 'duel') duelDone();
+    else if (K.kind === 'mut' && k === 'mut') mutDone();
+    else if (K.kind === 'why') { T.running = false; setStep('done'); taskIn(); }
+    else if (K.kind === 'bench') setStep('done');
+  }
+  function afterHtml() {
+    const K = E.task; if (!K || (K.step !== 'done' && K.kind !== 'bench')) return '';
+    const changed = (K.kind === 'bench' && E.bench && E.bench.genes.join() !== E.bench.src.genes.join()) || (K.kind === 'mut' && E.mut && !E.mut.busy && E.mut.src.genes.join() !== E.mut.orig0.join());
+    return `<div class="after"><h4>${K.step === 'done' ? 'Klaar. En nu?' : 'En nu?'}</h4>${changed ? '<button class="btn primary" data-ev="save-ver">Bewaar als nieuwe versie</button>' : ''}<button class="btn" data-ev="next-task">Volgende taak</button><button class="btn" data-ev="page" data-page="algos">Terug naar overzicht</button></div>`;
+  }
+  // nieuw bewaarde versie: krijgt de kaart, en is het algoritme voor de volgende taak
+  function saveVersion(o) {
+    const list = EV().loadAlgos();
+    if (list.some(a => a.genes.join() === o.genes.join())) { note('Dit DNA staat al in je algoritmes.'); return null; }
+    const a = EV().newAlgo(o); EV().stampHist(a); list.push(a); EV().saveAlgos(list);
+    E.sel = a.id; rankList(); champCard();
+    return a;
+  }
+
+  // ---- Werkbank ----
+  function benchRide() {
+    const B = E.bench; if (!B) return;
+    startShow('solo', [{ id: 'bench', name: B.name, genes: B.genes.slice(), col: '#ffd34d' }], true);
+    setStep('busy');
+  }
+  function benchIn() {
+    const B = E.bench; if (!B) return '';
+    return `<p class="hint" style="margin-top:0">Schuif aan de genen van <b>${esc(B.src.name)}</b>. Elke wijziging start meteen een proefrit in het doolhof; de testbaan rekent rechts mee. Streepje = origineel.</p>
       <label class="frow"><span>Naam</span><input id="bench-name" value="${esc(B.name)}" maxlength="40"></label>
       <div class="bench-sl">${EV().GENES.map((G, i) => `<label class="bsl" title="+ ${esc(G.pos)} · − ${esc(G.neg)}"><span><i class="sw" style="background:${G.col}"></i>${esc(G.name)}</span>
         <span class="bw"><input type="range" data-g="${i}" min="${G.lo}" max="${G.hi}" step="0.1" value="${B.genes[i]}"><s style="left:${(B.src.genes[i] - G.lo) / (G.hi - G.lo) * 100}%" title="origineel ${B.src.genes[i].toFixed(1)}"></s></span><output>${B.genes[i].toFixed(1)}</output></label>`).join('')}</div>
       <p class="desc" id="bench-desc">${esc(EV().describe(B.genes))}</p>
-      <div id="bench-score"></div>
-      <div class="btns"><button class="btn primary" data-ev="bench-save">Bewaar als nieuwe versie</button><button class="btn" data-ev="bench-duel">Vergelijk met origineel</button></div>
-      <div class="btns"><button class="btn" data-ev="bench-ride">Proefrit opnieuw</button><button class="btn" data-ev="bench-nudge">Kleine mutatie</button><button class="btn" data-ev="bench-reset">Terug naar origineel</button></div>`;
-    benchScore();
+      <div class="btns"><button class="btn" data-ev="bench-nudge">Kleine mutatie</button><button class="btn" data-ev="bench-reset">Terug naar origineel</button><button class="btn" data-ev="bench-ride">Proefrit opnieuw</button></div>`;
   }
-  function benchScore() {
-    const el = $('#bench-score'), B = E.bench; if (!el || !B) return;
+  function benchOut() {
+    const B = E.bench; if (!B) return '';
     const t = EV().testScore(B.genes), o = EV().testScore(B.src.genes), d = Math.round((t.score - o.score) * 10) / 10;
     const sign = v => v > 0 ? `<em class="up">+${v}</em>` : v < 0 ? `<em class="down">${v}</em>` : '<em>±0</em>';
-    el.innerHTML = `<div class="evo-score"><b>${t.score}</b><span>testbaan (${t.solved}/${t.of} gehaald)<br>${sign(d)} t.o.v. origineel ${o.score}</span></div>
-      <div class="cats">${EV().TEST_CATS.map(c => `<span>${esc(c.name)} <b>${t.cats[c.k]}</b> ${sign(Math.round((t.cats[c.k] - o.cats[c.k]) * 10) / 10)}</span>`).join('')}</div>`;
+    const w = T.runs && T.runs[0] && T.runs[0].ws[0];
+    return `<div class="evo-score"><b>${t.score}</b><span>testbaan (${t.solved}/${t.of} gehaald)<br>${sign(d)} t.o.v. origineel ${o.score}</span></div>
+      <div class="cats">${EV().TEST_CATS.map(c => `<span>${esc(c.name)} <b>${t.cats[c.k]}</b> ${sign(Math.round((t.cats[c.k] - o.cats[c.k]) * 10) / 10)}</span>`).join('')}</div>
+      <p class="hint">Proefrit: ${!w ? '—' : w.reached ? `gehaald in ${w.steps} stappen (kortste ${T.runs[0].mz.ctx.opt})` : w.done ? 'niet gehaald binnen de limiet' : 'bezig…'}</p>
+      <div class="btns"><button class="btn" data-ev="bench-duel">Vergelijk met origineel (duel)</button></div>`;
   }
   let benchTimer = 0;
   function benchInput(inp) {
@@ -579,49 +798,45 @@
     const i = +inp.dataset.g; B.genes[i] = Number(inp.value);
     inp.closest('.bsl').querySelector('output').textContent = B.genes[i].toFixed(1);
     $('#bench-desc').textContent = EV().describe(B.genes);
-    clearTimeout(benchTimer); benchTimer = setTimeout(() => { benchRide(); benchScore(); }, 160);
-  }
-  function benchRide() {
-    const B = E.bench; if (!B) return;
-    E.forced = null; E.show = { kind: 'solo', list: [{ id: 'bench', name: B.name, genes: B.genes.slice(), col: '#ffd34d' }] };
-    E.running = true; startGen(); toolbar();
+    clearTimeout(benchTimer); benchTimer = setTimeout(benchRide, 160);
   }
   function benchSave() {
     const B = E.bench; if (!B) return;
-    const name = (($('#bench-name') || {}).value || B.name).trim().slice(0, 40) || B.name;
-    const algos = EV().loadAlgos();
-    if (algos.some(a => a.genes.join() === B.genes.map(v => Math.round(v * 1000) / 1000).join())) { note('Dit DNA staat al in je bibliotheek.'); champCard(); return; }
-    const a = EV().newAlgo({ name, genes: B.genes, parent: B.src.id, ver: B.src.ver + 1, parents: [B.src.name], folder: B.src.folder, tags: B.src.tags,
-      born: E.gen, note: `Getweakt vanaf ${B.src.name}` });
-    EV().stampHist(a); algos.push(a); EV().saveAlgos(algos);
+    const name = (B.name || '').trim().slice(0, 40) || B.src.name + ' v' + (B.src.ver + 1);
+    const a = saveVersion({ name, genes: B.genes.map(v => Math.round(v * 1000) / 1000), parent: B.src.id, ver: B.src.ver + 1, parents: [B.src.name], folder: B.src.folder, tags: B.src.tags, born: E.gen, note: `Getweakt vanaf ${B.src.name}` });
+    if (!a) return;
     note(`${a.name} bewaard als versie ${a.ver} van ${B.src.name}.`);
-    E.bench = { src: { ...a, mine: true }, genes: a.genes.slice(), name: `${name.replace(/ v\d+$/, '')} v${a.ver + 1}` };
-    benchRender(); rankList(); champCard();
+    E.bench = { src: pick({ ...a, mine: true }), genes: a.genes.slice(), name: `${name.replace(/ v\d+$/, '')} v${a.ver + 1}` };
+    E.task.algo = E.bench.src; stepsRender(); taskIn(); taskOut();
   }
 
   // ---- Duel ----
   function startDuel(list, keepMaze) {
     if (!list || list.length < 2) return;
-    E.turbo = 0; if (!keepMaze) E.forced = null;
-    E.duel = { list: list.slice(0, 4).map((a, k) => ({ id: a.id || 'duel-' + k, name: a.name, genes: a.genes.slice(), col: DUEL_COLS[k] })), done: false };
-    E.show = { kind: 'duel', list: E.duel.list }; E.running = true;
-    openDrawer('duel'); startGen(); toolbar();
+    E.duel.list = list.slice(0, 4).map((a, k) => ({ id: a.id || 'duel-' + k, name: a.name, genes: a.genes.slice(), col: DUEL_COLS[k] }));
+    E.duel.done = false; E.duel.res = null;
+    startShow('duel', E.duel.list, keepMaze);
+    setStep('busy'); taskIn();
   }
   function duelDone() {
-    if (!E.duel) return;
-    E.duel.done = true;
-    E.duel.res = E.duel.list.map((_, k) => E.runs.map(run => { const w = run.ws[k]; return { steps: w.steps, ok: w.reached, opt: run.mz.ctx.opt }; }));
-    if (E.drawer === 'duel') duelRender();
+    const D = E.duel; if (!D || !D.list) return;
+    D.done = true;
+    D.res = D.list.map((_, k) => T.runs.map(run => { const w = run.ws[k]; return { steps: w.steps, ok: w.reached, opt: run.mz.ctx.opt }; }));
+    setStep('done'); taskIn();
   }
-  function duelRender() {
-    const el = $('#evo-dbody'), D = E.duel;
-    if (!D) {
-      const sel = [...E.duelSel.values()];
-      el.innerHTML = `<p class="hint" style="margin-top:0">Laat 2–4 algoritmes tegelijk door hetzelfde doolhof lopen, elk met eigen kleur en spoor. Daarna: verschil op de testbaan en per doolhof-soort.</p>
-        <p>${sel.length ? 'Gekozen: ' + sel.map(s => `<b>${esc(s.name)}</b>`).join(', ') : 'Kies algoritmes met de knop vs in de ranglijst of bibliotheek.'}</p>
-        <div class="btns"><button class="btn primary" data-ev="duel-start"${sel.length < 2 ? ' disabled' : ''}>Start duel</button><button class="btn" data-ev="tab" data-tab="lib">Naar bibliotheek</button></div>`;
-      return;
-    }
+  function duelIn() {
+    const D = E.duel; if (!D) return '';
+    const ids = new Set(D.pick.map(p => p.id)), cand = entries();
+    D.pick.forEach(p => { if (!cand.some(c => c.id === p.id)) cand.unshift({ ...p, t: EV().testScore(p.genes) }); });
+    const busy = T.show && T.show.kind === 'duel' && T.phase === 'run';
+    return `<p class="hint" style="margin-top:0">Kies 2–4 deelnemers. Ze lopen tegelijk door hetzelfde doolhof, elk met eigen kleur en spoor.</p>
+      <div class="dpick">${cand.slice(0, 24).map(a => { const on = ids.has(a.id), fixed = a.id === E.task.algo.id;
+        return `<label class="${on ? 'on' : ''}"><input type="checkbox" data-duel="${esc(a.id)}"${on ? ' checked' : ''}${fixed ? ' disabled' : ''}><i class="sw" style="background:${EV().colorOf(a.genes)}"></i>${esc(a.name)}<small>${a.t.score}</small></label>`; }).join('')}</div>
+      <div class="btns"><button class="btn primary" data-ev="duel-start"${D.pick.length < 2 || busy ? ' disabled' : ''}>${D.list ? 'Opnieuw (zelfde doolhof)' : 'Start duel'}</button>${D.done ? '<button class="btn" data-ev="duel-again">Ander doolhof</button>' : ''}</div>`;
+  }
+  function duelOut() {
+    const D = E.duel;
+    if (!D || !D.list) return '<p class="hint" style="margin-top:0">Nog niet gestart. Kies links de deelnemers en druk op Start duel. Hier verschijnt dan per deelnemer: stappen in dit doolhof, testbaan en score per doolhof-soort.</p>';
     const cats = EV().TEST_CATS, ts = D.list.map(a => EV().testScore(a.genes));
     const best = key => Math.max(...ts.map(key));
     const cell = (v, b, base, k) => `<td class="${v === b ? 'best' : ''}">${v}${k && base != null ? `<small>${v - base > 0 ? '+' : ''}${Math.round((v - base) * 10) / 10}</small>` : ''}</td>`;
@@ -631,40 +846,21 @@
       const bestTot = Math.min(...D.res.map(rr => rr.every(x => x.ok) ? rr.reduce((s, x) => s + x.steps, 0) : 1e9));
       return `<td class="${ok && tot === bestTot ? 'best' : ''}">${ok ? tot + ' st.' : '✗'}</td>`;
     };
-    el.innerHTML = `<p class="hint" style="margin-top:0">${D.done ? 'Klaar.' : 'Bezig…'} Groen = beste in die kolom; kleine getallen = verschil met de eerste rij.</p>
+    let win = '';
+    if (D.done && D.res) { const tots = D.res.map(r => r.every(x => x.ok) ? r.reduce((s, x) => s + x.steps, 0) : 1e9), m = Math.min(...tots); win = m < 1e9 ? `🏁 Dit doolhof: <b>${esc(D.list[tots.indexOf(m)].name)}</b> was het snelst.` : 'Niemand haalde het doel binnen de limiet.'; }
+    const tw = ts.indexOf(ts.reduce((a, b) => b.score > a.score ? b : a));
+    return `<p style="margin-top:0">${D.done ? win : 'Bezig…'}${D.done ? `<br>📏 Testbaan: <b>${esc(D.list[tw].name)}</b> is algemeen het sterkst.` : ''}</p>
       <div class="duel-wrap"><table class="duel"><thead><tr><th></th><th>Dit doolhof</th><th>Testbaan</th>${cats.map(c => `<th>${esc(c.name)}</th>`).join('')}</tr></thead><tbody>
       ${D.list.map((a, k) => `<tr><th><i class="sw" style="background:${a.col}"></i>${esc(a.name)}</th>${mazeCol(k)}${cell(ts[k].score, best(t => t.score), ts[0].score, k)}${cats.map(c => cell(ts[k].cats[c.k], best(t => t.cats[c.k]), ts[0].cats[c.k], k)).join('')}</tr>`).join('')}
-      </tbody></table></div>
-      <div class="btns"><button class="btn primary" data-ev="duel-again">Nog een keer (ander doolhof)</button><button class="btn" data-ev="duel-stop">Stop duel</button></div>`;
+      </tbody></table></div><p class="hint">Groen = beste in die kolom; kleine getallen = verschil met de eerste rij.</p>`;
   }
 
-  // ---- Eregalerij: top 20 van alle records (automatisch bij elk nieuw record) ----
-  function famRender() {
-    const el = $('#evo-dbody'), list = EV().loadFame(), Ev = EV();
-    if (!list.length) { el.innerHTML = '<p class="hint" style="margin-top:0">Nog leeg. Elk nieuw record van een eigen algoritme komt hier vanzelf in (top 20, ook over sessies heen).</p>'; return; }
-    const heavy = Ev.heavyReady(), medal = ['🥇', '🥈', '🥉'];
-    const acts = a => `<button title="Kijk alleen" data-ev="watch" data-id="${esc(a.id)}">▶</button><button title="Werkbank" data-ev="bench" data-id="${esc(a.id)}">🔧</button><button title="Mutantenlab" data-ev="mut-src" data-id="${esc(a.id)}">🧬</button><button title="Kies voor duel" data-ev="duel-tog" data-id="${esc(a.id)}"${E.duelSel.has(a.id) ? ' class="on"' : ''}>vs</button>`
-      + (isSaved(a.genes) ? '' : `<button title="Bewaar in bibliotheek" data-ev="save-fame" data-id="${esc(a.id)}">💾</button>`) + `<button title="Uit de eregalerij" data-ev="del-fame" data-id="${esc(a.id)}">✕</button>`;
-    const hv = a => a.heavy != null ? a.heavy : heavy ? Ev.heavyScore(a.genes).score : '…';
-    el.innerHTML = `<div class="podium">${list.slice(0, 3).map((a, i) => `<div class="pod p${i + 1}"><span class="md">${medal[i]}</span><i class="sw" style="background:${Ev.colorOf(a.genes)}"></i><b>${esc(a.name)}</b>
-        <span class="big">${a.test}</span><small>zwaar ${hv(a)} · gen ${a.gen} · ${esc(a.date)}</small><span class="acts">${acts(a)}</span></div>`).join('')}</div>
-      <div class="fame">${list.slice(3).map((a, i) => `<div class="erow" title="${esc(Ev.describe(a.genes))}"><b class="pos">${i + 4}</b><i class="sw" style="background:${Ev.colorOf(a.genes)}"></i>
-        <span class="nm">${esc(a.name)}<small>gen ${a.gen} · ${esc(a.date)}${a.parents && a.parents.length ? ' · ' + a.parents.map(esc).join(' × ') : ''}</small></span>
-        <span class="sc">${a.test}<small>zwaar ${hv(a)}</small></span><span class="acts">${acts(a)}</span></div>`).join('')}</div>
-      <div class="btns"><button class="btn" data-ev="report">Rapport (HTML)</button></div>`;
-  }
-
-  // ---- Mutantenlab: algoritme → N mutanten → race in één doolhof + testbaan; de beste gaat door naar de volgende ronde ----
+  // ---- Mutantenlab: algoritme → N mutanten → race in één doolhof + testbaan; de beste gaat door ----
+  // De rangorde komt van de testbaan; de race is om te zien. Daarom stopregel: klaar zodra genoeg binnen zijn of na max tijd.
   const MUT_STR = { klein: 0.06, middel: 0.12, groot: 0.25 };
-  function mutSrc(a) {
-    if (!a) return;
-    E.mut = { src: { id: a.id, name: a.name.replace(/ M\d+\.\d+$/, ''), genes: a.genes.slice(), ver: a.ver || 1, mine: !!a.mine || isSaved(a.genes) }, orig: a.genes.slice(), origName: a.name,
-      n: (E.mut && E.mut.n) || 16, str: (E.mut && E.mut.str) || 'middel', rounds: (E.mut && E.mut.rounds) || 3, heavy: !!(E.mut && E.mut.heavy), round: 0, res: null, log: [], busy: false };
-    openDrawer('mut');
-  }
   function mutRound() {
     const M = E.mut; if (!M) return;
-    E.turbo = 0; M.round++; M.busy = true; M.res = null;
+    M.round++; M.busy = true; M.res = null;
     const r = ML.makeRng(M.src.name + '|mut|' + M.round + '|' + Math.random()), G = EV().GENES, f = MUT_STR[M.str] || 0.12;
     const list = [{ id: 'mut-0-' + M.round, name: M.src.name + (M.round > 1 ? ' (beste vorige)' : ' (origineel)'), genes: M.src.genes.slice(), col: '#ffffff', base: true }];
     for (let k = 1; k <= M.n; k++) {
@@ -672,59 +868,81 @@
       do { genes = M.src.genes.map((v, i) => r() < 0.5 ? EV().clamp(v + Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(TAU * r()) * (G[i].hi - G[i].lo) * f, i) : v); } while (genes.join() === M.src.genes.join());
       list.push({ id: `mut-${k}-${M.round}`, name: `${M.src.name} M${M.round}.${k}`, genes: genes.map(v => Math.round(v * 100) / 100), col: `hsl(${Math.round(k * 360 / M.n)},85%,62%)` });
     }
-    M.list = list; E.salt++; E.forced = null;
-    E.show = { kind: 'mut', list }; E.running = true; startGen(); toolbar(); if (E.drawer === 'mut') mutRender();
+    M.list = list; T.salt++; T.forced = null;
+    startShow('mut', list, false);
+    setStep('busy'); taskIn();
+  }
+  // stopregel: genoeg binnen of tijd op → rest niet afwachten; kansloos (al 2× zo veel stappen als de eerste) → afkappen
+  function mutCheck(t, alive) {
+    const M = E.mut, run = T.runs && T.runs[0]; if (!M || !run) return alive;
+    const n = run.ws.length, need = M.need ? Math.min(M.need, n) : n, first = run.order[0];
+    const cut = w => { w.done = true; w.cut = true; w.p = 1; run.cut++; };
+    if (first) for (const w of run.ws) if (!w.done && w.steps > Math.max(first.steps * 2, first.steps + 30)) { cut(w); alive--; }
+    if (run.order.length >= need || t - T.t0 > M.maxT) { for (const w of run.ws) if (!w.done) cut(w); return 0; }
+    return alive;
   }
   function mutDone() {
     const M = E.mut; if (!M || !M.list) return;
-    const run = E.runs[0], Ev = EV();
+    const run = T.runs[0], Ev = EV();
     M.res = M.list.map((a, k) => {
       const w = run.ws[k], t = Ev.testScore(a.genes), h = M.heavy ? Ev.heavyScore(a.genes) : null;
-      return { a, race: w.reached ? w.steps : null, t: t.score, solved: t.solved, h: h ? h.score : null, score: h ? (t.score + h.score) / 2 : t.score };
+      return { a, race: w.reached ? w.steps : null, cut: !!w.cut, t: t.score, solved: t.solved, h: h ? h.score : null, score: h ? (t.score + h.score) / 2 : t.score };
     }).sort((x, y) => y.score - x.score || (x.race || 1e9) - (y.race || 1e9));
     const best = M.res[0], base = M.res.find(x => x.a.base);
     M.log.push({ round: M.round, name: best.a.name, score: Math.round(best.score * 10) / 10, gain: Math.round((best.score - base.score) * 10) / 10 });
-    M.busy = false;
     if (!best.a.base) { M.src = { ...M.src, genes: best.a.genes.slice() }; M.bestName = best.a.name; }
-    if (M.round < M.rounds) { M.busy = true; setTimeout(() => { if (E.mut === M && M.busy) mutRound(); }, 1400); }
-    if (E.drawer === 'mut') mutRender();
+    if (M.round < M.rounds && M.busy) { M.wait = true; setTimeout(() => { M.wait = false; if (E.mut === M && M.busy) mutRound(); }, 900); taskOut(); }
+    else { M.busy = false; setStep('done'); taskIn(); }
   }
-  function mutRender() {
-    const el = $('#evo-dbody'), M = E.mut, Ev = EV();
-    if (!M) { el.innerHTML = '<p class="hint" style="margin-top:0">Kies een algoritme met 🧬 (ranglijst, bibliotheek, eregalerij of kampioen). Het lab maakt er mutanten van, laat ze racen in één doolhof en meet ze op de testbaan. De beste gaat door naar de volgende ronde.</p>'; return; }
-    const sel = (id, opts, v) => `<select data-mut="${id}">${opts.map(([k, t]) => `<option value="${k}"${String(k) === String(v) ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
-    const o = Ev.testScore(M.orig).score, cur = Ev.testScore(M.src.genes).score;
-    let html = `<p class="hint" style="margin-top:0">Bron: <b>${esc(M.origName)}</b> (testbaan ${o})${M.round ? ` · nu ${cur} ${cur > o ? `<em class="up">+${Math.round((cur - o) * 10) / 10}</em>` : ''}` : ''}</p>
-      <div class="mut-set"><label>Mutanten ${sel('n', [[8, 8], [16, 16], [24, 24], [40, 40]], M.n)}</label><label>Sterkte ${sel('str', [['klein', 'klein'], ['middel', 'middel'], ['groot', 'groot']], M.str)}</label>
-      <label>Rondes ${sel('rounds', [[1, 1], [3, 3], [5, 5], [10, 10]], M.rounds)}</label><label class="check"><input type="checkbox" data-mut="heavy"${M.heavy ? ' checked' : ''}> ook zware testbaan</label></div>
-      <div class="btns"><button class="btn primary" data-ev="mut-go"${M.busy ? ' disabled' : ''}>${M.round ? 'Nog ' + M.rounds + ' rondes' : 'Start'}</button>${M.busy ? '<button class="btn" data-ev="mut-stop">Stop</button>' : ''}</div>`;
-    if (M.busy && !M.res) html += `<p>Ronde ${M.round}/${M.rounds}: ${M.n} mutanten + ${M.round > 1 ? 'beste van vorige ronde' : 'origineel'} racen…</p>`;
-    if (M.res) {
-      html += `<p><b>Ronde ${M.round}</b> · gerangschikt op ${M.heavy ? 'gemiddelde van testbaan en zware testbaan' : 'testbaan'}; race = stappen in dit doolhof.</p>
+  function mutIn() {
+    const M = E.mut; if (!M) return '';
+    const sel = (id, opts, v) => `<select data-mut="${id}"${M.busy ? ' disabled' : ''}>${opts.map(([k, t]) => `<option value="${k}"${String(k) === String(v) ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
+    return `<p class="hint" style="margin-top:0">Het lab maakt varianten van <b>${esc(M.origName)}</b>, laat ze racen en meet ze op de testbaan. De beste gaat door naar de volgende ronde.</p>
+      <div class="frow2"><span>Mutanten</span>${sel('n', [[8, 8], [16, 16], [24, 24], [40, 40]], M.n)}</div>
+      <div class="frow2"><span>Sterkte</span>${sel('str', [['klein', 'klein'], ['middel', 'middel'], ['groot', 'groot']], M.str)}</div>
+      <div class="frow2"><span>Rondes</span>${sel('rounds', [[1, 1], [3, 3], [5, 5], [10, 10]], M.rounds)}</div>
+      <div class="frow2"><span></span><label class="check"><input type="checkbox" data-mut="heavy"${M.heavy ? ' checked' : ''}${M.busy ? ' disabled' : ''}> ook zware testbaan</label></div>
+      <h4 class="col-h" style="margin-top:12px">Stopregel per ronde</h4>
+      <div class="frow2"><span>Klaar als</span>${sel('need', [[1, 'de eerste binnen is'], [3, '3 binnen zijn'], [5, '5 binnen zijn'], [0, 'iedereen klaar is']], M.need)}</div>
+      <div class="frow2"><span>of na</span>${sel('maxT', [[4, '4 s'], [8, '8 s'], [15, '15 s'], [30, '30 s']], M.maxT)}</div>
+      <p class="hint">Wie al 2× zo veel stappen zette als de eerste aankomer, wordt afgekapt. De race is om te kijken: de rangorde komt van de testbaan, dus wachten op de rest verandert niets.</p>
+      <div class="btns"><button class="btn primary" data-ev="mut-go"${M.busy ? ' disabled' : ''}>${M.busy ? 'Bezig…' : M.round ? `Nog ${M.rounds} ronde${M.rounds > 1 ? 's' : ''}` : 'Start'}</button>${M.busy ? '<button class="btn" data-ev="mut-stop">Stop</button>' : ''}</div>`;
+  }
+  function mutOut() {
+    const M = E.mut; if (!M) return '';
+    const Ev = EV(), o = Ev.testScore(M.orig0).score, cur = Ev.testScore(M.src.genes).score;
+    let html = `<p style="margin-top:0">Bron <b>${esc(M.origName)}</b>: testbaan ${o}${M.round ? ` · beste nu ${cur} ${cur > o ? `<em class="up">+${Math.round((cur - o) * 10) / 10}</em>` : ''}` : ''}</p>`;
+    const run = T.runs && T.runs[0];
+    if (M.busy && !M.res && run && T.show && T.show.kind === 'mut') {
+      const n = run.ws.length, need = M.need ? Math.min(M.need, n) : n, got = run.order.length;
+      const el = performance.now() / 1000 - T.t0, left = Math.max(0, Math.ceil(M.maxT - el)), p = Math.min(1, Math.max(got / need, el / M.maxT));
+      html += `<div class="wait">Ronde <b>${M.round}/${M.rounds}</b> · wacht op <b>${need}</b> van ${n} · <b>${got}</b> binnen · ${run.cut} afgekapt · nog max ${left} s</div>
+        <div class="prog"><i style="width:${Math.round(p * 100)}%"></i></div>
+        <div class="wsec">Binnen</div><ol class="arrivals">${run.order.map(w => `<li><i class="sw" style="background:${w.col}"></i>${esc(w.ge.name)}<em>${w.steps} st.</em></li>`).join('') || '<li class="hint">nog niemand…</li>'}</ol>`;
+    } else if (M.res) {
+      if (M.busy) html += `<div class="wait">Ronde ${M.round} klaar — ronde ${M.round + 1} start zo…</div>`;
+      html += `<p><b>Ronde ${M.round}</b> · volgorde op ${M.heavy ? 'gemiddelde van testbaan en zware testbaan' : 'testbaan'}; race = stappen in dit doolhof (– = niet afgewacht).</p>
         <div class="duel-wrap"><table class="duel"><thead><tr><th></th><th>Race</th><th>Test</th>${M.heavy ? '<th>Zwaar</th>' : ''}<th>Δ</th></tr></thead><tbody>
         ${M.res.slice(0, 14).map((x, i) => { const b = M.res.find(y => y.a.base), d = Math.round((x.score - b.score) * 10) / 10;
-          return `<tr${i ? '' : ' class="top"'}><th><i class="sw" style="background:${x.a.col}"></i>${esc(x.a.name)}</th><td>${x.race != null ? x.race : '✗'}</td><td class="${i ? '' : 'best'}">${x.t}</td>${M.heavy ? `<td>${x.h}</td>` : ''}<td>${x.a.base ? '' : (d > 0 ? '+' : '') + d}</td></tr>`; }).join('')}
+          return `<tr${i ? '' : ' class="top"'}><th><i class="sw" style="background:${x.a.col}"></i>${esc(x.a.name)}</th><td>${x.race != null ? x.race : x.cut ? '–' : '✗'}</td><td class="${i ? '' : 'best'}">${x.t}</td>${M.heavy ? `<td>${x.h}</td>` : ''}<td>${x.a.base ? '' : (d > 0 ? '+' : '') + d}</td></tr>`; }).join('')}
         </tbody></table></div>`;
-    }
+    } else if (!M.busy) html += '<p class="hint">Stel links in hoeveel mutanten en rondes, en druk op Start. Het doolhof laat nu een voorproefje van het origineel zien.</p>';
     if (M.log.length) html += `<div class="tree"><b>Verloop</b> ${M.log.map(l => `R${l.round}: ${l.score}${l.gain > 0 ? ` (+${l.gain})` : ' (geen winst)'}`).join(' · ')}</div>`;
-    if (M.round && M.src.genes.join() !== M.orig.join()) html += `<div class="btns"><button class="btn primary" data-ev="mut-save">Bewaar beste als nieuwe versie</button><button class="btn" data-ev="mut-bench">Naar werkbank</button><button class="btn" data-ev="mut-duel">Duel met origineel</button></div>`;
-    el.innerHTML = html;
+    if (!M.busy && M.round && M.src.genes.join() !== M.orig0.join()) html += '<div class="btns"><button class="btn" data-ev="mut-duel">Duel met origineel</button><button class="btn" data-ev="mut-bench">Beste naar werkbank</button></div>';
+    return html;
   }
   function mutSave() {
     const M = E.mut; if (!M) return;
-    const algos = EV().loadAlgos(), parent = algos.find(a => a.id === M.src.id) || algos.find(a => a.genes.join() === M.orig.join());
+    const algos = EV().loadAlgos(), parent = algos.find(a => a.id === M.src.id) || algos.find(a => a.genes.join() === M.orig0.join());
     const ver = parent ? parent.ver + 1 : 2, name = `${M.src.name.replace(/ v\d+$/, '')} v${ver}`;
-    if (addAlgo({ name, genes: M.src.genes, parent: parent ? parent.id : M.src.id, ver, parents: [M.origName], folder: parent ? parent.folder : '', tags: parent ? parent.tags : ['mutant'], born: E.gen, note: `Mutantenlab: ${M.log.length} rondes vanaf ${M.origName}` }))
-      note(`${name} bewaard.`); else note('Dit DNA stond al in je bibliotheek.');
-    rankList(); champCard(); mutRender();
+    const a = saveVersion({ name, genes: M.src.genes, parent: parent ? parent.id : M.src.id, ver, parents: [M.origName], folder: parent ? parent.folder : '', tags: parent ? parent.tags : ['mutant'], born: E.gen, note: `Mutantenlab: ${M.log.length} rondes vanaf ${M.origName}` });
+    if (!a) return;
+    note(`${name} bewaard.`);
+    E.task.algo = pick({ ...a, mine: true }); M.orig0 = a.genes.slice(); M.src = { ...M.src, id: a.id };
+    stepsRender(); taskOut();
   }
 
   // ---- Doolhof-zoeker: welke doolhoven zijn het moeilijkst voor dit algoritme? (zoekt + klimt naar slechtere scores) ----
-  function huntSrc(a) {
-    if (!a) return;
-    E.hunt = { target: { id: a.id, name: a.name, genes: a.genes.slice() }, found: [], tried: 0, running: false, grids: A.S.evoGrid === 'mix' ? 'all' : A.S.evoGrid };
-    openDrawer('hunt');
-  }
   function huntScore(genes, mz) { let s = 0; for (let r = 0; r < 3; r++) s += EV().evalOne(mz.ctx, genes, 'jacht|' + r).score(); return Math.round(s / 3 * 1000) / 10; }
   function huntCand(H, r) {
     const Ev = EV(), G = H.grids === 'all' ? Ev.GRIDS : [H.grids], f = H.found;
@@ -740,8 +958,9 @@
   }
   async function huntRun() {
     const H = E.hunt; if (!H || H.running) return;
-    H.running = true; huntRender();
+    H.running = true; setStep('busy'); taskIn();
     const r = ML.makeRng(Math.random()), Ev = EV(), budget = H.tried + 150;
+    let shown = 0;
     while (H.running && H.tried < budget && E.hunt === H && A.S.mode === 'evo') {
       const t0 = performance.now();
       while (performance.now() - t0 < 40 && H.tried < budget) {
@@ -755,96 +974,74 @@
           H.found.sort((a, b) => a.sc - b.sc); H.found.length = Math.min(8, H.found.length);
         }
       }
-      if (E.drawer === 'hunt') huntRender();
+      if (E.page === 'task' && E.task && E.task.kind === 'hunt' && performance.now() - shown > 300) { shown = performance.now(); taskOut(); }
       await new Promise(res => setTimeout(res, 0));
     }
-    H.running = false; if (E.drawer === 'hunt') huntRender();
+    const done = H.running; H.running = false;
+    if (E.hunt === H && E.task && E.task.kind === 'hunt') { if (done && H.found.length) huntShow(0, false); setStep(done ? 'done' : 'pick'); taskIn(); }
   }
-  function huntRender() {
-    const el = $('#evo-dbody'), H = E.hunt, Ev = EV();
-    if (!H) { el.innerHTML = '<p class="hint" style="margin-top:0">Kies een algoritme met 🎯 (ranglijst, bibliotheek of kampioen). De zoeker bouwt honderden doolhoven en klimt naar de doolhoven waar dat algoritme het slechtst op scoort. Daarna: kijken, duel met de klassiekers, of de populatie erop laten trainen.</p>'; return; }
-    const gsel = `<select data-hunt="grids">${[['all', 'Alle rasters'], ...Ev.GRIDS.map(g => [g, GRID_NAMES[g]])].map(([k, t]) => `<option value="${k}"${k === H.grids ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
-    el.innerHTML = `<p class="hint" style="margin-top:0">Doelwit: <b>${esc(H.target.name)}</b> · ${H.tried} doolhoven geprobeerd. Score = gemiddelde van 3 runs (0–100); lager = moeilijker.</p>
-      <div class="mut-set"><label>Raster ${gsel}</label></div>
-      <div class="btns"><button class="btn primary" data-ev="hunt-go">${H.running ? 'Stop' : H.tried ? 'Zoek verder (+150)' : 'Zoek (150 doolhoven)'}</button>${H.found.length ? '<button class="btn" data-ev="hunt-train">Train de populatie hierop</button>' : ''}</div>
-      ${H.found.length ? `<div class="duel-wrap"><table class="duel hunt"><thead><tr><th>Doolhof</th><th>Score</th><th>Klassiek</th><th></th></tr></thead><tbody>
-      ${H.found.map((f, i) => `<tr><th>${esc(Ev.spName(f.sp))}<small>${esc(f.sp.maker)} · kortste ${f.opt}</small></th><td class="${f.sc < f.cb.sc ? 'worse' : ''}">${f.sc}</td><td>${f.cb.sc}<small>${esc(f.cb.name)}</small></td>
-        <td class="acts"><button data-ev="hunt-watch" data-i="${i}" title="Kijk">▶</button><button data-ev="hunt-duel" data-i="${i}" title="Duel met de beste klassieker">vs</button></td></tr>`).join('')}
-      </tbody></table></div>` : ''}
-      ${huntSet().length ? `<p class="hint">Trainingsset actief: ${huntSet().length} doolhoven (knop “Zoeker-set” bovenaan).</p>` : ''}`;
+  function huntIn() {
+    const H = E.hunt, Ev = EV(); if (!H) return '';
+    const gsel = `<select data-hunt="grids"${H.running ? ' disabled' : ''}>${[['all', 'Alle rasters'], ...Ev.GRIDS.map(g => [g, GRID_NAMES[g]])].map(([k, t]) => `<option value="${k}"${k === H.grids ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
+    return `<p class="hint" style="margin-top:0">De zoeker bouwt honderden doolhoven en klimt naar de doolhoven waar <b>${esc(H.target.name)}</b> het slechtst op scoort. Daarna: kijken, duel met de beste klassieker, of de evolutie erop laten trainen.</p>
+      <div class="frow2"><span>Raster</span>${gsel}</div>
+      <div class="btns"><button class="btn primary" data-ev="hunt-go">${H.running ? 'Stop' : H.tried ? 'Zoek verder (+150)' : 'Zoek (150 doolhoven)'}</button></div>
+      ${H.found.length && !H.running ? '<div class="btns" style="margin-top:6px"><button class="btn" data-ev="hunt-train" title="De evolutie (Evolueren) traint vanaf nu op deze doolhoven">Train de evolutie hierop</button></div>' : ''}
+      ${huntSet().length ? `<p class="hint">Trainingsset actief: ${huntSet().length} doolhoven (Evolueren → Doolhof → Zoeker-set).</p>` : ''}`;
+  }
+  function huntOut() {
+    const H = E.hunt, Ev = EV(); if (!H) return '';
+    if (!H.found.length) return `<p class="hint" style="margin-top:0">${H.running ? `Zoeken… ${H.tried} doolhoven geprobeerd.` : 'Nog niets gezocht. Druk links op Zoek.'}</p>`;
+    return `<p style="margin-top:0">${H.running ? 'Zoeken… ' : ''}${H.tried} doolhoven geprobeerd. Score = gemiddelde van 3 runs (0–100); lager = moeilijker. Rood = slechter dan de beste klassieker.</p>
+      <div class="duel-wrap"><table class="duel hunt"><thead><tr><th>Doolhof</th><th>Score</th><th>Klassiek</th><th></th></tr></thead><tbody>
+      ${H.found.map((f, i) => `<tr${H.sel === i ? ' class="top"' : ''}><th>${esc(Ev.spName(f.sp))}<small>${esc(f.sp.maker)} · kortste ${f.opt}</small></th><td class="${f.sc < f.cb.sc ? 'worse' : ''}">${f.sc}</td><td>${f.cb.sc}<small>${esc(f.cb.name)}</small></td>
+        <td class="acts"><button data-ev="hunt-watch" data-i="${i}" title="Bekijk in het doolhof">▶</button><button data-ev="hunt-duel" data-i="${i}" title="Duel met de beste klassieker op dit doolhof">vs</button></td></tr>`).join('')}
+      </tbody></table></div>`;
   }
   function huntShow(i, duel) {
     const H = E.hunt, f = H && H.found[i]; if (!f) return;
-    E.turbo = 0; E.forced = EV().specMaze(f.sp, HUNT_ASP);
-    if (duel) { const bc = EV().PRESETS.find(p => p.name === f.cb.name) || EV().bestClassic().p; startDuel([H.target, bc], true); }
-    else { E.show = { kind: 'solo', list: [{ id: 'hunt', name: H.target.name, genes: H.target.genes.slice(), col: '#ffd34d' }] }; E.running = true; startGen(); toolbar(); }
-  }
-
-  // ---- Stamboom (grafisch): versies uit de bibliotheek als boom ----
-  function treeRender() {
-    const el = $('#evo-dbody'), Ev = EV(), algos = Ev.loadAlgos(), byId = new Map(algos.map(a => [a.id, a]));
-    Ev.PRESETS.forEach(p => { if (algos.some(a => a.parent === p.id)) byId.set(p.id, { ...p, classic: true }); });
-    const nodes = [...byId.values()], kids = new Map();
-    nodes.forEach(a => { const p = a.parent && byId.has(a.parent) ? a.parent : null; a._p = p; if (p) { if (!kids.has(p)) kids.set(p, []); kids.get(p).push(a); } });
-    const roots = nodes.filter(a => !a._p).sort((a, b) => Ev.testScore(b.genes).score - Ev.testScore(a.genes).score);
-    if (!nodes.length) { el.innerHTML = '<p class="hint" style="margin-top:0">Nog geen bewaarde algoritmes. Bewaar een kampioen en maak er versies van in de werkbank of het mutantenlab: die verschijnen hier als boom.</p>'; return; }
-    const DX = 150, DY = 40, W = 128, H = 30, pos = new Map();
-    let row = 0, maxD = 0;
-    const place = (a, d) => { maxD = Math.max(maxD, d); const ch = (kids.get(a.id) || []).sort((x, y) => String(x.created).localeCompare(String(y.created)));
-      if (!ch.length) pos.set(a.id, { x: 8 + d * DX, y: 8 + row++ * DY }); else { ch.forEach(c => place(c, d + 1)); const ys = ch.map(c => pos.get(c.id).y); pos.set(a.id, { x: 8 + d * DX, y: (Math.min(...ys) + Math.max(...ys)) / 2 }); } };
-    roots.forEach(a => place(a, 0));
-    const SW = 16 + (maxD + 1) * DX, SH = 16 + row * DY;
-    let edges = '', boxes = '';
-    nodes.forEach(a => {
-      const p = pos.get(a.id); if (!p) return;
-      if (a._p) { const q = pos.get(a._p); edges += `<path d="M${q.x + W},${q.y + H / 2} C${q.x + W + 14},${q.y + H / 2} ${p.x - 14},${p.y + H / 2} ${p.x},${p.y + H / 2}"/>`; }
-      const sc = Ev.testScore(a.genes).score, par = a._p ? Ev.testScore(byId.get(a._p).genes).score : null, d = par != null ? Math.round((sc - par) * 10) / 10 : null;
-      boxes += `<g class="tn${a.classic ? ' classic' : ''}" data-ev="tree-open" data-id="${esc(a.id)}" transform="translate(${p.x},${p.y})"><title>${esc(Ev.describe(a.genes))}</title><rect width="${W}" height="${H}" rx="7"/>
-        <rect width="5" height="${H}" rx="2" fill="${Ev.colorOf(a.genes)}"/><text x="11" y="13">${esc(a.name.length > 17 ? a.name.slice(0, 16) + '…' : a.name)}</text>
-        <text x="11" y="25" class="s">${sc}${d != null ? ` <tspan class="${d >= 0 ? 'up' : 'down'}">${d >= 0 ? '+' : ''}${d}</tspan>` : ''}${a.ver > 1 ? ' · v' + a.ver : ''}</text></g>`;
-    });
-    el.innerHTML = `<p class="hint" style="margin-top:0">Elke lijn = nieuwe versie (werkbank of mutantenlab). Groen/rood = winst/verlies op de testbaan t.o.v. de ouder. Klik een blokje om het in de bibliotheek te openen.</p>
-      <div class="treewrap"><svg class="stree" width="${SW}" height="${SH}" viewBox="0 0 ${SW} ${SH}"><g class="edges">${edges}</g>${boxes}</svg></div>`;
+    H.sel = i; T.forced = EV().specMaze(f.sp, HUNT_ASP); T.mazes = [];
+    if (duel) {
+      const bc = EV().PRESETS.find(p => p.name === f.cb.name) || EV().bestClassic().p;
+      startShow('duel', [{ id: 'h0', name: H.target.name, genes: H.target.genes.slice(), col: DUEL_COLS[0] }, { id: 'h1', name: bc.name, genes: bc.genes.slice(), col: DUEL_COLS[1] }]);
+    } else startShow('solo', [{ id: 'hunt', name: H.target.name, genes: H.target.genes.slice(), col: '#ffd34d' }]);
+    taskOut();
   }
 
   // ---- Uitleg-replay: per stap welke zetten er waren, de punten per gen en de kans ----
-  function whyStart() {
-    E.xp = { last: null };
-    if (!(E.show && E.show.kind === 'solo')) { const c = E.champ || EV().bestClassic().p; watch(c); }
-    E.running = false; toolbar(); whyRender();
-  }
-  function whyWalker() { return E.show && E.show.kind === 'solo' && E.runs && E.runs[0] ? { run: E.runs[0], w: E.runs[0].ws[0] } : null; }
+  function whyWalker() { return E.task && E.task.kind === 'why' && T.show && T.show.kind === 'solo' && T.runs && T.runs[0] ? { run: T.runs[0], w: T.runs[0].ws[0] } : null; }
   function whyStep(n) {
     const o = whyWalker(); if (!o) return;
     const { run, w } = o;
+    if (!E.xp) E.xp = { last: null };
     if (n < 0) { // terug: opnieuw vanaf de start met hetzelfde zaadje (deterministisch)
       const k = Math.max(0, w.steps + n);
       w.reset(w.ge.genes, w.seed); run.heat.fill(0); run.heatBy.clear(); run.order.length = 0;
       for (let i = 0; i < k - 1; i++) { w.step(); run.heat[w.nc]++; heatAdd(run, w); }
       if (k > 0) { const ex = w.explain(); w.step(); run.heat[w.nc]++; heatAdd(run, w); E.xp.last = { opts: ex, pick: w.s }; } else E.xp.last = null;
     } else for (let i = 0; i < n && !w.done; i++) { const ex = w.explain(); w.step(); run.heat[w.nc]++; heatAdd(run, w); E.xp.last = { opts: ex, pick: w.s }; }
-    w.p = 1; E.running = false; E.phase = w.done ? 'pause' : 'run'; E.endT = Infinity;
-    E.panes[0].dirty = true; paneStats(w.done); toolbar(); whyTable();
+    w.p = 1; T.running = false; T.phase = w.done ? 'pause' : 'run'; T.endT = Infinity;
+    T.panes[0].dirty = true; paneStats(T, w.done);
+    E.task.step = w.done ? 'done' : 'busy'; stepsRender(); taskIn(); taskOut();
   }
-  function whyRender() {
-    const el = $('#evo-dbody'), o = whyWalker();
-    if (!o) { el.innerHTML = '<p class="hint" style="margin-top:0">Open “Kijk alleen” bij een algoritme; hier zie je dan per stap waarom het die kant op ging.</p><div class="btns"><button class="btn primary" data-ev="why-start">Uitleg bij de kampioen</button></div>'; return; }
-    el.innerHTML = `<p class="hint" style="margin-top:0">Elke zet krijgt punten (gen × kenmerk). Daarna loot de loper met “chaos” als temperatuur: hoe hoger de punten, hoe groter de kans. In het doolhof: cirkel = kans per zet.</p>
-      <div class="btns"><button class="btn" data-ev="why-back10">−10</button><button class="btn" data-ev="why-back">◀ Stap</button><button class="btn primary" data-ev="why-step">Stap ▶</button><button class="btn" data-ev="why-10">+10</button><button class="btn" data-ev="why-play">${E.running ? 'Pauze' : 'Speel af'}</button></div>
-      <div id="why-tab"></div>`;
-    whyTable();
+  function whyIn() {
+    return `<p class="hint" style="margin-top:0">Elke zet krijgt punten (gen × kenmerk). Daarna loot de loper met “chaos” als temperatuur: hoe hoger de punten, hoe groter de kans. In het doolhof: cirkel = kans per zet.</p>
+      <div class="btns"><button class="btn" data-ev="why-back10">−10</button><button class="btn" data-ev="why-back">◀ Stap</button><button class="btn primary" data-ev="why-step">Stap ▶</button><button class="btn" data-ev="why-10">+10</button></div>
+      <div class="btns" style="margin-top:6px"><button class="btn" data-ev="why-play">${T.running && T.phase === 'run' ? 'Pauze' : 'Speel af'}</button><button class="btn" data-ev="why-restart">Vanaf het begin</button></div>`;
   }
-  function whyTable() {
-    const el = $('#why-tab'), o = whyWalker(); if (!el || !o) return;
+  function whyOut() { return `<div id="why-tab">${whyHtml()}</div>`; }
+  function whyTable() { const el = $('#why-tab'); if (el) el.innerHTML = whyHtml(); }
+  function whyHtml() {
+    const o = whyWalker(); if (!o) return '';
     const { w } = o, G = EV().GENES, cur = w.done ? null : w.explain(), L = E.xp && E.xp.last;
     const row = (x, picked) => {
       const chips = x.parts.map((v, i) => Math.abs(v) >= 0.05 ? `<em style="border-color:${G[i].col}" title="${esc(G[i].name)}">${v > 0 ? '+' : ''}${v.toFixed(1)} ${esc(G[i].name)}</em>` : '').join('');
       return `<div class="wrow${picked ? ' pick' : ''}"><b>${Math.round(x.p * 100)}%</b><span>${x.visits ? `al ${x.visits}× geweest` : 'nieuw'}${x.jump ? ' · sprong' : ''} · ${x.sc.toFixed(1)} pt</span><div class="chips">${chips || '<em>geen voorkeur</em>'}</div></div>`;
     };
-    let html = `<p><b>Stap ${w.steps}</b>${w.reached ? ' · doel bereikt ✓' : w.done ? ' · gestopt (limiet)' : ''} · temperatuur ${w.T.toFixed(2)}</p>`;
-    if (L) html += `<div class="wsec">Vorige keuze</div>` + L.opts.slice().sort((a, b) => b.p - a.p).map(x => row(x, x.s2 === L.pick)).join('');
+    let html = `<p style="margin-top:0"><b>Stap ${w.steps}</b>${w.reached ? ' · doel bereikt ✓' : w.done ? ' · gestopt (limiet)' : ''} · temperatuur ${w.T.toFixed(2)}</p>`;
+    if (L) html += '<div class="wsec">Vorige keuze</div>' + L.opts.slice().sort((a, b) => b.p - a.p).map(x => row(x, x.s2 === L.pick)).join('');
     if (cur) html += `<div class="wsec">Nu te kiezen (${cur.length})</div>` + cur.slice().sort((a, b) => b.p - a.p).map(x => row(x, false)).join('');
-    el.innerHTML = html;
+    return html;
   }
   function drawWhy(run, g, r) {
     const w = run.ws[0]; if (!w || w.done) return;
@@ -861,10 +1058,53 @@
     g.textAlign = 'left'; g.textBaseline = 'alphabetic';
   }
 
+  // ======================= Analyse =======================
+  function anaRender() { treeRender(); famRender(); }
+  function famRender() {
+    const el = $('#ana-fame'); if (!el) return;
+    const list = EV().loadFame(), Ev = EV();
+    if (!list.length) { el.innerHTML = '<p class="hint" style="margin-top:0">Nog leeg. Elk nieuw record van een eigen algoritme komt hier vanzelf in (top 20, ook over sessies heen).</p>'; return; }
+    const heavy = Ev.heavyReady(), medal = ['🥇', '🥈', '🥉'];
+    const acts = a => (isSaved(a.genes) ? '' : `<button title="Bewaar in mijn algoritmes" data-ev="save-fame" data-id="${esc(a.id)}">💾</button>`) + `<button title="Uit de eregalerij" data-ev="del-fame" data-id="${esc(a.id)}">✕</button>`;
+    const hv = a => a.heavy != null ? a.heavy : heavy ? Ev.heavyScore(a.genes).score : '…';
+    el.innerHTML = `<div class="podium">${list.slice(0, 3).map((a, i) => `<div class="pod p${i + 1}" data-ev="sel-go" data-id="${esc(a.id)}" title="klik: openen in Algoritmes"><span class="md">${medal[i]}</span><i class="sw" style="background:${Ev.colorOf(a.genes)}"></i><b>${esc(a.name)}</b>
+        <span class="big">${a.test}</span><small>zwaar ${hv(a)} · gen ${a.gen} · ${esc(a.date)}</small><span class="acts">${acts(a)}</span></div>`).join('')}</div>
+      <div class="fame">${list.slice(3).map((a, i) => `<div class="erow" data-ev="sel-go" data-id="${esc(a.id)}" title="${esc(Ev.describe(a.genes))}"><b class="pos">${i + 4}</b><i class="sw" style="background:${Ev.colorOf(a.genes)}"></i>
+        <span class="nm">${esc(a.name)}<small>gen ${a.gen} · ${esc(a.date)}${a.parents && a.parents.length ? ' · ' + a.parents.map(esc).join(' × ') : ''}</small></span>
+        <span class="sc">${a.test}<small>zwaar ${hv(a)}</small></span><span class="acts">${acts(a)}</span></div>`).join('')}</div>`;
+  }
+  function treeRender() {
+    const el = $('#ana-tree'); if (!el) return;
+    const Ev = EV(), algos = Ev.loadAlgos(), byId = new Map(algos.map(a => [a.id, a]));
+    Ev.PRESETS.forEach(p => { if (algos.some(a => a.parent === p.id)) byId.set(p.id, { ...p, classic: true }); });
+    const nodes = [...byId.values()], kids = new Map();
+    nodes.forEach(a => { const p = a.parent && byId.has(a.parent) ? a.parent : null; a._p = p; if (p) { if (!kids.has(p)) kids.set(p, []); kids.get(p).push(a); } });
+    const roots = nodes.filter(a => !a._p).sort((a, b) => Ev.testScore(b.genes).score - Ev.testScore(a.genes).score);
+    if (!nodes.length) { el.innerHTML = '<p class="hint" style="margin-top:0">Nog geen bewaarde algoritmes. Bewaar een kampioen en maak er versies van met de werkbank of het mutantenlab: die verschijnen hier als boom.</p>'; return; }
+    const DX = 150, DY = 40, W = 128, H = 30, pos = new Map();
+    let row = 0, maxD = 0;
+    const place = (a, d) => { maxD = Math.max(maxD, d); const ch = (kids.get(a.id) || []).sort((x, y) => String(x.created).localeCompare(String(y.created)));
+      if (!ch.length) pos.set(a.id, { x: 8 + d * DX, y: 8 + row++ * DY }); else { ch.forEach(c => place(c, d + 1)); const ys = ch.map(c => pos.get(c.id).y); pos.set(a.id, { x: 8 + d * DX, y: (Math.min(...ys) + Math.max(...ys)) / 2 }); } };
+    roots.forEach(a => place(a, 0));
+    const SW = 16 + (maxD + 1) * DX, SH = 16 + row * DY;
+    let edges = '', boxes = '';
+    nodes.forEach(a => {
+      const p = pos.get(a.id); if (!p) return;
+      if (a._p) { const q = pos.get(a._p); edges += `<path d="M${q.x + W},${q.y + H / 2} C${q.x + W + 14},${q.y + H / 2} ${p.x - 14},${p.y + H / 2} ${p.x},${p.y + H / 2}"/>`; }
+      const sc = Ev.testScore(a.genes).score, par = a._p ? Ev.testScore(byId.get(a._p).genes).score : null, d = par != null ? Math.round((sc - par) * 10) / 10 : null;
+      boxes += `<g class="tn${a.classic ? ' classic' : ''}${E.treeSel === a.id ? ' hl' : ''}" data-ev="sel-go" data-id="${esc(a.id)}" transform="translate(${p.x},${p.y})"><title>${esc(Ev.describe(a.genes))}</title><rect width="${W}" height="${H}" rx="7"/>
+        <rect width="5" height="${H}" rx="2" fill="${Ev.colorOf(a.genes)}"/><text x="11" y="13">${esc(a.name.length > 17 ? a.name.slice(0, 16) + '…' : a.name)}</text>
+        <text x="11" y="25" class="s">${sc}${d != null ? ` <tspan class="${d >= 0 ? 'up' : 'down'}">${d >= 0 ? '+' : ''}${d}</tspan>` : ''}${a.ver > 1 ? ' · v' + a.ver : ''}</text></g>`;
+    });
+    el.innerHTML = `<p class="hint" style="margin-top:0">Elke lijn = nieuwe versie (werkbank of mutantenlab). Groen/rood = winst/verlies op de testbaan t.o.v. de ouder. Klik een blokje om het te openen in Algoritmes.</p>
+      <div class="treewrap"><svg class="stree" width="${SW}" height="${SH}" viewBox="0 0 ${SW} ${SH}"><g class="edges">${edges}</g>${boxes}</svg></div>`;
+    const hl = el.querySelector('.tn.hl'); if (hl) hl.scrollIntoView({ block: 'center', inline: 'center' });
+  }
+
   // ---- Rapport: ranglijst + kampioen + verloop + eregalerij als zelfstandige HTML ----
   function report() {
     const Ev = EV(), list = entries(), fame = Ev.loadFame(), c = E.champ, d = new Date(), heavy = Ev.heavyReady();
-    const bars = genes => `<div class="dna">${Ev.GENES.map((G, i) => { const v = genes[i], z = G.k === 'chaos' ? (v - G.lo) / (G.hi - G.lo) : v / G.hi, w = Math.abs(z) * 50;
+    const bars = genes => `<div class="dna">${Ev.GENES.map((G, i) => { const v = genes[i], z = geneZ(G, v), w = Math.abs(z) * 50;
       const st = G.k === 'chaos' ? `left:0;width:${z * 100}%` : z >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`; return `<span title="${esc(G.name)} ${v.toFixed(2)}"><i style="${st};background:${G.col}"></i></span>`; }).join('')}</div>`;
     const hs = E.hist, n = hs.length, step = Math.max(1, Math.ceil(n / 400));
     let svg = '';
@@ -898,100 +1138,121 @@ ${fame.length ? `<h2>Eregalerij</h2><div class="wrap"><table><thead><tr><th>#</t
     a.href = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
     a.download = `maze-lab-rapport-${d.toISOString().slice(0, 10)}.html`; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    note('Rapport gedownload.'); champCard();
+    note('Rapport gedownload.');
   }
 
-  // ---- acties ----
+  // ======================= acties =======================
+  function afterSave() { champCard(); rankList(); liveCard(); if (E.page === 'algos') { algoGrid(); algoDetail(); } }
   function saveChamp() {
-    const c = E.champ; if (!c) return;
-    const list = EV().loadAlgos();
-    if (list.some(a => a.genes.join() === c.genes.join())) return;
-    const a = EV().newAlgo({ name: c.name, genes: c.genes, born: c.born, parents: c.parents || [] });
-    EV().stampHist(a); list.push(a);
-    EV().saveAlgos(list); note(`${c.name} is bewaard in de bibliotheek.`); champCard(); rankList(); if (E.drawer === 'lib') libList();
-  }
-  function watch(a) {
-    if (!a) return;
-    E.turbo = 0; E.forced = null; E.show = { kind: 'solo', list: [{ id: 'solo-' + a.name, name: a.name, genes: a.genes.slice(), col: '#ffd34d' }] }; E.running = !E.xp;
-    startGen(); toolbar();
+    const c = E.champ; if (!c || c.from) return;
+    if (!addAlgo({ name: c.name, genes: c.genes, born: c.born, parents: c.parents || [] })) return;
+    note(`${c.name} is bewaard bij Algoritmes.`); afterSave();
   }
   function seed(a) {
     if (!a || !E.pop.length) return;
     const s = E.pop.slice().sort((x, y) => (x.fit || 0) - (y.fit || 0));
     const g = EV().genome(a.genes, E.gen, [], { from: a.name, name: a.name });
     E.pop[E.pop.indexOf(s[0])] = g;
-    speciate(); persist(); note(`${a.name} doet mee vanaf de volgende generatie.`); champCard(); legend();
+    speciate(); persist(); note(`${a.name} doet mee vanaf de volgende generatie.`); legend(); liveCard();
   }
-  function duelToggle(a) {
-    if (!a) return;
-    if (E.duelSel.has(a.id)) E.duelSel.delete(a.id);
-    else if (E.duelSel.size < 4) E.duelSel.set(a.id, { id: a.id, name: a.name, genes: a.genes.slice() });
-    else note('Een duel heeft hooguit 4 deelnemers.');
-    rankList(); if (E.drawer === 'lib') libList(); if (E.drawer === 'duel' && !E.duel) duelRender(); champCard();
-  }
-  function onClick(e) {
-    const b = e.target.closest('[data-ev]'); if (!b) return;
-    const act = b.dataset.ev, id = b.dataset.id;
-    if (act === 'lib-open') { if (e.target.closest('.ldet, button, input, textarea, select')) return; E.libOpen = E.libOpen === id ? null : id; libList(); return; }
-    e.stopPropagation();
-    const a = id ? entryById(id) : null;
-    const algos = EV().loadAlgos(), mine = id ? algos.find(x => x.id === id) : null;
-    if (act === 'save-champ') saveChamp();
-    else if (act === 'watch') watch(a);
-    else if (act === 'seed') seed(a);
-    else if (act === 'bench') openBench(a);
-    else if (act === 'duel-tog') duelToggle(a);
-    else if (act === 'duel-start') startDuel([...E.duelSel.values()]);
-    else if (act === 'duel-clear') { E.duelSel.clear(); rankList(); libList(); }
-    else if (act === 'duel-again') { E.salt++; E.forced = null; if (E.duel) { E.duel.done = false; E.show = { kind: 'duel', list: E.duel.list }; E.running = true; startGen(); duelRender(); toolbar(); } }
-    else if (act === 'duel-stop') { E.duel = null; resume(); duelRender(); }
-    else if (act === 'tab') openDrawer(b.dataset.tab);
-    else if (act === 'bench-save') benchSave();
-    else if (act === 'bench-ride') benchRide();
-    else if (act === 'bench-duel' && E.bench) startDuel([{ id: E.bench.src.id, name: E.bench.src.name, genes: E.bench.src.genes }, { id: 'bench-edit', name: E.bench.name, genes: E.bench.genes }]);
-    else if (act === 'bench-reset' && E.bench) { E.bench.genes = E.bench.src.genes.slice(); benchRender(); benchRide(); }
-    else if (act === 'bench-nudge' && E.bench) {
-      const r = ML.makeRng(Math.random()), G = EV().GENES;
-      E.bench.genes = E.bench.genes.map((v, i) => r() < 0.4 ? EV().clamp(v + (r() * 2 - 1) * (G[i].hi - G[i].lo) * 0.12, i) : v).map(v => Math.round(v * 10) / 10);
-      benchRender(); benchRide();
-    }
-    else if (act === 'save-fame' && a) { note(addAlgo({ name: a.name, genes: a.genes, born: a.born || a.gen, parents: a.parents || [] }) ? `${a.name} bewaard.` : 'Stond er al.'); famRender(); rankList(); champCard(); }
-    else if (act === 'del-fame') { EV().delFame(id); famRender(); }
-    else if (act === 'report') report();
-    else if (act === 'mut-src') mutSrc(a);
-    else if (act === 'mut-go' && E.mut) { E.mut.rounds = +E.mut.rounds; E.mut.round = 0; E.mut.log = []; E.mut.orig = E.mut.src.genes.slice(); E.mut.origName = E.mut.bestName || E.mut.origName; mutRound(); }
-    else if (act === 'mut-stop' && E.mut) { E.mut.busy = false; mutRender(); }
-    else if (act === 'mut-save') mutSave();
-    else if (act === 'mut-bench' && E.mut) openBench({ id: E.mut.src.id, name: E.mut.bestName || E.mut.src.name, genes: E.mut.src.genes, ver: E.mut.src.ver });
-    else if (act === 'mut-duel' && E.mut) startDuel([{ id: 'mut-orig', name: E.mut.origName, genes: E.mut.orig }, { id: 'mut-best', name: E.mut.bestName || 'Beste mutant', genes: E.mut.src.genes }]);
-    else if (act === 'hunt-src') huntSrc(a);
-    else if (act === 'hunt-go' && E.hunt) { if (E.hunt.running) E.hunt.running = false; else huntRun(); }
-    else if (act === 'hunt-watch') huntShow(+b.dataset.i, false);
-    else if (act === 'hunt-duel') huntShow(+b.dataset.i, true);
-    else if (act === 'hunt-train' && E.hunt) { A.S.evoHunt = E.hunt.found.map(f => f.sp); A.S.evoMazeMode = 'hunt'; A.save(); E.show = null; E.forced = null; makePanes(); startGen(); toolbar(); note(`De populatie traint nu op ${A.S.evoHunt.length} moeilijke doolhoven.`); champCard(); huntRender(); }
-    else if (act === 'tree-open') { E.libOpen = id; openDrawer('lib'); }
-    else if (act === 'why-start') whyStart();
-    else if (act === 'why-of' && a) { E.xp = { last: null }; watch(a); openDrawer('why'); E.running = false; toolbar(); }
-    else if (act === 'why-step') whyStep(1);
-    else if (act === 'why-10') whyStep(10);
-    else if (act === 'why-back') whyStep(-1);
-    else if (act === 'why-back10') whyStep(-10);
-    else if (act === 'why-play') { E.running = !E.running; if (E.phase === 'pause') E.endT = performance.now() / 1000 + 0.5; toolbar(); whyRender(); }
-    else if (act === 'export') exportAlgos();
-    else if (act === 'import') $('#evo-file').click();
-    else if (act === 'paste') pasteCode();
-    else if (act === 'code' && mine) { const code = EV().toCode(mine); (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(() => note('Deelcode gekopieerd.'), () => prompt('Kopieer deze code', code)).then(champCard); }
-    else if (act === 'del' && mine) {
-      const kids = algos.filter(x => x.parent === mine.id).length;
-      if (confirm(`${mine.name} verwijderen uit je bibliotheek?${kids ? ` (${kids} nieuwere versie${kids > 1 ? 's' : ''} blijven bestaan)` : ''}`)) { EV().saveAlgos(algos.filter(x => x !== mine)); E.duelSel.delete(mine.id); rankList(); libList(); champCard(); }
-    }
-  }
-  function resume() { E.show = null; E.forced = null; E.running = true; if (E.mut) E.mut.busy = false; startGen(); toolbar(); }
   function addAlgo(o) {
     const list = EV().loadAlgos();
     if (list.some(a => a.genes.join() === o.genes.join())) return false;
     const a = EV().newAlgo(o); EV().stampHist(a); list.push(a);
     EV().saveAlgos(list); return true;
+  }
+  function onClick(e) {
+    const hb = e.target.closest('[data-heat]');
+    if (hb && (hb.closest('#evo-species') || hb.closest('#task-legend'))) { // hittekaart per soort/deelnemer
+      const v = hb.dataset.heat, task = !!hb.closest('#task-legend'), k = v === '' ? null : task ? v : +v, view = task ? T : V;
+      view.heatSel = view.heatSel === k ? null : k; if (task) taskLegend(); else legend(); view.panes.forEach(r => { r.dirty = true; });
+      return;
+    }
+    const b = e.target.closest('[data-ev]'); if (!b) return;
+    const act = b.dataset.ev, id = b.dataset.id;
+    if (b.tagName === 'A') e.preventDefault();
+    if (act === 'sel') { if (e.target.closest('input, textarea, select')) return; E.sel = E.sel === id ? null : id; markSel(); algoDetail(); return; }
+    const a = id && id !== '*evo' ? entryById(id) : null;
+    const algos = EV().loadAlgos(), mine = id ? algos.find(x => x.id === id) : null;
+    const M = E.mut, H = E.hunt, B = E.bench;
+    if (act === 'page') setPage(b.dataset.page);
+    else if (act === 'unsel') { E.sel = null; markSel(); algoDetail(); }
+    else if (act === 'sel-go') { E.sel = id; setPage('algos'); const c = document.querySelector(`#algo-grid .acard.sel`); if (c) c.scrollIntoView({ block: 'nearest' }); }
+    else if (act === 'save-champ') saveChamp();
+    else if (act === 'save-any' && a) { note(addAlgo({ name: a.name, genes: a.genes, born: a.born || a.gen || 0, parents: a.parents || [] }) ? `${a.name} bewaard.` : 'Stond er al.'); afterSave(); }
+    else if (act.startsWith('task-') && TASKS[act.slice(5)]) openTask(act.slice(5), a);
+    else if (act === 'tree') { E.treeSel = id; setPage('ana'); }
+    else if (act === 'seed' && a) { seed(a); setPage('evolve'); }
+    else if (act === 'run') toggleRun();
+    else if (act === 'skip') { if (V.phase === 'run') finishNow(); else startGen(); }
+    else if (act === 'turbo') turbo(+b.dataset.turbo);
+    else if (act === 'mm') { A.S.evoMazeMode = b.dataset.mm; A.save(); makePanes(); startGen(); evoBar(); }
+    else if (act === 'reset') {
+      if (!confirm('Opnieuw beginnen? De huidige populatie en grafiek gaan weg (bewaarde algoritmes blijven).')) return;
+      E.turbo = 0; fresh(A.S.evoSeedSaved ? EV().loadAlgos() : []); refreshUI(true); startGen(); evoBar();
+    }
+    // taak algemeen
+    else if (act === 'next-task') { stopTask(); E.task = null; taskRender(); }
+    else if (act === 'save-ver') { if (E.task && E.task.kind === 'bench') benchSave(); else if (E.task && E.task.kind === 'mut') mutSave(); }
+    else if (act === 'task-maze' && E.task) {
+      T.salt++; T.forced = null; T.mazes = []; if (H) H.sel = -1;
+      const k = E.task.kind;
+      if (k === 'bench') benchRide();
+      else if (k === 'duel' && E.duel && E.duel.list) startDuel(E.duel.pick, false);
+      else if (k === 'why') { E.xp = { last: null }; startShow('solo', T.show ? T.show.list : [{ id: 'why', name: E.task.algo.name, genes: E.task.algo.genes, col: '#ffd34d' }]); T.running = false; E.task.step = 'pick'; stepsRender(); taskIn(); taskOut(); }
+      else if (!(M && M.busy)) startShow(T.show && T.show.kind !== 'mut' ? T.show.kind : 'preview', T.show && T.show.kind !== 'mut' ? T.show.list : [{ id: 'prev', name: E.task.algo.name, genes: E.task.algo.genes, col: '#ffd34d' }]);
+    }
+    // werkbank
+    else if (act === 'bench-ride') benchRide();
+    else if (act === 'bench-duel' && B) duelNow([{ ...B.src }, { id: 'bench-edit', name: B.name, genes: B.genes }]);
+    else if (act === 'bench-reset' && B) { B.genes = B.src.genes.slice(); taskIn(); benchRide(); }
+    else if (act === 'bench-nudge' && B) {
+      const r = ML.makeRng(Math.random()), G = EV().GENES;
+      B.genes = B.genes.map((v, i) => r() < 0.4 ? EV().clamp(v + (r() * 2 - 1) * (G[i].hi - G[i].lo) * 0.12, i) : v).map(v => Math.round(v * 10) / 10);
+      taskIn(); benchRide();
+    }
+    // duel
+    else if (act === 'duel-start' && E.duel) startDuel(E.duel.pick, true);
+    else if (act === 'duel-again' && E.duel) { T.salt++; T.forced = null; T.mazes = []; startDuel(E.duel.pick, false); }
+    // mutanten
+    else if (act === 'mut-go' && M) { M.rounds = +M.rounds; M.round = 0; M.log = []; M.orig = M.src.genes.slice(); M.origName = M.bestName || M.origName; mutRound(); }
+    else if (act === 'mut-stop' && M) { M.busy = false; if (T.show && T.show.kind === 'mut' && T.phase === 'run') { T.running = false; } setStep(M.res ? 'done' : 'pick'); taskIn(); }
+    else if (act === 'mut-bench' && M) openTask('bench', { id: M.src.id, name: M.bestName || M.src.name, genes: M.src.genes, ver: M.src.ver, folder: M.src.folder, tags: M.src.tags });
+    else if (act === 'mut-duel' && M) duelNow([{ id: 'mut-orig', name: M.origName, genes: M.orig0 }, { id: 'mut-best', name: M.bestName || 'Beste mutant', genes: M.src.genes }]);
+    // zoeker
+    else if (act === 'hunt-go' && H) { if (H.running) H.running = false; else huntRun(); }
+    else if (act === 'hunt-watch') huntShow(+b.dataset.i, false);
+    else if (act === 'hunt-duel') huntShow(+b.dataset.i, true);
+    else if (act === 'hunt-train' && H) {
+      A.S.evoHunt = H.found.map(f => f.sp); A.S.evoMazeMode = 'hunt'; A.save(); makePanes(); startGen(); evoBar();
+      note(`De evolutie traint nu op ${A.S.evoHunt.length} moeilijke doolhoven (Evolueren).`); taskIn();
+    }
+    // uitleg
+    else if (act === 'why-step') whyStep(1);
+    else if (act === 'why-10') whyStep(10);
+    else if (act === 'why-back') whyStep(-1);
+    else if (act === 'why-back10') whyStep(-10);
+    else if (act === 'why-restart') { const o = whyWalker(); if (o) whyStep(-o.w.steps); }
+    else if (act === 'why-play') whyPlay();
+    // eregalerij, rapport, bibliotheek
+    else if (act === 'save-fame' && a) { note(addAlgo({ name: a.name, genes: a.genes, born: a.born || a.gen, parents: a.parents || [] }) ? `${a.name} bewaard.` : 'Stond er al.'); famRender(); afterSave(); }
+    else if (act === 'del-fame') { EV().delFame(id); famRender(); }
+    else if (act === 'report') report();
+    else if (act === 'export') exportAlgos();
+    else if (act === 'import') $('#evo-file').click();
+    else if (act === 'paste') pasteCode();
+    else if (act === 'code' && mine) { const code = EV().toCode(mine); (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(() => note('Deelcode gekopieerd.'), () => prompt('Kopieer deze code', code)); }
+    else if (act === 'del' && mine) {
+      const kids = algos.filter(x => x.parent === mine.id).length;
+      if (confirm(`${mine.name} verwijderen uit je algoritmes?${kids ? ` (${kids} nieuwere versie${kids > 1 ? 's' : ''} blijven bestaan)` : ''}`)) { EV().saveAlgos(algos.filter(x => x !== mine)); E.sel = null; afterSave(); }
+    }
+  }
+  function toggleRun() { if (E.turbo) { E.turbo = 0; return; } V.running = !V.running; if (V.running && V.phase === 'idle') startGen(); evoBar(); }
+  function whyPlay() {
+    const o = whyWalker(); if (!o) return;
+    if (o.w.done) whyStep(-o.w.steps);
+    T.running = !(T.running && T.phase === 'run'); T.phase = 'run';
+    E.task.step = 'busy'; stepsRender(); taskIn();
   }
   function exportAlgos() {
     const data = { format: 'maze-lab-dna/2', genes: EV().GENES.map(G => G.k), algos: EV().loadAlgos() };
@@ -1011,7 +1272,7 @@ ${fame.length ? `<h2>Eregalerij</h2><div class="wrap"><table><thead><tr><th>#</t
             ver: x.ver | 0 || 1, folder: str(x.folder, 30), tags: Array.isArray(x.tags) ? x.tags.map(t => str(t, 20)).filter(Boolean) : [], note: str(x.note, 500) })) n++;
         }
       } catch (e) { /* ongeldig */ }
-      note(n ? `${n} algoritme${n === 1 ? '' : 's'} geïmporteerd.` : 'Niets nieuws gevonden in dat bestand.'); rankList(); champCard(); if (E.drawer === 'lib') libRender();
+      note(n ? `${n} algoritme${n === 1 ? '' : 's'} geïmporteerd.` : 'Niets nieuws gevonden in dat bestand.'); afterSave(); if (E.page === 'algos') algosRender();
     };
     rd.readAsText(f);
   }
@@ -1019,60 +1280,14 @@ ${fame.length ? `<h2>Eregalerij</h2><div class="wrap"><table><thead><tr><th>#</t
     const s = prompt('Plak een deelcode (begint met MLDNA1:)');
     if (!s) return;
     const o = EV().fromCode(s);
-    note(!o ? 'Dat is geen geldige deelcode.' : addAlgo(o) ? `${o.name} toegevoegd.` : `${o.name} stond er al.`); rankList(); champCard(); if (E.drawer === 'lib') libList();
-  }
-
-  // ---- statusregel, knoppen, legenda ----
-  function status() {
-    const el = $('#evo-status'); if (!el) return;
-    if (E.turbo) {
-      const sec = (performance.now() - E.turboT0) / 1000, gps = sec > 0.3 ? Math.round(E.turboDone / sec) : 0;
-      el.textContent = `Turbo${A.S.evoFast === 'max' && !EV().Pool.broken ? ` (${EV().Pool.size()} kernen${EV().Pool.canBuild && mm() !== 'hunt' ? ', bouwen in workers' : ''})` : ''}: ${E.turboDone}${E.turboN ? '/' + E.turboN : ''} generaties · ${gps}/s · generatie ${E.gen} · ${E.seen.size} verschillende doolhoven`;
-      return;
-    }
-    const nm = E.mazes.length || nEval(), dz = nm > 1 ? 'doolhoven' : 'doolhof';
-    if (E.show && E.show.kind === 'duel') { el.textContent = `Duel: ${E.show.list.map(a => a.name).join(' tegen ')}`; return; }
-    if (E.show) { el.textContent = `Kijken: ${E.show.list[0].name} alleen`; return; }
-    const h = E.hist[E.hist.length - 1];
-    el.textContent = `Generatie ${E.gen} · ${E.pop.length} lopers × ${nm} ${dz}${runs() > 1 ? ' × ' + runs() + ' runs' : ''}${mm() === 'hunt' ? ' (zoeker-set)' : ''} · ${E.species.length} ${E.species.length === 1 ? 'soort' : 'soorten'}${isl() > 1 ? ' op ' + isl() + ' eilanden' : ''}` + ` · ${E.seen.size} verschillende doolhoven deze sessie`
-      + (h ? ` · vorige: beste ${h.best}, gem. ${h.mean}` : '');
-  }
-  function toolbar() {
-    const run = $('#evo-run');
-    if (run) run.textContent = E.turbo ? 'Stop turbo' : E.show ? 'Verder evolueren' : E.running ? 'Pauze' : 'Start';
-    document.querySelectorAll('[data-turbo]').forEach(b => {
-      const n = +b.dataset.turbo, on = E.turbo && E.turboN === n;
-      b.classList.toggle('on', !!on); b.textContent = on ? 'Stop' : n ? '×' + n : '∞';
-    });
-    document.querySelectorAll('#evo-mm [data-mm]').forEach(b => b.classList.toggle('on', b.dataset.mm === mm()));
-    const sn = $('#evo-mm select'); if (sn) sn.hidden = mm() !== 'set';
-    const hb = $('#evo-mm [data-mm="hunt"]'); if (hb) { hb.hidden = !huntSet().length; hb.title = `Train op de ${huntSet().length} moeilijkste doolhoven uit de doolhof-zoeker`; }
-    status();
-  }
-  function outputs() {
-    const S = A.S, set = (k, v) => { const o = document.querySelector(`[data-out="${k}"]`); if (o) o.textContent = v; };
-    set('evoSize', S.evoSize); set('evoBraid', S.evoBraid + '%'); set('evoMut', S.evoMut + '%');
-    const r = rate(S.evoSpeed); set('evoSpeed', r < 10 ? r.toFixed(1) + '/s' : Math.round(r) + '/s');
-  }
-  // sleutels voor de hittekaart per soort/deelnemer (zelfde als w.hk)
-  const legendKeys = () => E.show ? E.show.list.map((_, k) => 'w' + k) : E.species.map(s => s.id);
-  function legend() {
-    const el = $('#evo-species'); if (!el) return;
-    let items;
-    const hs = E.heatSel, on = k => hs === k ? ' class="on"' : '', tip = 'klik: hittekaart van alleen deze';
-    if (E.show) items = E.show.list.slice(0, 10).map((a, k) => `<span data-heat="w${k}"${on('w' + k)} title="${tip}"><i class="sw" style="background:${a.col}"></i>${esc(a.name)}</span>`)
-      .concat(E.show.list.length > 10 ? [`<span><small>+${E.show.list.length - 10}</small></span>`] : []);
-    else if (A.S.evoColor === 'gene') items = EV().GENES.slice(0, -1).map(G => `<span><i class="sw" style="background:${G.col}"></i>${esc(G.name)}</span>`);
-    else items = E.species.slice(0, 8).map(s => `<span data-heat="${s.id}"${on(s.id)} title="${s.n} lopers · beste fitness ${Math.round((s.best || 0) * 100)} · ${tip} soort"><i class="sw" style="background:${s.col}"></i>${esc(s.name)} <small>${s.n}</small></span>`)
-      .concat(E.species.length > 8 ? [`<span><small>+${E.species.length - 8}</small></span>`] : []);
-    if (hs != null) items.unshift('<span data-heat="" class="all" title="Hittekaart van iedereen">✕ alle</span>');
-    el.innerHTML = items.join('');
+    note(!o ? 'Dat is geen geldige deelcode.' : addAlgo(o) ? `${o.name} toegevoegd.` : `${o.name} stond er al.`); afterSave();
   }
 
   // ---- koppeling met app.js ----
   let started = false;
   function init(app) {
     A = app;
+    if (A.S.evoTaskSpeed == null) A.S.evoTaskSpeed = 75;
     if (!restore()) E.base = '';
     else speciate();
     const fo = document.querySelector('[data-key="evoFast"] option[value="max"]');
@@ -1082,61 +1297,40 @@ ${fame.length ? `<h2>Eregalerij</h2><div class="wrap"><table><thead><tr><th>#</t
       el.addEventListener('change', () => {
         const k = el.dataset.key;
         if (A.S.mode !== 'evo') return;
-        if (k === 'evoMazes' || k === 'evoSetN') { E.show = null; makePanes(); startGen(); toolbar(); }
-        else if (k === 'evoPop') { resizePop(); E.show = null; startGen(); toolbar(); }
-        else if (k === 'evoColor') { if (E.runs && !E.show) E.runs.forEach(run => run.ws.forEach(w => { w.col = colorFor(w.ge); })); legend(); }
-        else if (['evoGrid', 'evoSize', 'evoBraid', 'evoPuzzle', 'evoMakers'].includes(k)) { E.show = null; startGen(); toolbar(); }
-        else if (k === 'evoIslands') { EV().assignIslands(E.pop, isl()); speciate(); persist(); status(); note(isl() > 1 ? `${isl()} eilanden: elk eiland evolueert apart; elke 8 generaties verhuist de beste naar het volgende eiland.` : 'Weer één populatie.'); champCard(); }
+        if (k === 'evoMazes' || k === 'evoSetN') { makePanes(); startGen(); evoBar(); }
+        else if (k === 'evoPop') { resizePop(); startGen(); evoBar(); }
+        else if (k === 'evoColor') { if (V.runs) V.runs.forEach(run => run.ws.forEach(w => { w.col = colorFor(w.ge); })); legend(); }
+        else if (['evoGrid', 'evoSize', 'evoBraid', 'evoPuzzle', 'evoMakers'].includes(k)) { startGen(); evoBar(); }
+        else if (k === 'evoIslands') { EV().assignIslands(E.pop, isl()); speciate(); persist(); status(); note(isl() > 1 ? `${isl()} eilanden: elk eiland evolueert apart; elke 8 generaties verhuist de beste naar het volgende eiland.` : 'Weer één populatie.'); }
         else if (k === 'evoRuns') status();
       });
     });
-    document.querySelectorAll('#evo-mm [data-mm]').forEach(b => b.addEventListener('click', () => {
-      A.S.evoMazeMode = b.dataset.mm; A.save(); E.show = null; makePanes(); startGen(); toolbar();
-    }));
-    $('#evo-run').addEventListener('click', () => {
-      if (E.turbo) { E.turbo = 0; return; }
-      if (E.show) { if (E.duel) { E.duel = null; if (E.drawer === 'duel') duelRender(); } resume(); }
-      else { E.running = !E.running; if (E.running && E.phase === 'idle') startGen(); toolbar(); }
-    });
-    $('#evo-skip').addEventListener('click', () => { if (E.phase === 'run') finishNow(); else if (!E.show) startGen(); });
-    document.querySelectorAll('[data-turbo]').forEach(b => b.addEventListener('click', () => turbo(+b.dataset.turbo)));
-    $('#evo-save').addEventListener('click', saveChamp);
-    $('#evo-reset').addEventListener('click', () => {
-      if (!confirm('Opnieuw beginnen? De huidige populatie en grafiek gaan weg (bewaarde algoritmes blijven).')) return;
-      const seeds = A.S.evoSeedSaved ? EV().loadAlgos() : [];
-      E.show = null; E.duel = null; fresh(seeds); refreshUI(true); startGen(); toolbar();
-    });
-    $('#evo-export').addEventListener('click', exportAlgos);
-    $('#evo-report').addEventListener('click', report);
-    $('#evo-import').addEventListener('click', () => $('#evo-file').click());
+    const view = $('#view-evo');
+    view.addEventListener('click', onClick);
+    document.querySelectorAll('#evo-tabs [data-page]').forEach(b => b.addEventListener('click', () => setPage(b.dataset.page)));
     $('#evo-file').addEventListener('change', e => { if (e.target.files[0]) importFile(e.target.files[0]); e.target.value = ''; });
-    $('#evo-paste').addEventListener('click', pasteCode);
-    document.querySelectorAll('[data-open-drawer]').forEach(b => b.addEventListener('click', () => { const t = b.dataset.openDrawer; if (E.drawer === t) closeDrawer(); else openDrawer(t); }));
-    $('#evo-dclose').addEventListener('click', closeDrawer);
-    document.querySelectorAll('#evo-drawer [data-tab]').forEach(b => b.addEventListener('click', () => openDrawer(b.dataset.tab)));
-    ['#evo-champ', '#evo-rank', '#evo-dbody'].forEach(s => $(s).addEventListener('click', onClick));
-    $('#evo-species').addEventListener('click', e => { // hittekaart per soort/deelnemer
-      const sp = e.target.closest('[data-heat]'); if (!sp) return;
-      const v = sp.dataset.heat, k = v === '' ? null : /^w/.test(v) ? v : +v;
-      E.heatSel = E.heatSel === k ? null : k; legend(); E.panes.forEach(r => { r.dirty = true; });
-    });
-    const body = $('#evo-dbody');
-    body.addEventListener('input', e => {
+    view.addEventListener('input', e => {
       const t = e.target;
-      if (t.id === 'lib-q') { E.libQ = t.value; libList(); }
+      if (t.id === 'lib-q') { E.libQ = t.value; algoGrid(); }
       else if (t.dataset.g != null) benchInput(t);
       else if (t.id === 'bench-name' && E.bench) E.bench.name = t.value;
     });
-    body.addEventListener('change', e => {
+    view.addEventListener('change', e => {
       const t = e.target;
-      if (t.id === 'lib-folder') { E.libFolder = t.value; libList(); }
-      else if (t.id === 'lib-sort') { E.libSort = t.value; libList(); }
+      if (t.id === 'lib-folder') { E.libFolder = t.value; algoGrid(); }
+      else if (t.id === 'lib-sort') { E.libSort = t.value; algoGrid(); }
       else if (t.dataset.f) libField(t);
-      else if (t.dataset.mut && E.mut) { const k = t.dataset.mut; E.mut[k] = k === 'heavy' ? t.checked : k === 'str' ? t.value : +t.value; if (k === 'heavy' && t.checked) setTimeout(() => { EV().heavyScore(E.mut.orig); mutRender(); }, 30); }
-      else if (t.dataset.hunt && E.hunt) { E.hunt.grids = t.value; }
+      else if (t.dataset.mut && E.mut) { const k = t.dataset.mut; E.mut[k] = k === 'heavy' ? t.checked : k === 'str' ? t.value : +t.value; if (k === 'heavy' && t.checked) setTimeout(() => { EV().heavyScore(E.mut.orig); taskOut(); }, 30); }
+      else if (t.dataset.hunt && E.hunt) E.hunt.grids = t.value;
+      else if (t.dataset.duel != null && E.duel) {
+        const id = t.dataset.duel;
+        if (t.checked) { if (E.duel.pick.length >= 4) { t.checked = false; note('Een duel heeft hooguit 4 deelnemers.'); return; } const x = entryById(id); if (x) E.duel.pick.push(pick(x)); }
+        else E.duel.pick = E.duel.pick.filter(p => p.id !== id);
+        taskIn();
+      }
     });
     new ResizeObserver(() => drawChart()).observe($('#cv-evo'));
-    outputs(); legend(); toolbar();
+    outputs(); legend(); evoBar();
   }
   function resizePop() {
     const N = Number(A.S.evoPop);
@@ -1148,21 +1342,27 @@ ${fame.length ? `<h2>Eregalerij</h2><div class="wrap"><table><thead><tr><th>#</t
   function enter() {
     if (!E.pop.length || !E.base) fresh([]);
     if (!started) {
-      started = true; makePanes(); requestAnimationFrame(() => { startGen(); refreshUI(true); toolbar(); });
+      started = true; makePanes(); setPage(E.page);
+      requestAnimationFrame(() => { startGen(); refreshUI(true); evoBar(); });
       // zware testbaan op de achtergrond klaarzetten (8 grote doolhoven bouwen duurt even)
-      setTimeout(() => { EV().heavyScore(EV().PRESETS[0].genes); if (E.champ && E.champ.heavy == null) E.champ.heavy = EV().heavyScore(E.champ.genes).score; refreshUI(true); }, 1500);
-    }
-    else requestAnimationFrame(() => { drawChart(); E.panes.forEach(r => { r.dirty = true; }); });
+      setTimeout(() => {
+        EV().heavyScore(EV().PRESETS[0].genes); if (E.champ && E.champ.heavy == null) E.champ.heavy = EV().heavyScore(E.champ.genes).score;
+        refreshUI(true); if (E.page === 'algos') { algoGrid(); algoDetail(); }
+      }, 1500);
+    } else setPage(E.page);
   }
   function key(e) {
-    if (e.key === ' ') { e.preventDefault(); $('#evo-run').click(); }
+    if (e.key === ' ') {
+      e.preventDefault();
+      if (E.page === 'task' && E.task && E.task.kind === 'why') whyPlay(); else toggleRun();
+    }
     else if (e.key === 't') turbo(25);
-    else if (e.key === 'v' || e.key === 'Enter') $('#evo-skip').click();
+    else if ((e.key === 'v' || e.key === 'Enter') && E.page === 'evolve') { if (V.phase === 'run') finishNow(); else startGen(); }
     else if (e.key === 'b') saveChamp();
-    else if (e.key === 'l') { if (E.drawer === 'lib') closeDrawer(); else openDrawer('lib'); }
-    else if (e.key === 'Escape' && E.drawer) closeDrawer();
+    else if (e.key === 'l') setPage('algos');
+    else if (e.key === 'Escape') { if (E.page === 'algos' && E.sel) { E.sel = null; markSel(); algoDetail(); } else if (E.page !== 'algos') setPage('algos'); }
   }
-  function setPalette(p) { E.panes.forEach(r => r.setPalette(p)); }
+  function setPalette(p) { V.panes.concat(T.panes).forEach(r => r.setPalette(p)); }
 
   ML.EvoUI = { init, enter, frame, key, setPalette };
 })(window.ML = window.ML || {});

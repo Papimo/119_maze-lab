@@ -18,7 +18,7 @@
     // evolutie
     evoPop: 40, evoMazes: 1, evoGrid: 'square', evoMakers: 'mix', evoSize: 14, evoBraid: 0, evoPuzzle: false, evoSame: false,
     evoMut: 30, evoSpeed: 50, evoClassics: true, evoSeedSaved: false,
-    evoMazeMode: 'new', evoSetN: 6, evoColor: 'species', evoFast: 'simple', evoV: 0, evoRuns: 1, evoIslands: 1, evoHunt: []
+    evoMazeMode: 'new', evoSetN: 6, evoColor: 'species', evoFast: 'simple', evoV: 0, evoRuns: 1, evoIslands: 1, evoHunt: [], evoTaskSpeed: 75
   };
   try { Object.assign(S, JSON.parse(localStorage.getItem(STORE) || '{}')); } catch (e) { /* geen opslag */ }
   if (S.mode === 'watch') S.mode = 'build';
