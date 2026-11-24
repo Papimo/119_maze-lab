@@ -63,5 +63,15 @@
     E.task.step = 'busy'; stepsRender(); taskIn();
   }
 
+
+  // klik-acties (data-ev) van deze module
+  Object.assign(U.ACTIONS, {
+    'why-step': () => whyStep(1),
+    'why-10': () => whyStep(10),
+    'why-back': () => whyStep(-1),
+    'why-back10': () => whyStep(-10),
+    'why-restart': () => { const o = whyWalker(); if (o) whyStep(-o.w.steps); },
+    'why-play': () => whyPlay(),
+  });
   Object.assign(U, { whyWalker, whyStep, whyIn, whyOut, whyTable, whyHtml, drawWhy, whyPlay });
 })(window.ML = window.ML || {});

@@ -52,5 +52,11 @@
   }
 
 
+
+  // klik-acties (data-ev) van deze module
+  Object.assign(U.ACTIONS, {
+    'duel-start': () => { if (E.duel) startDuel(E.duel.pick, true); },
+    'duel-again': () => { if (E.duel) { T.salt++; T.forced = null; T.mazes = []; startDuel(E.duel.pick, false); } },
+  });
   Object.assign(U, { startDuel, duelDone, duelIn, duelOut });
 })(window.ML = window.ML || {});

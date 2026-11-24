@@ -3,8 +3,8 @@
   'use strict';
   const U = ML.EvoUI._;
   const { $, E, EV, addAlgo, esc, note } = U;
-  let setPage;
-  U.link(() => ({ setPage } = U));
+  let algoDetail, setPage;
+  U.link(() => ({ algoDetail, setPage } = U));
 
   // delen: korte link (#dna=…, opent de app en zet hem in de bibliotheek) + QR-code (qrcode-generator in vendor/, geen externe dienst)
   const APP_URL = 'https://papimo.github.io/119_maze-lab/';
@@ -53,5 +53,13 @@
     }
   }
 
+
+  // klik-acties (data-ev) van deze module
+  Object.assign(U.ACTIONS, {
+    tour: c => tour(+c.b.dataset.k || 0),
+    'tour-end': () => tour(null),
+    share: ({ a }) => { if (a) { E.share = E.share === a.id ? null : a.id; algoDetail(); } },
+    'share-copy': ({ a }) => { if (!a) return; const url = shareLink(a); (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => note('Link gekopieerd.'), () => prompt('Kopieer deze link', url)); },
+  });
   Object.assign(U, { APP_URL, shareLink, qrSvg, shareHtml, openShared, TOUR, tour });
 })(window.ML = window.ML || {});

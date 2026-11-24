@@ -2,9 +2,9 @@
 (function (ML) {
   'use strict';
   const U = ML.EvoUI._;
-  const { $, A, DUEL_COLS, E, EV, GRID_NAMES, HUNT_ASP, T, esc, huntSet, pick, runs } = U;
-  let key, seed, setStep, startShow, taskIn, taskOut;
-  U.link(() => ({ key, seed, setStep, startShow, taskIn, taskOut } = U));
+  const { $, A, DUEL_COLS, E, EV, GRID_NAMES, HUNT_ASP, T, esc, huntSet, note, pick, runs } = U;
+  let evoBar, key, makePanes, seed, setStep, startGen, startShow, taskIn, taskOut;
+  U.link(() => ({ evoBar, key, makePanes, seed, setStep, startGen, startShow, taskIn, taskOut } = U));
 
   // ---- Doolhof-zoeker: welke doolhoven zijn het moeilijkst voor dit algoritme? (zoekt + klimt naar slechtere scores) ----
   function huntScore(genes, mz) { let s = 0; for (let r = 0; r < 3; r++) s += EV().evalOne(mz.ctx, genes, 'jacht|' + r).score(); return Math.round(s / 3 * 1000) / 10; }
@@ -73,5 +73,17 @@
   }
 
 
+
+  // klik-acties (data-ev) van deze module
+  Object.assign(U.ACTIONS, {
+    'hunt-go': () => { const H = E.hunt; if (!H) return; if (H.running) H.running = false; else huntRun(); },
+    'hunt-watch': c => huntShow(+c.b.dataset.i, false),
+    'hunt-duel': c => huntShow(+c.b.dataset.i, true),
+    'hunt-train': () => {
+      const H = E.hunt; if (!H) return;
+      A.S.evoHunt = H.found.map(f => f.sp); A.S.evoMazeMode = 'hunt'; A.save(); makePanes(); startGen(); evoBar();
+      note(`De evolutie traint nu op ${A.S.evoHunt.length} moeilijke doolhoven (Evolueren).`); taskIn();
+    },
+  });
   Object.assign(U, { huntScore, huntCand, huntRun, huntIn, huntOut, huntShow });
 })(window.ML = window.ML || {});

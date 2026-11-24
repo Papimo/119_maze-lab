@@ -2,9 +2,9 @@
 (function (ML) {
   'use strict';
   const U = ML.EvoUI._;
-  const { $, E, EV, T, TAU, esc, fresh, note, opts, pick, r1 } = U;
-  let goalHtml, saveVersion, setStep, startShow, taskIn, taskOut;
-  U.link(() => ({ goalHtml, saveVersion, setStep, startShow, taskIn, taskOut } = U));
+  const { $, A, E, EV, T, TAU, esc, fresh, note, opts, pick, r1 } = U;
+  let duelNow, goalHtml, openTask, saveVersion, setStep, startShow, taskIn, taskOut;
+  U.link(() => ({ duelNow, goalHtml, openTask, saveVersion, setStep, startShow, taskIn, taskOut } = U));
 
   // ---- Mutantenlab: algoritme → N mutanten (vast voor de hele reeks) → elke ronde een ánder doolhof ----
   // Score = 0–100 (100 = elke keer de kortste route), zelfde maat als de testbaan. Winnaar = hoogste gemiddelde over alle rondes.
@@ -210,5 +210,29 @@
   }
 
 
+
+  // klik-acties (data-ev) van deze module
+  Object.assign(U.ACTIONS, {
+    'mut-go': () => { const M = E.mut; if (!M) return; M.rounds = +M.rounds; M.auto = false; M.hist = []; mutMake(); mutRound(); },
+    'mut-auto': () => { const M = E.mut; if (!M) return; M.rounds = +M.rounds; M.auto = true; M.hist = []; M.src = { ...M.src, genes: M.orig0.slice(), name: M.root }; mutMake(); mutRound(); },
+    'mut-preset': c => { const M = E.mut; if (M && !M.busy) { Object.assign(M, MUT_PRESET[c.b.dataset.p]); taskIn(); } },
+    'mut-more': () => { const M = E.mut; if (M && M.res) { M.target = M.sc[0].length + 5; M.res = null; M.saved = null; mutRound(); } },
+    'mut-go-build': () => { const M = E.mut; if (M && M.saved && A.go) A.go('build', M.saved); },
+    'mut-go-race': () => { const M = E.mut; if (M && M.saved && A.go) A.go('race', M.saved); },
+    'mut-stop': () => {
+      const M = E.mut; if (!M) return;
+      M.busy = false; M.wait = false; M.auto = false; if (T.show && T.show.kind === 'mut' && T.phase === 'run') T.running = false;
+      if (M.list && M.sc[0].length) mutFinish(); else { M.round = 0; setStep('pick'); taskIn(); }
+    },
+    'mut-pick': c => { const M = E.mut; if (M && M.res) { M.pick = +c.b.dataset.k; M.saved = null; M.saveNote = null; taskOut(); } },
+    'mut-save': () => { if (E.mut) mutSave(); },
+    'mut-again': () => { const M = E.mut; if (M && M.saved) openTask('mut', { ...M.saved, mine: true }); },
+    'mut-bench': () => { const M = E.mut; if (M && M.saved) openTask('bench', { ...M.saved, mine: true }); },
+    'mut-duel': () => {
+      const M = E.mut; if (!M || !M.res || !M.res[M.pick]) return;
+      const x = M.res[M.pick];
+      duelNow([{ id: 'mut-orig', name: M.root, genes: M.orig0 }, { id: M.saved ? M.saved.id : 'mut-best', name: M.saved ? M.saved.name : x.a.name, genes: x.a.genes }]);
+    },
+  });
   Object.assign(U, { MUT_STR, STR_ORDER, MUT_PRESET, AUTO_MAX, mutMake, mutRound, mutRate, mutCheck, mutStand, mutSure, mutDone, mutFinish, canSave, mutIn, mutTable, autoHtml, mutOut, mutSaveBox, mutSave });
 })(window.ML = window.ML || {});

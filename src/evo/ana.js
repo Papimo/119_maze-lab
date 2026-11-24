@@ -2,9 +2,9 @@
 (function (ML) {
   'use strict';
   const U = ML.EvoUI._;
-  const { $, E, EV, entries, esc, geneZ, isSaved, isl, note, runs } = U;
-  let record;
-  U.link(() => ({ record } = U));
+  const { $, E, EV, addAlgo, entries, esc, geneZ, isSaved, isl, note, runs } = U;
+  let afterSave, record;
+  U.link(() => ({ afterSave, record } = U));
 
   // ======================= Analyse =======================
   function anaRender() { treeRender(); famRender(); }
@@ -90,5 +90,12 @@ ${fame.length ? `<h2>Eregalerij</h2><div class="wrap"><table><thead><tr><th>#</t
   }
 
 
+
+  // klik-acties (data-ev) van deze module
+  Object.assign(U.ACTIONS, {
+    'save-fame': ({ a }) => { if (!a) return; note(addAlgo({ name: a.name, genes: a.genes, born: a.born || a.gen, parents: a.parents || [] }) ? `${a.name} bewaard.` : 'Stond er al.'); famRender(); afterSave(); },
+    'del-fame': ({ id }) => { EV().delFame(id); famRender(); },
+    report: () => report(),
+  });
   Object.assign(U, { anaRender, famRender, treeRender, report });
 })(window.ML = window.ML || {});

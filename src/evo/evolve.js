@@ -2,9 +2,9 @@
 (function (ML) {
   'use strict';
   const U = ML.EvoUI._;
-  const { $, A, E, EV, T, V, addAlgo, dnaHtml, entries, esc, huntSet, isSaved, isl, mm, nEval, note, persist, rng, runs, scoreBox, speciate, subOf } = U;
-  let afterSave, algoDetail, algoGrid, drawChart, famRender, key, liveCard, mazesFor, rate, specsFor, startGen, tabsInfo, viewAspect;
-  U.link(() => ({ afterSave, algoDetail, algoGrid, drawChart, famRender, key, liveCard, mazesFor, rate, specsFor, startGen, tabsInfo, viewAspect } = U));
+  const { $, A, E, EV, T, V, addAlgo, dnaHtml, entries, esc, fresh, huntSet, isSaved, isl, mm, nEval, note, persist, rng, runs, scoreBox, speciate, subOf } = U;
+  let afterSave, algoDetail, algoGrid, drawChart, famRender, finishNow, key, liveCard, makePanes, mazesFor, rate, setPage, specsFor, startGen, tabsInfo, viewAspect;
+  U.link(() => ({ afterSave, algoDetail, algoGrid, drawChart, famRender, finishNow, key, liveCard, makePanes, mazesFor, rate, setPage, specsFor, startGen, tabsInfo, viewAspect } = U));
 
   // na een geëvalueerde generatie: geschiedenis, kampioen, kinderen, soorten
   // later = testbaan-score volgt (turbo: rekent in een worker tijdens de volgende generatie) → E.pend, daarna record()
@@ -211,5 +211,19 @@
     speciate(); persist();
   }
 
+
+  // klik-acties (data-ev) van deze module
+  Object.assign(U.ACTIONS, {
+    'save-champ': () => saveChamp(),
+    seed: ({ a }) => { if (a) { seed(a); setPage('evolve'); } },
+    run: () => toggleRun(),
+    skip: () => { if (V.phase === 'run') finishNow(); else startGen(); },
+    turbo: c => turbo(+c.b.dataset.turbo),
+    mm: c => { A.S.evoMazeMode = c.b.dataset.mm; A.save(); makePanes(); startGen(); evoBar(); },
+    reset: () => {
+      if (!confirm('Opnieuw beginnen? De huidige populatie en grafiek gaan weg (bewaarde algoritmes blijven).')) return;
+      E.turbo = 0; fresh(A.S.evoSeedSaved ? EV().loadAlgos() : []); refreshUI(true); startGen(); evoBar();
+    },
+  });
   Object.assign(U, { advance, autoSave, stall, autoInfo, autoChecks, grow, flushPend, record, refreshUI, turbo, champCard, rankList, status, evoBar, outputs, legend, taskLegend, saveChamp, seed, toggleRun, resizePop });
 })(window.ML = window.ML || {});

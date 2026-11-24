@@ -3,8 +3,8 @@
   'use strict';
   const U = ML.EvoUI._;
   const { $, A, E, EV, T, TASKS, entryById, esc, note, pick } = U;
-  let benchIn, benchOut, benchRide, champCard, duelDone, duelIn, duelOut, huntIn, huntOut, mutDone, mutIn, mutOut, rankList, setPage, startDuel, startShow, tabsInfo, todoHtml, whyIn, whyOut, whyTable;
-  U.link(() => ({ benchIn, benchOut, benchRide, champCard, duelDone, duelIn, duelOut, huntIn, huntOut, mutDone, mutIn, mutOut, rankList, setPage, startDuel, startShow, tabsInfo, todoHtml, whyIn, whyOut, whyTable } = U));
+  let benchIn, benchOut, benchRide, benchSave, champCard, duelDone, duelIn, duelOut, huntIn, huntOut, mutDone, mutIn, mutOut, mutSave, rankList, setPage, startDuel, startShow, tabsInfo, todoHtml, whyIn, whyOut, whyTable;
+  U.link(() => ({ benchIn, benchOut, benchRide, benchSave, champCard, duelDone, duelIn, duelOut, huntIn, huntOut, mutDone, mutIn, mutOut, mutSave, rankList, setPage, startDuel, startShow, tabsInfo, todoHtml, whyIn, whyOut, whyTable } = U));
 
   // ======================= Taak =======================
   function stopTask() {
@@ -102,5 +102,21 @@
   }
 
 
+
+  // klik-acties (data-ev) van deze module
+  Object.assign(U.ACTIONS, {
+    'task-*': ({ act, a }) => openTask(act.slice(5), a),
+    'next-task': () => { stopTask(); E.task = null; taskRender(); },
+    'save-ver': () => { if (E.task && E.task.kind === 'bench') benchSave(); else if (E.task && E.task.kind === 'mut') mutSave(); },
+    'task-maze': () => { // zelfde taak op een ander doolhof
+      if (!E.task) return;
+      const M = E.mut, H = E.hunt, k = E.task.kind;
+      T.salt++; T.forced = null; T.mazes = []; if (H) H.sel = -1;
+      if (k === 'bench') benchRide();
+      else if (k === 'duel' && E.duel && E.duel.list) startDuel(E.duel.pick, false);
+      else if (k === 'why') { E.xp = { last: null }; startShow('solo', T.show ? T.show.list : [{ id: 'why', name: E.task.algo.name, genes: E.task.algo.genes, col: '#ffd34d' }]); T.running = false; E.task.step = 'pick'; stepsRender(); taskIn(); taskOut(); }
+      else if (!(M && M.busy)) startShow(T.show && T.show.kind !== 'mut' ? T.show.kind : 'preview', T.show && T.show.kind !== 'mut' ? T.show.list : [{ id: 'prev', name: E.task.algo.name, genes: E.task.algo.genes, col: '#ffd34d' }]);
+    },
+  });
   Object.assign(U, { stopTask, openTask, duelNow, taskRender, stepsRender, setStep, taskIn, taskOut, taskTick, taskEnded, afterHtml, saveVersion });
 })(window.ML = window.ML || {});

@@ -1,7 +1,7 @@
 // Evolutie-scherm: gedeelde toestand (E, tonelen V/T), opslag, soorten, scoretaal, hulpjes. Laadt als eerste; maakt ML.EvoUI._ (= U) aan.
 (function (ML) {
   'use strict';
-  const U = { links: [], link: fn => U.links.push(fn) }; // gedeelde namen; main.js roept alle links aan zodra alles geladen is
+  const U = { links: [], link: fn => U.links.push(fn), ACTIONS: {} }; // gedeelde namen; main.js roept alle links aan zodra alles geladen is. ACTIONS: data-ev → fn(c)
   ML.EvoUI = { _: U };
 
   const $ = s => document.querySelector(s);

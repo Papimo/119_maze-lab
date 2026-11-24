@@ -3,8 +3,8 @@
   'use strict';
   const U = ML.EvoUI._;
   const { $, E, EV, T, esc, note, pick, scoreBox, signed } = U;
-  let saveVersion, setStep, startShow, stepsRender, taskIn, taskOut;
-  U.link(() => ({ saveVersion, setStep, startShow, stepsRender, taskIn, taskOut } = U));
+  let duelNow, saveVersion, setStep, startShow, stepsRender, taskIn, taskOut;
+  U.link(() => ({ duelNow, saveVersion, setStep, startShow, stepsRender, taskIn, taskOut } = U));
 
   // ---- Werkbank ----
   function benchRide() {
@@ -50,5 +50,18 @@
   }
 
 
+
+  // klik-acties (data-ev) van deze module
+  Object.assign(U.ACTIONS, {
+    'bench-ride': () => benchRide(),
+    'bench-duel': () => { const B = E.bench; if (B) duelNow([{ ...B.src }, { id: 'bench-edit', name: B.name, genes: B.genes }]); },
+    'bench-reset': () => { const B = E.bench; if (!B) return; B.genes = B.src.genes.slice(); taskIn(); benchRide(); },
+    'bench-nudge': () => {
+      const B = E.bench; if (!B) return;
+      const r = ML.makeRng(Math.random()), G = EV().GENES;
+      B.genes = B.genes.map((v, i) => r() < 0.4 ? EV().clamp(v + (r() * 2 - 1) * (G[i].hi - G[i].lo) * 0.12, i, v) : v).map(v => Math.round(v * 10) / 10);
+      taskIn(); benchRide();
+    },
+  });
   Object.assign(U, { benchRide, benchIn, benchOut, benchTimer, benchInput, benchSave });
 })(window.ML = window.ML || {});

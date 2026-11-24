@@ -2,9 +2,9 @@
 (function (ML) {
   'use strict';
   const U = ML.EvoUI._;
-  const { $, E, EV, V, addAlgo, dnaHtml, dnaStrip, entries, entryById, esc, isSaved, note, r1, scoreBox, subOf, vsClassic } = U;
-  let champCard, dotCls, rankList, seed, shareHtml, turbo;
-  U.link(() => ({ champCard, dotCls, rankList, seed, shareHtml, turbo } = U));
+  const { $, A, E, EV, V, addAlgo, dnaHtml, dnaStrip, entries, entryById, esc, isSaved, note, r1, scoreBox, subOf, vsClassic } = U;
+  let champCard, dotCls, rankList, seed, setPage, shareHtml, turbo;
+  U.link(() => ({ champCard, dotCls, rankList, seed, setPage, shareHtml, turbo } = U));
 
   // "Wat wil je doen?" met het algoritme al gekozen
   function todoHtml(a) {
@@ -199,5 +199,28 @@
     note(!o ? 'Dat is geen geldige deelcode.' : addAlgo(o) ? `${o.name} toegevoegd.` : `${o.name} stond er al.`); afterSave();
   }
 
+
+  // klik-acties (data-ev) van deze module
+  Object.assign(U.ACTIONS, {
+    'go-build': ({ a }) => { if (a && A.go) A.go('build', a); },
+    'go-race': ({ a }) => { if (a && A.go) A.go('race', a); },
+    'go-watch': ({ a }) => {
+      if (!A.go) return;
+      if (a && !a.classic && !isSaved(a.genes)) addAlgo({ name: a.name, genes: a.genes, born: a.born || 0, parents: a.parents || [] });
+      if (!EV().loadAlgos().length) { note('Bewaar eerst een eigen algoritme; Kijken toont dan alleen jouw algoritmes.'); return; }
+      A.go('watch', a);
+    },
+    'save-any': ({ a }) => { if (!a) return; note(addAlgo({ name: a.name, genes: a.genes, born: a.born || a.gen || 0, parents: a.parents || [] }) ? `${a.name} bewaard.` : 'Stond er al.'); afterSave(); },
+    tree: ({ id }) => { E.treeSel = id; setPage('ana'); },
+    export: () => exportAlgos(),
+    import: () => $('#evo-file').click(),
+    paste: () => pasteCode(),
+    code: ({ mine }) => { if (!mine) return; const code = EV().toCode(mine); (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(() => note('Deelcode gekopieerd.'), () => prompt('Kopieer deze code', code)); },
+    del: ({ mine, algos }) => {
+      if (!mine) return;
+      const kids = algos.filter(x => x.parent === mine.id).length;
+      if (confirm(`${mine.name} verwijderen uit je algoritmes?${kids ? ` (${kids} nieuwere versie${kids > 1 ? 's' : ''} blijven bestaan)` : ''}`)) { EV().saveAlgos(algos.filter(x => x !== mine)); E.sel = null; afterSave(); }
+    },
+  });
   Object.assign(U, { todoHtml, algosRender, algoCard, algoGrid, spark, liveCard, markSel, algoDetail, evoDetail, lineage, libField, goalHtml, afterSave, exportAlgos, importFile, pasteCode });
 })(window.ML = window.ML || {});
