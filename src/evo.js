@@ -22,11 +22,19 @@
     // nieuw in engine 3: geheugen = hoe lang geleden hij een plek zag; feromoon = verse geur die hij zelf achterlaat (vervliegt)
     { k: 'mem', name: 'Geheugen', lo: -6, hi: 6, col: '#f72585', pos: 'loopt vergeten hoeken na', neg: 'blijft dicht bij waar hij net was' },
     { k: 'pher', name: 'Feromoon', lo: -6, hi: 6, col: '#a7c957', pos: 'volgt zijn verse geurspoor', neg: 'mijdt plekken die nog naar hem ruiken' },
+    // nieuw in engine 4: draaiteller = som van alle bochten terug naar 0 (Pledge); zichtveld = kijkt door rechte gangen (nieuwe cellen + doel in zicht)
+    { k: 'turn', name: 'Draaiteller', lo: -6, hi: 6, col: '#6c7bff', pos: 'draait elke bocht weer terug (Pledge)', neg: 'blijft steeds dezelfde kant op draaien' },
+    { k: 'sight', name: 'Zichtveld', lo: -6, hi: 6, col: '#ffafcc', pos: 'kijkt ver door rechte gangen en ziet het doel', neg: 'mijdt lange open zichtlijnen' },
     { k: 'chaos', name: 'Chaos', lo: -4, hi: 1.5, col: '#9aa5b1', pos: 'en is vrij grillig', neg: 'en is heel beslist' }
   ];
   const NG = GENES.length, CH = NG - 1;
-  // oude DNA's (9 genen, engine ≤ 2) → 11 genen: geheugen + feromoon = 0 vóór chaos (zelfde gedrag)
-  function upGenes(gs) { if (Array.isArray(gs) && gs.length === 9) { gs = gs.slice(); gs.splice(8, 0, 0, 0); } return gs; }
+  // oude DNA's → 13 genen, nieuwe genen = 0 vóór chaos (zelfde gedrag): 9 (engine ≤ 2) + geheugen/feromoon, 11 (engine 3) + draaiteller/zichtveld
+  function upGenes(gs) {
+    if (!Array.isArray(gs)) return gs;
+    if (gs.length === 9) { gs = gs.slice(); gs.splice(8, 0, 0, 0); }
+    if (gs.length === 11) { gs = gs.slice(); gs.splice(10, 0, 0, 0); }
+    return gs;
+  }
   const okGenes = gs => Array.isArray(gs) && gs.length === NG && gs.every(v => typeof v === 'number' && isFinite(v));
   ML.EVO_GENES = GENES;
 
@@ -74,7 +82,7 @@
   // ======================================================================
   function ENGINE() {
     'use strict';
-    const TAU = Math.PI * 2, CH = 10, NP = 10; // NP = aantal gen-termen (zonder chaos)
+    const TAU = Math.PI * 2, CH = 12, NP = 12, RAY = 12; // RAY = zichtveld: max cellen per zichtlijn; NP = aantal gen-termen (zonder chaos)
     const PH = 24, DEC = new Float64Array(256); for (let t = 0; t < 256; t++) DEC[t] = Math.pow(0.5, t / PH); // feromoon: halveert elke 24 stappen
     const decay = dt => dt < 256 ? DEC[dt] : 0;
     function hashStr(s) {
@@ -98,6 +106,7 @@
         this.ctx = ctx;
         this.vis = new Uint16Array(ctx.N); this.dead = new Uint8Array(ctx.n);
         this.last = new Int32Array(ctx.N); this.scent = new Float64Array(ctx.n); this.scT = new Int32Array(ctx.n); // geheugen + feromoon
+        this.seen = new Uint8Array(ctx.n); // zichtveld: cellen die hij ooit in een rechte lijn zag
         this.pos = new Int32Array(ctx.N).fill(-1); this.stk = new Int32Array(ctx.N + 1); this.sl = 0; // stapel als vaste rij (geen array.length-knippen)
         if (genes) this.reset(genes, seed);
       }
@@ -107,13 +116,32 @@
         this.vis.fill(0); this.dead.fill(0);
         this.g8 = genes[8]; this.g9 = genes[9];
         if (this.g8 || this.g9 || this.memUsed) { this.last.fill(0); this.scent.fill(0); this.scT.fill(0); this.memUsed = !!(this.g8 || this.g9); }
+        this.g10 = genes[10]; this.g11 = genes[11]; this.ts = 0; // draaiteller: som van de bochten (radialen, + = rechtsaf)
+        if (this.g11 || this.seeUsed) { this.seen.fill(0); this.seeUsed = !!this.g11; }
         this.g = genes; this.rng = makeRng(seed); this.T = Math.exp(genes[CH]);
         this.s = ctx.start; this.c = this.nc = ctx.cellOf[ctx.start]; this.hx = 1; this.hy = 0; this.ha = 0; // kijkrichting (+ als hoek)
         this.ag4 = Math.abs(genes[4]); this.iT = 1 / this.T;
         this.vis[this.s] = 1; st[0] = this.s; this.sl = 1; pos[this.s] = 0;
         this.steps = 0; this.done = false; this.reached = false; this.p = 0; this.jump = false;
         if (this.memUsed) this.scent[this.c] = 1;
+        this.nv = 1;
+        if (this.seeUsed) this.look(this.c);
         return this;
+      }
+      // zichtveld: vanuit cel c alle rechte zichtlijnen als gezien markeren
+      look(c) {
+        const ctx = this.ctx, cTo = ctx.cTo, cStr = ctx.cStr, seen = this.seen;
+        seen[c] = 1;
+        for (let k = ctx.cOff[c], kb = ctx.cOff[c + 1]; k < kb; k++) for (let q = k, L = 0; q >= 0 && L < RAY; L++) { seen[cTo[q]] = 1; q = cStr[q]; }
+      }
+      // zichtveld: hoeveel nieuwe cellen (max 6) hij vanaf c2 in rechte lijnen zou zien (niet terug naar c)
+      gain(c, c2) {
+        const ctx = this.ctx, cTo = ctx.cTo, cStr = ctx.cStr, seen = this.seen; let u = seen[c2] ? 0 : 1;
+        for (let k = ctx.cOff[c2], kb = ctx.cOff[c2 + 1]; k < kb && u < 6; k++) {
+          if (cTo[k] === c) continue;
+          for (let q = k, L = 0; q >= 0 && L < RAY && u < 6; L++) { if (!seen[cTo[q]]) u++; q = cStr[q]; }
+        }
+        return u;
       }
       step() {
         if (this.done) return;
@@ -130,6 +158,7 @@
         const eu = ctx.eu, exits = ctx.exits, to = ctx.to, an = ctx.an, euc = eu[c], ha = this.ha, ag4 = this.ag4;
         const g0 = G[0], g1 = G[1], g2 = G[2], g3 = G[3], g4 = G[4], g5 = G[5], g6 = G[6], g7 = G[7];
         const g8 = this.g8, g9 = this.g9, steps = this.steps, last = this.last, scent = this.scent, scT = this.scT;
+        const g10 = this.g10, g11 = this.g11, ts = this.ts, ats = ts < 0 ? -ts : ts;
         let mx = -1e9;
         for (let i = 0; i < n; i++) {
           const e = a + i, s2 = to[e], c2 = tc[e], v = vis[s2];
@@ -144,6 +173,12 @@
               if (phi < 1e-3 || phi >= TAU) phi = TAU;
               sc += ag4 * (1 - phi * iPI);
             }
+            if (g10) { // draaiteller: punten als de bochten-som dichter bij 0 komt (1 = een kwartslag terug)
+              let th = an[e] - ha; if (th > PI) th -= TAU; else if (th <= -PI) th += TAU;
+              const t2 = ts + th; let u = (ats - (t2 < 0 ? -t2 : t2)) * iPI * 2; if (u > 2) u = 2; else if (u < -2) u = -2;
+              sc += g10 * u * 0.5;
+            }
+            if (g11) { const k0 = ctx.ce[e]; if (k0 >= 0) sc += g11 * (this.gain(c, c2) / 6 + ctx.gRay[k0]); } // zichtveld: nieuw uitzicht vanaf c2 + loopt op het doel af dat in zicht is
           }
           if (g8 && v) { const age = (steps - last[s2]) * 0.015625; sc += g8 * (age > 1 ? 1 : age); } // geheugen: 0 = net gezien, 1 = ≥64 stappen geleden
           if (g9) { const f = scent[c2] * decay(steps - scT[c2]); sc += g9 * (f > 2 ? 2 : f) * 0.5; } // feromoon: verse geur 0..1
@@ -161,9 +196,11 @@
         const at = pos[t2];
         if (at >= 0) { for (let j = sl - 1; j > at; j--) pos[st[j]] = -1; this.sl = at + 1; }
         else { pos[t2] = sl; st[sl] = t2; this.sl = sl + 1; }
-        if (vis[t2] < 65535) vis[t2]++;
+        const vv = vis[t2]; if (!vv) this.nv++; if (vv < 65535) vis[t2] = vv + 1;
         this.s = t2; this.c = c; this.nc = c2; this.steps++;
         if (this.memUsed) { const T = this.steps; this.last[t2] = T; this.scent[c2] = this.scent[c2] * decay(T - this.scT[c2]) + 1; this.scT[c2] = T; }
+        if (g10 && kd[e] === 1) { let th = an[e] - ha; if (th > PI) th -= TAU; else if (th <= -PI) th += TAU; this.ts = ts + th; }
+        if (this.seeUsed && c2 !== c) this.look(c2);
         if (c2 !== c) { this.jump = kd[e] !== 1; if (!this.jump) { this.hx = ex[e]; this.hy = ey[e]; this.ha = an[e]; } }
         else this.jump = false;
         if (c2 === ctx.goal) { this.done = true; this.reached = true; }
@@ -177,6 +214,13 @@
         return d >= 1e9 ? 0 : 0.05 * Math.max(0, 1 - d / ctx.d0);
       }
       run() { while (!this.done) this.step(); return this; }
+      // gedrag (nieuwheid): 5 getallen 0..1 → dekking, nieuw-per-stap, eindafstand tot doel, stappen/grens, padzuinigheid
+      behav(out, o) {
+        const ctx = this.ctx, S = this.steps + 1, d = ctx.dist[this.nc];
+        out[o] += this.nv / ctx.N; out[o + 1] += this.nv / S;
+        out[o + 2] += this.reached ? 0 : d >= 1e9 ? 1 : Math.min(1, d / ctx.d0);
+        out[o + 3] += this.steps / ctx.cap; out[o + 4] += this.sl / S;
+      }
       get st() { return Array.from(this.stk.subarray(0, this.sl)); } // eenvoudig pad vanaf de start
       // Uitleg (zelfde formule als step, zonder te lopen): per mogelijke zet de punten per gen en de kans
       explain() {
@@ -193,6 +237,8 @@
           if (ctx.kd[e] === 1) {
             const dx = ctx.ex[e], dy = ctx.ey[e], cs = this.hx * dx + this.hy * dy;
             P[5] = G[5] * cs;
+            if (G[10]) { let th = ctx.an[e] - this.ha; if (th > Math.PI) th -= TAU; else if (th <= -Math.PI) th += TAU; let u = (Math.abs(this.ts) - Math.abs(this.ts + th)) / Math.PI * 2; u = Math.max(-2, Math.min(2, u)); P[10] = G[10] * u * 0.5; }
+            if (G[11] && ctx.ce[e] >= 0) P[11] = G[11] * (this.gain(c, c2) / 6 + ctx.gRay[ctx.ce[e]]);
             if (G[4]) { const th = Math.atan2(this.hx * dy - this.hy * dx, cs); let phi = G[4] > 0 ? Math.PI - th : Math.PI + th; phi = ((phi % TAU) + TAU) % TAU; if (phi < 1e-3) phi = TAU; P[4] = Math.abs(G[4]) * (1 - phi / Math.PI); }
           }
           let sc = 0; for (let i = 0; i < NP; i++) sc += P[i];
@@ -211,31 +257,39 @@
     }
     // fitness voor een lijst DNA's over meerdere doolhoven
     // runs > 1: elk doolhof meerdere keren (andere loting), gemiddelde → minder geluk. i0 = nummer van het eerste doolhof (voor zaadjes)
-    function evalList(ctxs, genesList, ids, gen, runs, i0) {
+    // bh = ook gedrag (BD getallen per DNA, gemiddeld over doolhoven + runs)
+    const BD = 5;
+    function evalList(ctxs, genesList, ids, gen, runs, i0, bh) {
       const N = genesList.length, R = runs || 1, o = i0 || 0, fit = new Float64Array(N), ok = new Int32Array(N), steps = new Int32Array(N);
+      const B = bh ? new Float64Array(N * BD) : null;
       for (let j = 0; j < N; j++) {
         let s = 0;
         for (let i = 0; i < ctxs.length; i++) for (let r = 0; r < R; r++) {
           const w = evalOne(ctxs[i], genesList[j], ids[j] + '|' + gen + '|' + (i + o) + (r ? '|r' + r : ''));
           s += w.score(); if (w.reached) ok[j]++; steps[j] += w.steps;
+          if (B) w.behav(B, j * BD);
         }
         fit[j] = s / (ctxs.length * R);
+        if (B) for (let q = 0; q < BD; q++) B[j * BD + q] /= ctxs.length * R;
       }
-      return { fit, ok, steps };
+      return { fit, ok, steps, bh: B };
     }
     // zelfde lopen als evalList, maar losse scores terug (sc[(j*M + i)*R + r]) → de hoofddraad telt op in vaste volgorde (bit-gelijk aan evalList)
-    function evalRaw(ctxs, genesList, ids, gen, runs, i0) {
+    // bh = ook gedrag per DNA (som over doolhoven + runs; de hoofddraad deelt)
+    function evalRaw(ctxs, genesList, ids, gen, runs, i0, bh) {
       const N = genesList.length, M = ctxs.length, R = runs || 1, o = i0 || 0, sc = new Float64Array(N * M * R), ok = new Int32Array(N), steps = new Int32Array(N);
+      const B = bh ? new Float64Array(N * BD) : null;
       for (let j = 0; j < N; j++) for (let i = 0; i < M; i++) for (let r = 0; r < R; r++) {
         const w = evalOne(ctxs[i], genesList[j], ids[j] + '|' + gen + '|' + (i + o) + (r ? '|r' + r : ''));
         sc[(j * M + i) * R + r] = w.score(); if (w.reached) ok[j]++; steps[j] += w.steps;
+        if (B) w.behav(B, j * BD);
       }
-      return { sc, ok, steps };
+      return { sc, ok, steps, bh: B };
     }
-    return { Walker, evalOne, evalList, evalRaw, makeRng };
+    return { Walker, evalOne, evalList, evalRaw, makeRng, BD };
   }
   const ENG = ENGINE();
-  const ENGINE_V = 3; // verandert de loper-logica → testscores opnieuw in de geschiedenis
+  const ENGINE_V = 4; // 4 = draaiteller + zichtveld. Verandert de loper-logica → testscores opnieuw in de geschiedenis
 
   // ---- Doolhof-context (gedeeld door alle lopers op één doolhof) ----
   function context(m) {
@@ -267,12 +321,36 @@
     off[N] = T.length;
     const ex = Float32Array.from(EX), ey = Float32Array.from(EY), an = new Float64Array(ex.length);
     for (let e = 0; e < an.length; e++) an[e] = Math.atan2(ey[e], ex[e]);
-    return { m, P, n, N, cellOf, off, to: Int32Array.from(T), tc: Int32Array.from(TC), kd: Uint8Array.from(KD), ex, ey, an,
+    // zichtlijnen (gen zichtveld): per cel de open gangen (cOff/cTo), per gang de gang die er rechtdoor op volgt (cStr, -1 = geen),
+    // gRay = doel ligt op die rechte lijn, ce = per toestand-rand de bijbehorende gang (-1 = sprong/zelfde cel)
+    const tri = !!(C[0] && C[0].grid && 'up' in C[0].grid), thr = tri ? 0.45 : 0.85; // driehoeken: zigzag langs een rij telt als rechtdoor
+    const cOff = new Int32Array(n + 1), CT = [], DX = [], DY = [];
+    for (let i = 0; i < n; i++) {
+      cOff[i] = CT.length;
+      for (const nb of C[i].nbrs) {
+        const w = m.walls[nb.w]; if (!w.open || w.stair || w.wrap) continue;
+        const a = C[i].center, b = C[nb.c].center, L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        CT.push(nb.c); DX.push((b[0] - a[0]) / L); DY.push((b[1] - a[1]) / L);
+      }
+    }
+    cOff[n] = CT.length;
+    const cTo = Int32Array.from(CT), cStr = new Int32Array(CT.length).fill(-1), gRay = new Uint8Array(CT.length);
+    for (let i = 0; i < n; i++) for (let k = cOff[i]; k < cOff[i + 1]; k++) {
+      const c2 = cTo[k]; let bq = -1, bc = thr;
+      for (let q = cOff[c2]; q < cOff[c2 + 1]; q++) { if (cTo[q] === i) continue; const cs = DX[k] * DX[q] + DY[k] * DY[q]; if (cs >= bc) { bc = cs; bq = q; } }
+      cStr[k] = bq;
+    }
+    for (let k = 0; k < CT.length; k++) for (let q = k, L = 0; q >= 0 && L < 12; L++) { if (cTo[q] === m.goal) { gRay[k] = 1; break; } q = cStr[q]; }
+    const ce = new Int32Array(T.length).fill(-1);
+    for (let s = 0; s < N; s++) for (let e = off[s]; e < off[s + 1]; e++) if (KD[e] === 1) {
+      const c = cellOf[s]; for (let k = cOff[c]; k < cOff[c + 1]; k++) if (cTo[k] === TC[e]) { ce[e] = k; break; }
+    }
+    return { m, P, n, N, cellOf, off, to: Int32Array.from(T), tc: Int32Array.from(TC), kd: Uint8Array.from(KD), ex, ey, an, cOff, cTo, cStr, gRay, ce,
       start: P.start, startCell: m.start, goal: m.goal, exits, eu, dist, opt, d0: Math.max(1, dist[c0] < 1e9 ? dist[c0] : opt),
       cap: Math.max(200, Math.min(Math.round(n * 6), opt * 25)) }; // na 25× de kortste route levert aankomen niets meer op
   }
   // alleen de platte rijen (voor een Worker)
-  const PACK = ['n', 'N', 'cellOf', 'off', 'to', 'tc', 'kd', 'ex', 'ey', 'an', 'start', 'startCell', 'goal', 'exits', 'eu', 'dist', 'opt', 'd0', 'cap'];
+  const PACK = ['n', 'N', 'cellOf', 'off', 'to', 'tc', 'kd', 'ex', 'ey', 'an', 'cOff', 'cTo', 'cStr', 'gRay', 'ce', 'start', 'startCell', 'goal', 'exits', 'eu', 'dist', 'opt', 'd0', 'cap'];
   function pack(ctx) { if (!ctx._pack) { const o = {}; PACK.forEach(k => { o[k] = ctx[k]; }); ctx._pack = o; } return ctx._pack; }
 
 
@@ -427,29 +505,123 @@
     return pop.slice(0, o.pop);
   }
   // fitness = gemiddelde score over de doolhoven (en 1 loper per doolhof)
-  function evaluate(pop, mazes, gen, runs) {
-    const r = ENG.evalList(mazes.map(mz => mz.ctx), pop.map(g => g.genes), pop.map(g => g.id), gen, runs);
-    pop.forEach((ge, j) => { ge.fit = r.fit[j]; ge.ok = r.ok[j]; ge.steps = r.steps[j]; });
+  // x = { bh: true → ook ge.bh (gedrag, nodig voor select 'novelty'/'mix'), lamarck: k → daarna k proefstapjes per individu (x.lamInfo = uitkomst) }
+  const BD = ENG.BD;
+  const wantBh = x => !!(x && (x.bh || x.select === 'novelty' || x.select === 'mix'));
+  function evaluate(pop, mazes, gen, runs, x) {
+    const bh = wantBh(x), r = ENG.evalList(mazes.map(mz => mz.ctx), pop.map(g => g.genes), pop.map(g => g.id), gen, runs, 0, bh);
+    pop.forEach((ge, j) => { ge.fit = r.fit[j]; ge.ok = r.ok[j]; ge.steps = r.steps[j]; if (bh) ge.bh = Array.from(r.bh.subarray(j * BD, j * BD + BD)); });
+    if (x && x.lamarck > 0) x.lamInfo = lamarck(pop, mazes, gen, runs, { k: x.lamarck });
     return pop;
   }
-  // o = { pop, mut (0..1), elite, rng, gen }
+  const noLam = x => x && x.lamarck ? Object.assign({}, x, { lamarck: 0 }) : x;
+  // Mutatiesoorten (o.mutKind): 'gauss' (standaard, stap ~12% van het bereik) · 'cauchy' (meestal klein, soms een enorme sprong)
+  // · 'self' (zelfregelend: elk DNA draagt eigen σ = ge.sig, fractie van het bereik; kind erft σ × lognormaal, dan mutatie met die σ)
+  const MUT_KINDS = ['gauss', 'cauchy', 'self'], SIG0 = 0.12, SIG_LO = 0.01, SIG_HI = 0.5;
+  const cauchy = rng => Math.tan(Math.PI * (rng() - 0.5) * 0.98);
+  // Selectie (o.select): 'fitness' (standaard) · 'novelty' (alleen nieuwheid ge.nov) · 'mix' (gemiddelde rang fitness + nieuwheid). Elite = altijd op fitness.
+  function selValue(sorted, sel) {
+    if (sel !== 'novelty' && sel !== 'mix') return null;
+    if (!sorted.every(g => typeof g.nov === 'number')) return null; // nog geen nieuwheid berekend → gewoon fitness
+    const val = new Map(), n = Math.max(1, sorted.length - 1);
+    if (sel === 'novelty') sorted.forEach(g => val.set(g, g.nov));
+    else {
+      const byN = sorted.slice().sort((a, b) => a.nov - b.nov), rn = new Map();
+      byN.forEach((g, i) => rn.set(g, i / n));
+      sorted.forEach((g, i) => val.set(g, 0.5 * (1 - i / n) + 0.5 * rn.get(g)));
+    }
+    return val;
+  }
+  // o = { pop, mut (0..1), elite, rng, gen, mutKind, select, archive (array, bij novelty/mix) }
   function nextGen(pop, o) {
     const rng = o.rng, N = o.pop, sorted = pop.slice().sort((a, b) => b.fit - a.fit), out = [];
-    const elite = Math.min(o.elite == null ? 2 : o.elite, sorted.length);
+    if ((o.select === 'novelty' || o.select === 'mix') && o.archive && pop.some(g => g.bh)) novelty(pop, o.archive); // archief = array van het scherm
+    const elite = Math.min(o.elite == null ? 2 : o.elite, sorted.length), kind = o.mutKind || 'gauss', val = selValue(sorted, o.select);
     for (let i = 0; i < elite; i++) { const e = sorted[i]; out.push(Object.assign({}, e, { fit: 0, elite: true, age: (e.age || 0) + 1 })); }
-    const pick = () => { let b = null; for (let i = 0; i < 3; i++) { const c = sorted[Math.floor(rng() * sorted.length)]; if (!b || c.fit > b.fit) b = c; } return b; };
+    const pick = val
+      ? () => { let b = null; for (let i = 0; i < 3; i++) { const c = sorted[Math.floor(rng() * sorted.length)]; if (!b || val.get(c) > val.get(b)) b = c; } return b; }
+      : () => { let b = null; for (let i = 0; i < 3; i++) { const c = sorted[Math.floor(rng() * sorted.length)]; if (!b || c.fit > b.fit) b = c; } return b; };
     while (out.length < N) {
-      if (rng() < 0.05) { out.push(genome(randomGenes(rng), o.gen)); continue; } // nieuwkomer
-      const a = pick(), b = pick(), genes = a.genes.map((v, i) => rng() < 0.5 ? v : b.genes[i]);
-      for (let i = 0; i < NG; i++) if (rng() < o.mut) genes[i] = clamp(genes[i] + gauss(rng) * (GENES[i].hi - GENES[i].lo) * 0.12, i, genes[i]);
+      if (rng() < 0.05) { out.push(genome(randomGenes(rng), o.gen, [], kind === 'self' ? { sig: SIG0 } : null)); continue; } // nieuwkomer
+      const a = pick(), b = pick(), genes = a.genes.map((v, i) => rng() < 0.5 ? v : b.genes[i]), extra = { sp: a.sp };
+      if (kind === 'cauchy') {
+        for (let i = 0; i < NG; i++) if (rng() < o.mut) genes[i] = clamp(genes[i] + cauchy(rng) * (GENES[i].hi - GENES[i].lo) * 0.04, i, genes[i]);
+      } else if (kind === 'self') {
+        const ps = Math.sqrt((a.sig || SIG0) * (b.sig || SIG0)), sig = Math.max(SIG_LO, Math.min(SIG_HI, ps * Math.exp(0.35 * gauss(rng))));
+        extra.sig = Math.round(sig * 10000) / 10000;
+        for (let i = 0; i < NG; i++) if (rng() < o.mut) genes[i] = clamp(genes[i] + gauss(rng) * (GENES[i].hi - GENES[i].lo) * extra.sig, i, genes[i]);
+      } else {
+        for (let i = 0; i < NG; i++) if (rng() < o.mut) genes[i] = clamp(genes[i] + gauss(rng) * (GENES[i].hi - GENES[i].lo) * 0.12, i, genes[i]);
+      }
       // soort erven van de beste ouder (kleur blijft rustig)
-      out.push(genome(genes, o.gen, a === b ? [a.name] : [a.name, b.name], { sp: a.sp }));
+      out.push(genome(genes, o.gen, a === b ? [a.name] : [a.name, b.name], extra));
     }
     return out;
+  }
+
+  // ---- Nieuwheid: gedrag (ge.bh, zie evaluate x.bh) vergelijken met de populatie + een archief ----
+  // arch = array (bewaard door het scherm, start []); o = { k (buren, 10), add (per generatie in archief, 2), max (300) }
+  // zet ge.nov = gemiddelde afstand tot de k dichtstbijzijnde gedragingen; → arch (aangevuld)
+  function novelty(pop, arch, o) {
+    o = o || {}; arch = arch || [];
+    const k = o.k || 10, add = o.add == null ? 2 : o.add, max = o.max || 300, live = pop.filter(g => g.bh), all = live.map(g => g.bh).concat(arch);
+    const d2 = (a, b) => { let s = 0; for (let q = 0; q < BD; q++) { const d = a[q] - b[q]; s += d * d; } return Math.sqrt(s); };
+    live.forEach(g => {
+      const ds = []; for (const b of all) if (b !== g.bh) ds.push(d2(g.bh, b));
+      ds.sort((x, y) => x - y);
+      const kk = Math.min(k, ds.length); let s = 0; for (let i = 0; i < kk; i++) s += ds[i];
+      g.nov = kk ? Math.round(s / kk * 1e6) / 1e6 : 0;
+    });
+    live.slice().sort((a, b) => b.nov - a.nov).slice(0, add).forEach(g => arch.push(g.bh.slice()));
+    if (arch.length > max) arch.splice(0, arch.length - max);
+    return arch;
+  }
+
+  // ---- Lamarck: elk individu leert op dezelfde doolhoven (k proefstapjes, beste houden) en geeft de geleerde genen door ----
+  // o = { k (proefstapjes, 4), step (fractie van het bereik, 0.08) }. Kosten: k extra evaluaties per individu → rekenwerk × (1 + k).
+  function lamProps(pop, gen, o) {
+    const k = (o && o.k) || 4, step = (o && o.step) || 0.08, props = [];
+    pop.forEach((ge, j) => {
+      const r = ENG.makeRng(ge.id + '|lam|' + gen);
+      for (let t = 0; t < k; t++) {
+        const genes = ge.genes.slice(), nCh = 1 + (r() < 0.5 ? 1 : 0);
+        for (let c = 0; c < nCh; c++) { const i = Math.floor(r() * NG); genes[i] = Math.round(clamp(genes[i] + gauss(r) * (GENES[i].hi - GENES[i].lo) * step, i, genes[i]) * 1000) / 1000; }
+        props.push({ genes, id: ge.id, j }); // zelfde id = zelfde loting als de eigen evaluatie → eerlijk vergelijken
+      }
+    });
+    return props;
+  }
+  function lamApply(pop, props, res) {
+    const best = pop.map(ge => ({ f: ge.fit, t: -1 }));
+    props.forEach((p, t) => { if (res[t].fit > best[p.j].f + 1e-12) best[p.j] = { f: res[t].fit, t }; });
+    let better = 0;
+    pop.forEach((ge, j) => {
+      const b = best[j]; ge.lamGain = 0;
+      if (b.t < 0) return;
+      const r = res[b.t]; better++;
+      ge.lamGain = r.fit - ge.fit; ge.genes = props[b.t].genes; ge.fit = r.fit; ge.ok = r.ok; ge.steps = r.steps; ge.learned = (ge.learned || 0) + 1;
+      if (r.bh) ge.bh = r.bh;
+    });
+    return { k: props.length / Math.max(1, pop.length), tried: props.length, better, cost: 1 + props.length / Math.max(1, pop.length) };
+  }
+  const LAMARCK_COST = '×5 rekentijd (4 proefstapjes per individu)';
+  // op de hoofddraad (na evaluate, zelfde doolhoven); → { k, tried, better, cost (× rekenwerk) }
+  function lamarck(pop, mazes, gen, runs, o) {
+    const props = lamProps(pop, gen, o), bh = pop.some(g => g.bh);
+    const r = ENG.evalList(mazes.map(mz => mz.ctx), props.map(p => p.genes), props.map(p => p.id), gen, runs, 0, bh);
+    return lamApply(pop, props, props.map((p, t) => ({ fit: r.fit[t], ok: r.ok[t], steps: r.steps[t], bh: bh ? Array.from(r.bh.subarray(t * BD, t * BD + BD)) : null })));
+  }
+  // zelfde in de workers (na Pool.evaluateSpecs, zelfde specs); geen workers → hoofddraad met fallbackMazes(). → Promise
+  function lamarckAsync(pop, specs, gen, runs, fallbackMazes, o) {
+    const props = lamProps(pop, gen, o), bh = pop.some(g => g.bh), pseudo = props.map(p => ({ genes: p.genes, id: p.id }));
+    const pr = Pool.evaluateSpecs(pseudo, specs, gen, runs, fallbackMazes, bh ? { bh: true } : null);
+    if (!pr) return Promise.resolve(lamarck(pop, fallbackMazes(), gen, runs, o));
+    return pr.then(() => lamApply(pop, props, pseudo.map(q => ({ fit: q.fit, ok: q.ok, steps: q.steps, bh: q.bh || null }))));
   }
   // Eilanden: I aparte populaties (ge.isl); elke `every` generaties verhuist de beste van elk eiland naar het volgende
   function nextGenIslands(pop, o, I, every) {
     if (!(I > 1)) return nextGen(pop, o);
+    if ((o.select === 'novelty' || o.select === 'mix') && o.archive && pop.some(g => g.bh)) { novelty(pop, o.archive); o = Object.assign({}, o, { archive: null }); } // één keer over alle eilanden
     const per = k => Math.max(4, Math.floor(o.pop / I) + (k < o.pop % I ? 1 : 0)), groups = [];
     for (let k = 0; k < I; k++) groups.push([]);
     pop.forEach((ge, j) => { const k = ge.isl != null && ge.isl < I ? ge.isl : j % I; groups[k].push(ge); });
@@ -487,7 +659,7 @@
 if(d.only){postMessage({job:d.job,part:d.part,tp:d.only==='heavy'?E.heavyPart(d.test,d.tidx):E.testPart(d.test,d.tidx)});return;}
 if(d.build)ctxs=d.specs.map(x=>x.sp?E.specMaze(x.sp,x.asp).ctx:E.buildMaze(x.o,x.sd,x.i,x.asp).ctx);
 else{if(d.clear)cache.clear();if(d.ctxs)for(const k in d.ctxs)cache.set(k,d.ctxs[k]);ctxs=d.keys.map(k=>cache.get(k));}
-const r=d.raw?E.evalRaw(ctxs,d.genes,d.ids,d.gen,d.runs,d.i0):E.evalList(ctxs,d.genes,d.ids,d.gen,d.runs,d.i0);postMessage({job:d.job,part:d.part,sc:r.sc,fit:r.fit,ok:r.ok,steps:r.steps,tp:d.test?E.testPart(d.test,d.tidx):null});
+const r=d.raw?E.evalRaw(ctxs,d.genes,d.ids,d.gen,d.runs,d.i0,d.bh):E.evalList(ctxs,d.genes,d.ids,d.gen,d.runs,d.i0,d.bh);postMessage({job:d.job,part:d.part,sc:r.sc,fit:r.fit,ok:r.ok,steps:r.steps,bh:r.bh,tp:d.test?E.testPart(d.test,d.tidx):null});
 if(d.pre)for(const x of d.pre)x.sp?E.specMaze(x.sp,x.asp):E.buildMaze(x.o,x.sd,x.i,x.asp);};`; // pre = doolhoven van de volgende generatie alvast bouwen (terwijl de hoofddraad kinderen maakt)
         const url = URL.createObjectURL(new Blob([src + '\n' + body], { type: 'text/javascript' }));
         this.ws = [];
@@ -534,8 +706,9 @@ if(d.pre)for(const x of d.pre)x.sp?E.specMaze(x.sp,x.asp):E.buildMaze(x.o,x.sd,x
       return pr;
     },
     // alleen zonder bouwen-in-workers (MLDEF onvolledig): doolhoven op de hoofddraad gebouwd, rijen naar de workers (populatie verdeeld)
-    evaluate(pop, mazes, gen, runs) {
-      if (!this.ensure() || this.broken) { evaluate(pop, mazes, gen, runs); return Promise.resolve(pop); }
+    evaluate(pop, mazes, gen, runs, x) {
+      const bh = wantBh(x);
+      if (!this.ensure() || this.broken) { evaluate(pop, mazes, gen, runs, x); return Promise.resolve(pop); }
       const W = this.ws.length, per = Math.ceil(pop.length / W), keys = mazes.map(mz => mz.key), jobs = [];
       for (let p = 0; p * per < pop.length; p++) {
         const part = pop.slice(p * per, (p + 1) * per), w = this.ws[p];
@@ -543,26 +716,30 @@ if(d.pre)for(const x of d.pre)x.sp?E.specMaze(x.sp,x.asp):E.buildMaze(x.o,x.sd,x
         if (w.has.size > 60) { w.has.clear(); clear = true; }
         const ctxs = {};
         mazes.forEach(mz => { if (!w.has.has(mz.key)) { ctxs[mz.key] = pack(mz.ctx); w.has.add(mz.key); } });
-        jobs.push({ w: p, msg: { clear, ctxs, keys, genes: part.map(g => g.genes), ids: part.map(g => g.id), gen, runs },
-          apply: d => part.forEach((ge, j) => { ge.fit = d.fit[j]; ge.ok = d.ok[j]; ge.steps = d.steps[j]; }) });
+        jobs.push({ w: p, msg: { clear, ctxs, keys, genes: part.map(g => g.genes), ids: part.map(g => g.id), gen, runs, bh },
+          apply: d => part.forEach((ge, j) => { ge.fit = d.fit[j]; ge.ok = d.ok[j]; ge.steps = d.steps[j]; if (bh && d.bh) ge.bh = Array.from(d.bh.subarray(j * BD, j * BD + BD)); }) });
       }
-      return this.run(jobs, () => evaluate(pop, mazes, gen, runs)).then(() => pop);
+      return this.run(jobs, () => evaluate(pop, mazes, gen, runs, noLam(x))).then(() => {
+        if (x && x.lamarck > 0) x.lamInfo = lamarck(pop, mazes, gen, runs, { k: x.lamarck }); // zeldzaam pad (geen bouwen in workers) → hoofddraad
+        return pop;
+      });
     },
     // doolhoven bouwen ín de workers: specs = [{ o, sd, i, asp }] of [{ sp, i, asp }] (losse beschrijving, zoals specMaze; doolhof-zoeker). Werk = M doolhoven × N lopers, in W gelijke stukken (stuk k → worker k;
     // een stuk dat over een doolhofgrens loopt = twee berichten). Losse scores terug, optellen in vaste volgorde → zelfde fitness als evaluate().
-    // x = { next: specs van de volgende generatie (zelfde worker bouwt ze alvast), test: genes → x.onTest(testScore) in een worker }
+    // x = { next: specs van de volgende generatie (zelfde worker bouwt ze alvast), test: genes → x.onTest(testScore) in een worker, bh: ook gedrag (ge.bh) }
     evaluateSpecs(pop, specs, gen, runs, fallbackMazes, x) {
       if (!this.ensure() || this.broken || !this.canBuild) return null;
       const W = this.ws.length, M = specs.length, N = pop.length, R = runs || 1, U = N * M, next = x && x.next;
-      const sc = new Float64Array(U * R), ok = new Int32Array(N), st = new Int32Array(N), jobs = [], last = [];
+      const sc = new Float64Array(U * R), ok = new Int32Array(N), st = new Int32Array(N), jobs = [], last = [], bh = wantBh(x), BH = bh ? new Float64Array(U * BD) : null;
       const genes = pop.map(g => g.genes), ids = pop.map(g => g.id);
       for (let k = 0; k < W; k++) {
         const u0 = Math.floor(k * U / W), u1 = Math.floor((k + 1) * U / W), built = new Set();
         for (let u = u0; u < u1;) {
           const i = Math.floor(u / N), from = u - i * N, to = Math.min(N, from + (u1 - u)), sp = specs[i];
           const pre = next && next[i] && !built.has(i) ? [next[i]] : null; built.add(i);
-          jobs.push({ w: k, msg: { build: true, raw: true, specs: [sp], genes: genes.slice(from, to), ids: ids.slice(from, to), gen, runs: R, i0: sp.i, pre },
-            apply: d => { for (let j = 0; j < to - from; j++) { for (let r = 0; r < R; r++) sc[((from + j) * M + i) * R + r] = d.sc[j * R + r]; ok[from + j] += d.ok[j]; st[from + j] += d.steps[j]; } } });
+          jobs.push({ w: k, msg: { build: true, raw: true, specs: [sp], genes: genes.slice(from, to), ids: ids.slice(from, to), gen, runs: R, i0: sp.i, pre, bh },
+            apply: d => { for (let j = 0; j < to - from; j++) { for (let r = 0; r < R; r++) sc[((from + j) * M + i) * R + r] = d.sc[j * R + r]; ok[from + j] += d.ok[j]; st[from + j] += d.steps[j];
+              if (BH && d.bh) for (let q = 0; q < BD; q++) BH[((from + j) * M + i) * BD + q] = d.bh[j * BD + q]; } } });
           u += to - from;
         }
         if (u1 > u0) last.push(jobs.length - 1);
@@ -576,10 +753,12 @@ if(d.pre)for(const x of d.pre)x.sp?E.specMaze(x.sp,x.asp):E.buildMaze(x.o,x.sd,x
         tj.forEach(j => { const ap = j.apply; j.apply = d => { ap(d); if (d.tp) tparts.push(...d.tp); }; });
       }
       let fell = false;
-      return this.run(jobs, () => { fell = true; evaluate(pop, fallbackMazes(), gen, runs); }).then(() => {
-        if (!fell) pop.forEach((ge, j) => { let s = 0; for (let q = j * M * R, e = q + M * R; q < e; q++) s += sc[q]; ge.fit = s / (M * R); ge.ok = ok[j]; ge.steps = st[j]; });
+      return this.run(jobs, () => { fell = true; evaluate(pop, fallbackMazes(), gen, runs, noLam(x)); }).then(() => {
+        if (!fell) pop.forEach((ge, j) => { let s = 0; for (let q = j * M * R, e = q + M * R; q < e; q++) s += sc[q]; ge.fit = s / (M * R); ge.ok = ok[j]; ge.steps = st[j];
+          if (BH) { const b = new Array(BD).fill(0); for (let i = 0; i < M; i++) for (let q = 0; q < BD; q++) b[q] += BH[(j * M + i) * BD + q]; ge.bh = b.map(v => v / (M * R)); } });
         if (!fell && tHit) x.onTest(tHit);
         else if (!fell && tparts.length === TEST.length) x.onTest(testCombine(x.test, tparts));
+        if (x && x.lamarck > 0) return lamarckAsync(pop, specs, gen, runs, fallbackMazes, { k: x.lamarck }).then(info => { x.lamInfo = info; return pop; });
         return pop;
       });
     }
@@ -609,9 +788,11 @@ if(d.pre)for(const x of d.pre)x.sp?E.specMaze(x.sp,x.asp):E.buildMaze(x.o,x.sd,x
   }
   // deelcode: "MLDNA1:" + base64(json)
   function toCode(a) { return 'MLDNA1:' + btoa(unescape(encodeURIComponent(JSON.stringify({ n: a.name, g: a.genes, b: a.born })))); }
-  // korte code (voor link + QR): "MLDNA2." + base64url( versie, NG × int16 (gen × 1000, exact), naam utf-8 )
+  // korte code (voor link + QR): "MLDNA2." + base64url( versie, genen × int16 (gen × 1000, exact), naam utf-8 )
+  // versie 2 = 11 genen (engine 3), versie 3 = 13 genen (engine 4). σ (zelfregelend) gaat niet mee.
+  const SHORT_NG = { 2: 11, 3: 13 };
   function toShort(a) {
-    const nm = unescape(encodeURIComponent(String(a.name || '').slice(0, 24))), b = [2];
+    const nm = unescape(encodeURIComponent(String(a.name || '').slice(0, 24))), b = [3];
     a.genes.forEach(v => { const x = Math.max(-32767, Math.min(32767, Math.round(v * 1000))) & 0xffff; b.push(x >> 8, x & 255); });
     let bin = String.fromCharCode(...b) + nm;
     return 'MLDNA2.' + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -619,10 +800,11 @@ if(d.pre)for(const x of d.pre)x.sp?E.specMaze(x.sp,x.asp):E.buildMaze(x.o,x.sd,x
   function fromShort(str) {
     const m = /MLDNA2\.([A-Za-z0-9_-]+)/.exec(str || ''); if (!m) return null;
     try {
-      const bin = atob(m[1].replace(/-/g, '+').replace(/_/g, '/')), L = 1 + NG * 2;
-      if (bin.charCodeAt(0) !== 2 || bin.length < L) return null;
-      const gs = [];
-      for (let i = 0; i < NG; i++) { let x = (bin.charCodeAt(1 + 2 * i) << 8) | bin.charCodeAt(2 + 2 * i); if (x > 32767) x -= 65536; gs.push(x / 1000); }
+      const bin = atob(m[1].replace(/-/g, '+').replace(/_/g, '/')), K = SHORT_NG[bin.charCodeAt(0)], L = 1 + (K || 0) * 2;
+      if (!K || bin.length < L) return null;
+      let gs = [];
+      for (let i = 0; i < K; i++) { let x = (bin.charCodeAt(1 + 2 * i) << 8) | bin.charCodeAt(2 + 2 * i); if (x > 32767) x -= 65536; gs.push(x / 1000); }
+      gs = upGenes(gs);
       if (!okGenes(gs)) return null;
       return { name: decodeURIComponent(escape(bin.slice(L))).slice(0, 40) || 'Gedeeld', genes: gs.map((v, i) => clampHard(v, i)), born: 0 };
     } catch (e) { return null; }
@@ -677,7 +859,7 @@ if(d.pre)for(const x of d.pre)x.sp?E.specMaze(x.sp,x.asp):E.buildMaze(x.o,x.sd,x
 
   ML.Evo = { GENES, PRESETS, TEST, TEST_CATS, HEAVY, Walker: ENG.Walker, ENGINE_V, context, pack, buildMaze, mazeSpec, specMaze, spName, testScore, testPut, testPart, testCombine, testMazes, heavyScore, heavyReady, bestClassic,
     testScoreAsync: genes => Pool.scoreAsync('test', genes), heavyScoreAsync: genes => Pool.scoreAsync('heavy', genes), heavyPart, heavyCombine,
-    initPop, evaluate, evalList: ENG.evalList, evalRaw: ENG.evalRaw, nextGen, nextGenIslands, assignIslands, Pool, loadFame, addFame, delFame, syncSolvers, solverFn, MAKERS, GRIDS,
+    initPop, evaluate, evalList: ENG.evalList, evalRaw: ENG.evalRaw, nextGen, nextGenIslands, MUT_KINDS, SIG0, novelty, lamarck, lamarckAsync, LAMARCK_COST, BD, assignIslands, Pool, loadFame, addFame, delFame, syncSolvers, solverFn, MAKERS, GRIDS,
     evalOne: ENG.evalOne, genome, nameOf, colorOf, describe, dominant, norm, dnaDist, clamp, clampHard, upGenes, okGenes, randomGenes,
     loadAlgos, saveAlgos, newAlgo, stampHist, toCode, toShort, fromCode, newId, today };
   // eigen algoritmes meteen als oplosser (niet in de Web Worker: daar is geen ML.SOLVERS)
