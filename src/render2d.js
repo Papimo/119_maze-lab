@@ -279,6 +279,112 @@
       g.restore();
     }
 
+    // ---- Oplosser-beeld (solvers2.js): m.viz hoort bij de oplosser die nu loopt ----
+    // Voorrang vs.viz; anders m.viz, gekoppeld aan de eerste view-state die hem ziet (oude viz van een vorige oplossing = niet tekenen).
+    vizOf(m, vs) {
+      if (vs.viz) return vs.viz;
+      const z = m.viz;
+      if (!z || !vs.order || vs.race) return null;
+      if (!z.vs) z.vs = vs;
+      return z.vs === vs ? z : null;
+    }
+    heatCells(H, rgb, amax) {
+      const lv = Array.from({ length: 8 }, () => []);
+      for (let i = 0; i < H.length; i++) if (H[i] > 0.02) lv[Math.min(7, Math.floor(H[i] * 8))].push(i);
+      const col = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      lv.forEach((l, k) => this.fillCells(l, col, amax * (k + 1) / 8));
+    }
+    cellLine(g, m, cells) { // polylijn door celmiddens, onderbroken bij torus-rand/trap/teleporter
+      const C = m.cells;
+      for (let i = 0; i < cells.length; i++) {
+        const c = C[cells[i]].center;
+        const w = i ? ML.edge(m, cells[i - 1], cells[i]) : null;
+        if (!i || !w || w.wrap || w.stair) g.moveTo(this.X(c[0]), this.Y(c[1])); else g.lineTo(this.X(c[0]), this.Y(c[1]));
+      }
+    }
+    vizFloor(g, m, z) {
+      const P = this.pal, M = P.maq, s = this.s, C = m.cells;
+      const rgbOf = h => hex2rgb(h);
+      if (z.heat) this.heatCells(z.heat, z.heatCol || rgbOf(P.visitB), M ? 0.55 : 0.6);
+      if (z.heat2) this.heatCells(z.heat2, z.heat2Col || [229, 72, 77], M ? 0.5 : 0.55);
+      if (z.tubes && z.tubes.length) { // slijmzwam: dikte = stroming
+        g.lineCap = 'round'; g.strokeStyle = M ? '#d69a1f' : '#ffd34d';
+        const lv = [[], [], [], [], [], []];
+        for (const t of z.tubes) if (t.ok && t.w > 0.02) lv[Math.min(5, Math.floor(t.w * 6))].push(t);
+        lv.forEach((l, k) => {
+          if (!l.length) return;
+          g.globalAlpha = 0.35 + 0.65 * (k + 1) / 6; g.lineWidth = Math.max(1, s * (0.06 + 0.4 * (k + 0.5) / 6));
+          g.beginPath();
+          for (const t of l) { const a = C[t.a].center, b = C[t.b].center; g.moveTo(this.X(a[0]), this.Y(a[1])); g.lineTo(this.X(b[0]), this.Y(b[1])); }
+          g.stroke();
+        });
+        g.globalAlpha = 1;
+      }
+      if (z.arrows) { // Q-learning: beste richting per cel
+        const A = z.arrows, r = s * 0.28;
+        g.strokeStyle = M ? '#6b5d48' : P.wall; g.lineWidth = Math.max(1, s * 0.07); g.lineCap = 'round'; g.globalAlpha = 0.8;
+        g.beginPath();
+        for (let i = 0; i < A.length; i++) {
+          const a = A[i]; if (a !== a) continue;
+          const c = C[i].center, x = this.X(c[0]), y = this.Y(c[1]), dx = Math.cos(a), dy = Math.sin(a);
+          g.moveTo(x - dx * r * 0.6, y - dy * r * 0.6); g.lineTo(x + dx * r, y + dy * r);
+          g.moveTo(x + dx * r - (dx * 0.5 - dy * 0.4) * r, y + dy * r - (dy * 0.5 + dx * 0.4) * r); g.lineTo(x + dx * r, y + dy * r);
+          g.lineTo(x + dx * r - (dx * 0.5 + dy * 0.4) * r, y + dy * r - (dy * 0.5 - dx * 0.4) * r);
+        }
+        g.stroke(); g.globalAlpha = 1;
+      }
+    }
+    vizTop(g, m, z, now) {
+      const P = this.pal, M = P.maq, s = this.s, C = m.cells, W = m.walls;
+      if (z.fog) { // mist over wat de verkenner nog niet gezien heeft
+        const f = [];
+        for (let i = 0; i < z.fog.length; i++) if (!z.fog[i]) f.push(i);
+        this.fillCells(f, M ? M.bg2 : P.bg, M ? 0.6 : 0.7);
+      }
+      if (z.walls) { // ontdekte muren
+        g.strokeStyle = P.accent; g.lineWidth = Math.max(1.5, s * 0.12); g.lineCap = 'round'; g.globalAlpha = 0.9;
+        g.beginPath();
+        for (let i = 0; i < z.walls.length; i++) if (z.walls[i] === 2) this.segPath(g, W[i]);
+        g.stroke(); g.globalAlpha = 1;
+      }
+      if (z.rays && z.rays.length) { // zicht: lichtstralen
+        g.strokeStyle = M ? '#f5b301' : '#fff1c9'; g.lineWidth = Math.max(1, s * 0.09); g.lineCap = 'round'; g.globalAlpha = 0.7;
+        g.beginPath(); for (const r of z.rays) this.cellLine(g, m, r); g.stroke(); g.globalAlpha = 1;
+      }
+      if (z.paths && z.paths.length) {
+        g.lineCap = 'round'; g.lineJoin = 'round';
+        for (const p of z.paths) {
+          g.strokeStyle = p.col || P.path; g.lineWidth = Math.max(1, s * (p.w || 0.1)); g.globalAlpha = p.a == null ? 0.9 : p.a;
+          if (p.dash) { g.setLineDash([s * 0.25, s * 0.18]); g.lineDashOffset = -now * s * 1.2; }
+          g.beginPath(); this.cellLine(g, m, p.cells); g.stroke(); g.setLineDash([]);
+        }
+        g.globalAlpha = 1;
+      }
+      if (z.dots) for (const d of z.dots) { const c = C[d.c] && C[d.c].center; if (c) this.head(c[0], c[1], d.col, d.r || 0.2); }
+      return !!(z.paths && z.paths.some(p => p.dash));
+    }
+    vizScreen(g, z) { // label + grafiekje (Q-learning) linksboven, schermruimte (onderaan staat de statusregel)
+      const P = this.pal, cv = this.cv, M = P.maq, fs = Math.round(Math.max(11, Math.min(14, cv.width / 60)));
+      const ink = M ? '#4a3f2f' : P.wall, box = M ? 'rgba(255,250,240,0.82)' : 'rgba(0,0,0,0.45)';
+      let y = 10;
+      g.textAlign = 'left'; g.textBaseline = 'top';
+      if (z.label) {
+        g.font = `600 ${fs}px system-ui, sans-serif`;
+        const tw = g.measureText(z.label).width;
+        g.fillStyle = box; g.fillRect(10, y, tw + 14, fs + 8);
+        g.fillStyle = ink; g.fillText(z.label, 17, y + 4);
+        y += fs + 14;
+      }
+      const ch = z.chart;
+      if (ch && ch.vals.length) {
+        const w = Math.min(220, cv.width * 0.4), h = 64, x = 10, v = ch.vals, mx = Math.max(...v, 1), bw = w / Math.max(v.length, 12);
+        g.fillStyle = box; g.fillRect(x, y, w + 12, h);
+        g.fillStyle = P.accent;
+        v.forEach((q, i) => { const bh = (h - 22) * q / mx; g.fillRect(x + 6 + i * bw, y + h - 6 - bh, Math.max(1, bw - 2), bh); });
+        g.fillStyle = ink; g.font = `600 ${fs - 2}px system-ui, sans-serif`;
+        g.fillText(ch.label, x + 6, y + 4);
+      }
+    }
     draw(m, vs, now) {
       const g = this.g, cv = this.cv, P = this.pal, M = P.maq;
       g.setTransform(1, 0, 0, 1, 0, 0);
@@ -288,6 +394,7 @@
       const C = m.cells, W = m.walls, n = C.length, s = this.s, lw = Math.max(1, s * 0.1), FX = ML.FX;
       const st = this.stateOf(m, vs, now), hp = this.hp, life = M && vs.life ? now : 0;
       let busy = false;
+      const VZ = this.vizOf(m, vs);
 
       // camera (Kijken: inzoomen op het doel / nieuw doolhof groeit uit het midden). cam = { x, y, z, px, py }
       if (vs.cam && !this.noWalls) {
@@ -325,7 +432,7 @@
       }
 
       // bezochte cellen: kleur naar volgorde; verse cellen ploppen op als rimpel
-      if (vs.order && vs.nOrder > 0 && !vs.noVisit) {
+      if (vs.order && vs.nOrder > 0 && !vs.noVisit && !(VZ && VZ.noVisit)) {
         const grad = this.grad(), gr = this._gradRGB, buckets = Array.from({ length: BUCKETS }, () => []);
         const vt = vs.vt, side = vs.side, cut = now - A.RIP;
         const bucketOf = i => { let b = Math.min(BUCKETS - 1, Math.floor(vs.order[i] / vs.nOrder * BUCKETS)); if (side && side[i]) b = BUCKETS - 1 - b; return b; };
@@ -394,6 +501,7 @@
       // eigen vloerlaag (zwerm, voetstappen, thema-leven): onder de muren
       if (vs.theme) busy = vs.theme.floor(g, this, now) || busy;
       if (vs.floorFx) busy = vs.floorFx(g, this, now) || busy;
+      if (VZ) this.vizFloor(g, m, VZ);
       if (ML.V2) busy = ML.V2.layers('floor', g, this, m, vs, now) || busy;
 
       // doodlopers dichten: gevulde cellen
@@ -638,6 +746,7 @@
       // race: per deelnemer eigen hoekje in de cel (speldjes), eigen spoor, kop en route
       this.hideList = !!vs.noVisit;
       if (vs.race) busy = this.drawRace(g, m, vs.race, now, lw) || busy;
+      if (VZ) busy = this.vizTop(g, m, VZ, now) || busy;
 
       // komeet-staart van de zoeker
       if (vs.tail && vs.tail.length) {
@@ -681,6 +790,7 @@
         g.setTransform(1, 0, 0, 1, 0, 0);
         if (!this.noWalls) busy = ML.V2.layers('screen', g, this, m, vs, now) || busy;
       }
+      if (VZ && !this.noWalls) { g.setTransform(1, 0, 0, 1, 0, 0); this.vizScreen(g, VZ); }
       return busy;
     }
   };
