@@ -130,11 +130,34 @@
   }
   const signed = v => v > 0 ? `<em class="up">+${v}</em>` : v < 0 ? `<em class="down">${v}</em>` : '<em>±0</em>';
   const sureTag = su => su.icon ? `<span class="sure ${su.k}" title="${esc(su.txt)}: per testdoolhof vergeleken (wisselt het per doolhof, dan kan het geluk zijn)">${su.icon} ${esc(su.txt)}</span>` : '';
-  // scorevak: grote Score (testbaan), optioneel zwaar en een vergelijking vs = { name, t }
+  // ---- scoretaal "vijf treden": 0–100 in vijf banden; zwaar = zelfde banden (eerlijk: daar is alles laag) ----
+  const BANDS = [{ max: 20, w: 'verdwaalt', c: '#ff6b6b' }, { max: 40, w: 'zwak', c: '#ff9f5a' }, { max: 60, w: 'redelijk', c: '#ffd166' }, { max: 80, w: 'goed', c: '#a7e06b' }, { max: 101, w: 'bijna perfect', c: '#4fd18b' }];
+  const HBANDS = [{ max: 20, w: 'makkelijk', c: '#8a96b8' }, { max: 40, w: 'te doen', c: '#9a86d6' }, { max: 60, w: 'pittig', c: '#b072e6' }, { max: 80, w: 'lastig', c: '#d05cdc' }, { max: 101, w: 'heel lastig', c: '#f04fc0' }];
+  const band = (s, B = BANDS) => B.find(b => (+s || 0) < b.max) || B[B.length - 1];
+  // vijf vakjes; mark = positie van een ijkpunt (driehoekje), B = HBANDS voor moeilijkheid
+  function treden(s, o = {}) {
+    const B = o.B || BANDS, b = band(s, B), v = +s || 0;
+    const seg = B.map((x, i) => { const p = Math.max(0, Math.min(1, (v - i * 20) / 20)); return `<i>${p ? `<b style="width:${r1(p * 100)}%;background:${b.c}"></b>` : ''}</i>`; }).join('');
+    return `<span class="trd${o.sm ? ' sm' : ''}"${o.title ? ` title="${esc(o.title)}"` : ''}>${seg}${o.mark != null ? `<u style="left:${o.mark}%" title="${esc(o.markName || '')} ${o.mark}"></u>` : ''}</span>`;
+  }
+  const scoreWord = (s, B) => { const b = band(s, B); return `<span class="sword" style="color:${b.c};background:${b.c}22;border-color:${b.c}66">${b.w}</span>`; };
+  const INFO = {
+    t: () => { const bc = EV().bestClassic(), dw = EV().testScore(EV().PRESETS[0].genes); return `<b>Score 0–100, hoger = beter.</b> 100 = elke keer de kortste route. Testbaan = 12 vaste doolhoven, elk 2×; iedereen loopt dezelfde, dus scores zijn eerlijk te vergelijken.<p>Vijf treden: verdwaalt (0–20) · zwak · redelijk · goed · bijna perfect (80–100). Ijkpunten: ${esc(EV().PRESETS[0].name)} (willekeurig) ${dw.score} · ${esc(bc.p.name)} (beste klassieker) ${bc.t.score} = ▼.</p>`; },
+    h: () => { const bc = EV().bestClassic(), kh = EV().heavyReady() ? EV().heavyScore(bc.p.genes).score : null; return `<b>Zwaar = zelfde maat, veel moeilijkere doolhoven.</b> 8 grote doolhoven met lussen en puzzels${kh != null ? `; ook ${esc(bc.p.name)} haalt hier maar ${kh}` : ''}.<p>Zelfde treden als de testbaan, dus bijna alles staat hier op “verdwaalt”: vergelijk zwaar alleen met zwaar.</p>`; },
+    d: () => `<b>Moeilijkheid = 100 − score op dit doolhof.</b> Hoger = moeilijker doolhof = beter gevonden. Paars, zodat je het niet verwart met een algoritme-score.<p>“voor klassieker”: hoe moeilijk hetzelfde doolhof is voor de beste klassieker. Rood = moeilijker voor jouw algoritme dan voor de klassieker (een zwakke plek).</p>`
+  };
+  const info = k => `<details class="inf" onclick="event.stopPropagation()"><summary title="Uitleg">i</summary><div>${INFO[k]()}</div></details>`;
+  const kompasMark = heavy => { const bc = EV().bestClassic(); if (!heavy) return { mark: bc.t.score, markName: bc.p.name }; return EV().heavyReady() ? { mark: EV().heavyScore(bc.p.genes).score, markName: bc.p.name } : {}; };
+  // scorevak: grote Score (testbaan) in treden, optioneel zwaar en een vergelijking vs = { name, t }
   function scoreBox(t, h, vs) {
     let cmp = '';
-    if (vs && vs.t) cmp = `<br>${signed(r1(t.score - vs.t.score))} t.o.v. ${esc(vs.name)} ${sureTag(sureOf(t.per, vs.t.per))}`;
-    return `<div class="evo-score"><b title="Score 0–100: 100 = elke keer de kortste route">${t.score}</b><span>Score · testbaan<br>${t.solved}/${t.of} gehaald${cmp}</span>${h && h.score != null ? `<b class="hv" title="Score op de zware testbaan (8 grote doolhoven met lussen en puzzels)">${h.score}</b><span>Score<br>zwaar</span>` : ''}</div>`;
+    if (vs && vs.t) cmp = ` · ${signed(r1(t.score - vs.t.score))} t.o.v. ${esc(vs.name)} ${sureTag(sureOf(t.per, vs.t.per))}`;
+    const bc = EV().bestClassic(), dw = EV().testScore(EV().PRESETS[0].genes), b = band(t.score);
+    const hv = h && h.score != null ? `<div class="es-hv"><span>Zwaar ${info('h')}</span><b style="color:${band(h.score).c}">${h.score}</b>${scoreWord(h.score)}${treden(h.score, { sm: true, ...kompasMark(true) })}</div>` : '';
+    return `<div class="evo-score"><div class="es-top"><b style="color:${b.c}">${t.score}<small>/100</small></b>${scoreWord(t.score)}${info('t')}</div>
+      ${treden(t.score, kompasMark(false))}
+      <div class="es-tk"><span style="left:0">${esc(EV().PRESETS[0].name)} ${dw.score}</span><span class="c" style="left:${bc.t.score}%">▼ ${esc(bc.p.name)} ${bc.t.score}</span><span class="r">100 = perfect</span></div>
+      <div class="es-cmp">Testbaan · ${t.solved}/${t.of} gehaald${cmp}</div>${hv}</div>`;
   }
   const vsClassic = () => { const bc = EV().bestClassic(); return { name: bc.p.name, t: bc.t, id: bc.p.id }; };
   function entries() {
@@ -163,5 +186,5 @@
     EV().saveAlgos(list); return a;
   }
 
-  Object.assign(U, { $, TAU, EV, STORE, GRID_NAMES, SP_COLS, DUEL_COLS, SP_THR, SP_MAX, TASKS, esc, A, E, mkView, V, T, opts, rng, mm, nEval, nPanes, runs, isl, huntSet, HUNT_ASP, mazeSeed, persist, restore, fresh, nv, vd, speciate, colorFor, note, toast, geneZ, dnaHtml, dnaStrip, isSaved, sureOf, signed, sureTag, scoreBox, vsClassic, entries, entryById, subOf, pick, r1, addAlgo });
+  Object.assign(U, { $, TAU, EV, STORE, GRID_NAMES, SP_COLS, DUEL_COLS, SP_THR, SP_MAX, TASKS, esc, A, E, mkView, V, T, opts, rng, mm, nEval, nPanes, runs, isl, huntSet, HUNT_ASP, mazeSeed, persist, restore, fresh, nv, vd, speciate, colorFor, note, toast, geneZ, dnaHtml, dnaStrip, isSaved, sureOf, signed, sureTag, scoreBox, vsClassic, BANDS, HBANDS, band, treden, scoreWord, info, kompasMark, entries, entryById, subOf, pick, r1, addAlgo });
 })(window.ML = window.ML || {});

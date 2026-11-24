@@ -2,7 +2,7 @@
 (function (ML) {
   'use strict';
   const U = ML.EvoUI._;
-  const { $, A, E, EV, V, addAlgo, dnaHtml, dnaStrip, entries, entryById, esc, isSaved, note, r1, scoreBox, subOf, vsClassic } = U;
+  const { $, A, E, EV, V, addAlgo, dnaHtml, dnaStrip, entries, entryById, esc, isSaved, note, r1, scoreBox, subOf, vsClassic, band, scoreWord, treden, kompasMark } = U;
   let champCard, dotCls, rankList, seed, setPage, shareHtml, turbo;
   U.link(() => ({ champCard, dotCls, rankList, seed, setPage, shareHtml, turbo } = U));
 
@@ -38,7 +38,8 @@
     const tags = (a.tags || []).slice(0, 3).map(t => `<em class="tag">${esc(t)}</em>`).join('');
     return `<div class="acard${a.classic ? ' classic' : ''}${E.sel === a.id ? ' sel' : ''}" data-ev="sel" data-id="${esc(a.id)}" title="${esc(EV().describe(a.genes))}">
       <div class="ac-top"><i class="sw" style="background:${EV().colorOf(a.genes)}"></i><b>${esc(a.name)}</b>${a.ver > 1 && !/ v\d+$/.test(a.name) ? `<em class="ver">v${a.ver}</em>` : ''}</div>
-      <div class="ac-sc"><b title="Score 0–100 op de testbaan">${a.t.score}</b><span>score · ${a.t.solved}/${a.t.of}${a.h ? `<br>zwaar ${a.h.score}` : ''}</span></div>
+      <div class="ac-sc"><b style="color:${band(a.t.score).c}" title="Score 0–100 op de testbaan; hoger = beter">${a.t.score}<small>/100</small></b>${scoreWord(a.t.score)}</div>${treden(a.t.score, { sm: true, ...kompasMark(false) })}
+      <small class="ac-sub">${a.t.solved}/${a.t.of} gehaald${a.h ? ` · zwaar ${a.h.score} <span style="color:${band(a.h.score).c}">${band(a.h.score).w}</span>` : ''}</small>
       <small class="ac-sub">${esc(subOf(a))}</small>${tags ? `<div class="ac-tags">${tags}</div>` : ''}${dnaStrip(a.genes)}</div>`;
   }
   function algoGrid() {
@@ -72,7 +73,7 @@
     const el = $('#ac-live'); if (!el) return;
     const c = E.champ, bc = EV().bestClassic();
     el.innerHTML = `<div class="ac-top"><i class="${dotCls()}"></i><b>Generatie ${E.gen}</b><small>${E.pop.length} lopers · ${E.species.length} soorten${E.turbo ? ' · turbo' : V.running ? '' : ' · gepauzeerd'}</small></div>
-      ${c ? `<div class="ac-sc"><b>${c.test}</b><span>kampioen <b>${esc(c.name)}</b><br>${c.test > bc.t.score ? '🏆 boven' : 'nog onder'} ${esc(bc.p.name)} (${bc.t.score})</span></div>` : '<p class="hint">Nog geen generatie klaar.</p>'}
+      ${c ? `<div class="ac-sc"><b style="color:${band(c.test).c}">${c.test}<small>/100</small></b>${scoreWord(c.test)}<span>kampioen <b>${esc(c.name)}</b><br>${c.test > bc.t.score ? '🏆 boven' : 'nog onder'} ${esc(bc.p.name)} (${bc.t.score})</span></div>` : '<p class="hint">Nog geen generatie klaar.</p>'}
       ${spark()}`;
   }
   function markSel() { document.querySelectorAll('#algo-grid .acard').forEach(c => c.classList.toggle('sel', c.dataset.id === E.sel)); }

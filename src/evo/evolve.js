@@ -2,7 +2,7 @@
 (function (ML) {
   'use strict';
   const U = ML.EvoUI._;
-  const { $, A, E, EV, HUNT_ASP, T, V, addAlgo, dnaHtml, entries, esc, fresh, huntSet, isSaved, isl, mm, nEval, note, persist, rng, runs, scoreBox, speciate, subOf } = U;
+  const { $, A, E, EV, HUNT_ASP, T, V, addAlgo, dnaHtml, entries, esc, fresh, huntSet, isSaved, isl, mm, nEval, note, persist, rng, runs, scoreBox, speciate, subOf, band, treden } = U;
   let afterSave, algoDetail, algoGrid, drawChart, famRender, finishNow, huntMazes, key, liveCard, makePanes, mazesFor, rate, setPage, specsFor, startGen, tabsInfo, viewAspect;
   U.link(() => ({ afterSave, algoDetail, algoGrid, drawChart, famRender, finishNow, huntMazes, key, liveCard, makePanes, mazesFor, rate, setPage, specsFor, startGen, tabsInfo, viewAspect } = U));
 
@@ -131,14 +131,14 @@
   }
   function rankList() {
     const el = $('#evo-rank'); if (!el) return;
-    const list = entries(), bc = EV().bestClassic(), top = list.length ? list[0].t.score : 1;
+    const list = entries(), bc = EV().bestClassic();
     el.innerHTML = list.slice(0, 12).map((a, i) => {
       const beat = !a.classic && a.t.score > bc.t.score;
       return `<div class="erow${a.classic ? ' classic' : ''}${a.live ? ' live' : ''}" data-ev="sel-go" data-id="${esc(a.id)}" title="${esc(EV().describe(a.genes))} · klik: openen in Algoritmes">
         <b class="pos">${i + 1}</b><i class="sw" style="background:${EV().colorOf(a.genes)}"></i>
         <span class="nm">${beat ? '🏆 ' : ''}${esc(a.name)}<small>${esc(subOf(a))}</small></span>
-        <span class="sc">${a.t.score}<small title="zware testbaan">${a.h ? 'zwaar ' + a.h.score : a.t.solved + '/' + a.t.of}</small></span>
-        <span class="bar"><i style="width:${Math.max(2, a.t.score / Math.max(1, top) * 100)}%"></i></span></div>`;
+        <span class="sc" style="color:${band(a.t.score).c}">${a.t.score} <em style="font-size:10.5px">${band(a.t.score).w}</em><small title="zware testbaan">${a.h ? 'zwaar ' + a.h.score + ' · ' + band(a.h.score).w : a.t.solved + '/' + a.t.of}</small></span>
+        ${treden(a.t.score, { sm: true })}</div>`;
     }).join('') + (list.length > 12 ? `<p class="hint">+${list.length - 12} meer bij Algoritmes</p>` : '');
   }
   function status() {

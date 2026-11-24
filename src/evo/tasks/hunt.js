@@ -2,7 +2,7 @@
 (function (ML) {
   'use strict';
   const U = ML.EvoUI._;
-  const { $, A, DUEL_COLS, E, EV, GRID_NAMES, HUNT_ASP, T, esc, huntSet, note, pick, runs } = U;
+  const { $, A, DUEL_COLS, E, EV, GRID_NAMES, HUNT_ASP, T, esc, huntSet, note, pick, runs, band, HBANDS, treden, info } = U;
   let evoBar, key, makePanes, seed, setStep, startGen, startShow, taskIn, taskOut;
   U.link(() => ({ evoBar, key, makePanes, seed, setStep, startGen, startShow, taskIn, taskOut } = U));
 
@@ -56,11 +56,16 @@
   function huntOut() {
     const H = E.hunt, Ev = EV(); if (!H) return '';
     if (!H.found.length) return `<p class="hint" style="margin-top:0">${H.running ? `Zoeken… ${H.tried} doolhoven geprobeerd.` : 'Nog niets gezocht. Druk links op Zoek.'}</p>`;
-    return `<p style="margin-top:0">${H.running ? 'Zoeken… ' : ''}${H.tried} doolhoven geprobeerd. Score = gemiddelde van 3 runs (0–100); lager = moeilijker. Rood = slechter dan de beste klassieker.</p>
-      <div class="duel-wrap"><table class="duel hunt"><thead><tr><th>Doolhof</th><th>Score</th><th>Klassiek</th><th></th></tr></thead><tbody>
-      ${H.found.map((f, i) => `<tr${H.sel === i ? ' class="top"' : ''}><th>${esc(Ev.spName(f.sp))}<small>${esc(f.sp.maker)} · kortste ${f.opt}</small></th><td class="${f.sc < f.cb.sc ? 'worse' : ''}">${f.sc}</td><td>${f.cb.sc}<small>${esc(f.cb.name)}</small></td>
+    return `<p style="margin-top:0">${H.running ? 'Zoeken… ' : ''}${H.tried} doolhoven geprobeerd. Moeilijkheid = 100 − score van ${esc(H.target.name)} (gemiddelde van 3 runs). <b>Hoger = moeilijker doolhof.</b> Rood = moeilijker voor ${esc(H.target.name)} dan voor de beste klassieker.</p>
+      <div class="duel-wrap"><table class="duel hunt"><thead><tr><th>Doolhof</th><th>Moeilijkheid ${info('d')}</th><th>voor klassieker</th><th></th></tr></thead><tbody>
+      ${H.found.map((f, i) => `<tr${H.sel === i ? ' class="top"' : ''}><th>${esc(Ev.spName(f.sp))}<small>${esc(f.sp.maker)} · kortste ${f.opt}</small></th>${huntCell(f)}
         <td class="acts"><button data-ev="hunt-watch" data-i="${i}" title="Bekijk in het doolhof">▶</button><button data-ev="hunt-duel" data-i="${i}" title="Duel met de beste klassieker op dit doolhof">vs</button></td></tr>`).join('')}
       </tbody></table></div>`;
+  }
+  const r1h = v => Math.round(v * 10) / 10;
+  function huntCell(f) {
+    const d = r1h(100 - f.sc), dk = r1h(100 - f.cb.sc), b = band(d, HBANDS);
+    return `<td class="${f.sc < f.cb.sc ? 'worse' : ''}"><b style="color:${f.sc < f.cb.sc ? '#ff6b6b' : b.c}">${d}</b> <em style="color:${b.c};font-size:10.5px">${b.w}</em>${treden(d, { sm: true, B: HBANDS })}</td><td>${dk}<small>${band(dk, HBANDS).w} · ${esc(f.cb.name)}</small></td>`;
   }
   function huntShow(i, duel) {
     const H = E.hunt, f = H && H.found[i]; if (!f) return;
