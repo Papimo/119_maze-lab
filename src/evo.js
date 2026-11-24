@@ -223,7 +223,16 @@
       }
       return { fit, ok, steps };
     }
-    return { Walker, evalOne, evalList, makeRng };
+    // zelfde lopen als evalList, maar losse scores terug (sc[(j*M + i)*R + r]) → de hoofddraad telt op in vaste volgorde (bit-gelijk aan evalList)
+    function evalRaw(ctxs, genesList, ids, gen, runs, i0) {
+      const N = genesList.length, M = ctxs.length, R = runs || 1, o = i0 || 0, sc = new Float64Array(N * M * R), ok = new Int32Array(N), steps = new Int32Array(N);
+      for (let j = 0; j < N; j++) for (let i = 0; i < M; i++) for (let r = 0; r < R; r++) {
+        const w = evalOne(ctxs[i], genesList[j], ids[j] + '|' + gen + '|' + (i + o) + (r ? '|r' + r : ''));
+        sc[(j * M + i) * R + r] = w.score(); if (w.reached) ok[j]++; steps[j] += w.steps;
+      }
+      return { sc, ok, steps };
+    }
+    return { Walker, evalOne, evalList, evalRaw, makeRng };
   }
   const ENG = ENGINE();
   const ENGINE_V = 3; // verandert de loper-logica → testscores opnieuw in de geschiedenis
@@ -266,8 +275,6 @@
   const PACK = ['n', 'N', 'cellOf', 'off', 'to', 'tc', 'kd', 'ex', 'ey', 'an', 'start', 'startCell', 'goal', 'exits', 'eu', 'dist', 'opt', 'd0', 'cap'];
   function pack(ctx) { if (!ctx._pack) { const o = {}; PACK.forEach(k => { o[k] = ctx[k]; }); ctx._pack = o; } return ctx._pack; }
 
-  // Walker met de oude aanroep: new Walker(ctx, genes, seed)
-  const Walker = ENG.Walker;
 
   // ---- Doolhoven ----
   const MAKERS = ['backtracker', 'prim', 'kruskal', 'wilson', 'huntkill'];
@@ -317,10 +324,11 @@
     return testSet;
   }
   const testCache = new Map();
+  const gkey = genes => genes.map(v => v.toFixed(3)).join(',');
   // → { score 0..100, solved (aantal gehaald van 24), ratio (gem. stappen / kortste bij gehaald), per: score per testdoolhof, cats: score per soort }
   function testScore(genes) {
-    const key = genes.map(v => v.toFixed(3)).join(',');
-    if (testCache.has(key)) return testCache.get(key);
+    const hit = testCache.get(gkey(genes));
+    if (hit) return hit;
     return testCombine(genes, testPart(genes, TEST.map((_, i) => i)));
   }
   // deel van de testbaan (doolhoven idx) → [{ i, s (som van 2 runs), solved, rs }]; workers rekenen elk een stukje
@@ -347,7 +355,7 @@
   // uitkomst uit een worker in dezelfde cache
   function testPut(genes, res) {
     if (testCache.size > 3000) testCache.clear();
-    testCache.set(genes.map(v => v.toFixed(3)).join(','), res);
+    testCache.set(gkey(genes), res);
     return res;
   }
   function bestClassic() {
@@ -376,20 +384,25 @@
     ['square', 40, 0, 0], ['square', 56, 20, 0], ['square', 70, 0, 1], ['hex', 40, 25, 0],
     ['tri', 48, 0, 1], ['polar', 50, 30, 0], ['square', 44, 40, 1], ['hex', 46, 0, 1]
   ].map(([grid, size, braid, puzzle], i) => ({ grid, size, braid, puzzle, maker: MAKERS[i % MAKERS.length], seed: 'evo-zwaar-' + (i + 1) }));
-  let heavySet = null;
-  const heavyMazes = () => heavySet || (heavySet = HEAVY.map(sp => { const m = specMaze(sp).ctx; spCache.clear(); return m; }));
+  const heavySet = [];
+  const heavyCtx = i => heavySet[i] || (heavySet[i] = (() => { const c = specMaze(HEAVY[i]).ctx; spCache.clear(); return c; })()); // groot: niet in spCache houden
   const heavyCache = new Map();
   function heavyScore(genes) {
-    const key = genes.map(v => v.toFixed(3)).join(',');
-    if (heavyCache.has(key)) return heavyCache.get(key);
+    const hit = heavyCache.get(gkey(genes));
+    return hit || heavyCombine(genes, heavyPart(genes, HEAVY.map((_, i) => i)));
+  }
+  // deel van de zware testbaan → [{ i, sc, ok }] (workers rekenen elk een stukje; elke worker bouwt alleen zijn eigen doolhoven)
+  function heavyPart(genes, idx) { return idx.map(i => { const w = ENG.evalOne(heavyCtx(i), genes, 'zwaar|' + i); return { i, sc: w.score(), ok: w.reached ? 1 : 0 }; }); }
+  function heavyCombine(genes, parts) {
     let tot = 0, solved = 0;
-    const per = heavyMazes().map((ctx, i) => { const w = ENG.evalOne(ctx, genes, 'zwaar|' + i), sc = w.score(); tot += sc; if (w.reached) solved++; return sc; });
+    const per = HEAVY.map(() => 0);
+    parts.slice().sort((a, b) => a.i - b.i).forEach(p => { tot += p.sc; solved += p.ok; per[p.i] = p.sc; }); // vaste volgorde = zelfde afronding
     const res = { score: Math.round(tot / HEAVY.length * 1000) / 10, solved, of: HEAVY.length, per };
     if (heavyCache.size > 3000) heavyCache.clear();
-    heavyCache.set(key, res);
+    heavyCache.set(gkey(genes), res);
     return res;
   }
-  const heavyReady = () => !!heavySet;
+  const heavyReady = () => HEAVY.every((_, i) => heavySet[i]);
 
   // ---- Evolutie ----
   let uid = 0;
@@ -471,10 +484,11 @@
           : `const E=(${ENGINE.toString()})();const cache=new Map();`;
         const body = `onmessage=function(e){const d=e.data;let ctxs;
 
-if(d.build)ctxs=d.specs.map(x=>E.buildMaze(x.o,x.sd,x.i,x.asp).ctx);
+if(d.only){postMessage({job:d.job,part:d.part,tp:d.only==='heavy'?E.heavyPart(d.test,d.tidx):E.testPart(d.test,d.tidx)});return;}
+if(d.build)ctxs=d.specs.map(x=>x.sp?E.specMaze(x.sp,x.asp).ctx:E.buildMaze(x.o,x.sd,x.i,x.asp).ctx);
 else{if(d.clear)cache.clear();if(d.ctxs)for(const k in d.ctxs)cache.set(k,d.ctxs[k]);ctxs=d.keys.map(k=>cache.get(k));}
-const r=E.evalList(ctxs,d.genes,d.ids,d.gen,d.runs,d.i0);postMessage({job:d.job,part:d.part,fit:r.fit,ok:r.ok,steps:r.steps,tp:d.test?E.testPart(d.test,d.tidx):null});
-if(d.pre)for(const x of d.pre)E.buildMaze(x.o,x.sd,x.i,x.asp);};`; // pre = doolhoven van de volgende generatie alvast bouwen (terwijl de hoofddraad kinderen maakt)
+const r=d.raw?E.evalRaw(ctxs,d.genes,d.ids,d.gen,d.runs,d.i0):E.evalList(ctxs,d.genes,d.ids,d.gen,d.runs,d.i0);postMessage({job:d.job,part:d.part,sc:r.sc,fit:r.fit,ok:r.ok,steps:r.steps,tp:d.test?E.testPart(d.test,d.tidx):null});
+if(d.pre)for(const x of d.pre)x.sp?E.specMaze(x.sp,x.asp):E.buildMaze(x.o,x.sd,x.i,x.asp);};`; // pre = doolhoven van de volgende generatie alvast bouwen (terwijl de hoofddraad kinderen maakt)
         const url = URL.createObjectURL(new Blob([src + '\n' + body], { type: 'text/javascript' }));
         this.ws = [];
         for (let i = 0; i < this.size(); i++) {
@@ -489,6 +503,7 @@ if(d.pre)for(const x of d.pre)E.buildMaze(x.o,x.sd,x.i,x.asp);};`; // pre = dool
     // jobs = [{ w (worker-index), msg, apply(d) }] → Promise; terugval = fb() op de hoofddraad
     run(jobs, fb) {
       const job = ++this.job;
+      if (!jobs.length) return Promise.resolve();
       return new Promise(resolve => {
         let left = jobs.length, over = false;
         const end = ok => { if (over) return; over = true; clearTimeout(timer); this.wait.delete(job); if (!ok) { this.broken = true; fb(); } resolve(); };
@@ -497,7 +512,28 @@ if(d.pre)for(const x of d.pre)E.buildMaze(x.o,x.sd,x.i,x.asp);};`; // pre = dool
         jobs.forEach((j, p) => this.ws[j.w].postMessage(Object.assign({ job, part: p }, j.msg)));
       });
     },
-    // doolhoven op de hoofddraad gebouwd, rijen naar de workers (populatie verdeeld)
+    // testbaan (kind 'test') of zware testbaan ('heavy') in de workers → Promise met dezelfde uitkomst als testScore/heavyScore
+    // doolhof i gaat altijd naar worker i % W: die houdt hem in zijn cache. Geen workers → hoofddraad (meteen).
+    scoreAsync(kind, genes) {
+      const heavy = kind === 'heavy', cache = heavy ? heavyCache : testCache, key = gkey(genes), hit = cache.get(key);
+      if (hit) return Promise.resolve(hit);
+      const main = () => heavy ? heavyScore(genes) : testScore(genes);
+      if (!this.ensure() || this.broken || (heavy && !this.canBuild)) return Promise.resolve(main());
+      const fly = this.fly || (this.fly = new Map()), fk = kind + '|' + key;
+      if (fly.has(fk)) return fly.get(fk);
+      const W = this.ws.length, list = heavy ? HEAVY : TEST, idx = [], parts = [];
+      list.forEach((_, i) => { (idx[i % W] = idx[i % W] || []).push(i); });
+      const jobs = idx.filter(Boolean).map((tidx, k) => ({ w: k, msg: { only: kind, test: genes, tidx }, apply: d => { parts.push(...d.tp); } }));
+      let fell = false;
+      const pr = this.run(jobs, () => { fell = true; }).then(() => {
+        fly.delete(fk);
+        if (fell || parts.length !== list.length) return main();
+        return heavy ? heavyCombine(genes, parts) : testCombine(genes, parts);
+      });
+      fly.set(fk, pr);
+      return pr;
+    },
+    // alleen zonder bouwen-in-workers (MLDEF onvolledig): doolhoven op de hoofddraad gebouwd, rijen naar de workers (populatie verdeeld)
     evaluate(pop, mazes, gen, runs) {
       if (!this.ensure() || this.broken) { evaluate(pop, mazes, gen, runs); return Promise.resolve(pop); }
       const W = this.ws.length, per = Math.ceil(pop.length / W), keys = mazes.map(mz => mz.key), jobs = [];
@@ -512,31 +548,38 @@ if(d.pre)for(const x of d.pre)E.buildMaze(x.o,x.sd,x.i,x.asp);};`; // pre = dool
       }
       return this.run(jobs, () => evaluate(pop, mazes, gen, runs)).then(() => pop);
     },
-    // doolhoven bouwen ín de workers: specs = [{ o, sd, i, asp }]; elk doolhof wordt door 1 worker (of een paar bij weinig doolhoven) gebouwd
+    // doolhoven bouwen ín de workers: specs = [{ o, sd, i, asp }] of [{ sp, i, asp }] (losse beschrijving, zoals specMaze; doolhof-zoeker). Werk = M doolhoven × N lopers, in W gelijke stukken (stuk k → worker k;
+    // een stuk dat over een doolhofgrens loopt = twee berichten). Losse scores terug, optellen in vaste volgorde → zelfde fitness als evaluate().
     // x = { next: specs van de volgende generatie (zelfde worker bouwt ze alvast), test: genes → x.onTest(testScore) in een worker }
     evaluateSpecs(pop, specs, gen, runs, fallbackMazes, x) {
       if (!this.ensure() || this.broken || !this.canBuild) return null;
-      const W = this.ws.length, M = specs.length, c = Math.max(1, Math.floor(W / M)), per = Math.ceil(pop.length / c), N = pop.length;
-      const sum = new Float64Array(N), ok = new Int32Array(N), st = new Int32Array(N), jobs = [], next = x && x.next;
-      specs.forEach((sp, i) => {
-        for (let p = 0; p * per < N; p++) {
-          const from = p * per, part = pop.slice(from, from + per), w = jobs.length % W;
-          const pre = next && next[i] && !jobs.some(j => j.w === w && j.msg.pre && j.msg.pre[0] === next[i]) ? [next[i]] : null;
-          jobs.push({ w, msg: { build: true, specs: [sp], genes: part.map(g => g.genes), ids: part.map(g => g.id), gen, runs, i0: sp.i, pre },
-            apply: d => { for (let j = 0; j < part.length; j++) { sum[from + j] += d.fit[j]; ok[from + j] += d.ok[j]; st[from + j] += d.steps[j]; } } });
+      const W = this.ws.length, M = specs.length, N = pop.length, R = runs || 1, U = N * M, next = x && x.next;
+      const sc = new Float64Array(U * R), ok = new Int32Array(N), st = new Int32Array(N), jobs = [], last = [];
+      const genes = pop.map(g => g.genes), ids = pop.map(g => g.id);
+      for (let k = 0; k < W; k++) {
+        const u0 = Math.floor(k * U / W), u1 = Math.floor((k + 1) * U / W), built = new Set();
+        for (let u = u0; u < u1;) {
+          const i = Math.floor(u / N), from = u - i * N, to = Math.min(N, from + (u1 - u)), sp = specs[i];
+          const pre = next && next[i] && !built.has(i) ? [next[i]] : null; built.add(i);
+          jobs.push({ w: k, msg: { build: true, raw: true, specs: [sp], genes: genes.slice(from, to), ids: ids.slice(from, to), gen, runs: R, i0: sp.i, pre },
+            apply: d => { for (let j = 0; j < to - from; j++) { for (let r = 0; r < R; r++) sc[((from + j) * M + i) * R + r] = d.sc[j * R + r]; ok[from + j] += d.ok[j]; st[from + j] += d.steps[j]; } } });
+          u += to - from;
         }
-      });
-      // testbaan van de vorige beste: doolhoven verdeeld over alle jobs (gelijke last)
-      const tparts = [];
-      if (x && x.test) {
-        jobs.forEach(j => { j.msg.test = x.test; j.msg.tidx = []; });
-        TEST.forEach((_, i) => jobs[(jobs.length - 1 - i % jobs.length)].msg.tidx.push(i));
-        jobs.forEach(j => { const ap = j.apply; j.apply = d => { ap(d); if (d.tp) tparts.push(...d.tp); }; });
+        if (u1 > u0) last.push(jobs.length - 1);
+      }
+      // testbaan van de vorige beste, verdeeld over de workers; al bekend (elite blijft vaak dezelfde) → niet opnieuw rekenen
+      const tparts = [], tHit = x && x.test ? testCache.get(gkey(x.test)) : null;
+      if (x && x.test && !tHit) {
+        const tj = last.map(p => jobs[p]); // per worker het laatste bericht (verdeeld vanaf de laatste worker: die heeft het kleinste stuk)
+        tj.forEach(j => { j.msg.test = x.test; j.msg.tidx = []; });
+        TEST.forEach((_, i) => tj[tj.length - 1 - i % tj.length].msg.tidx.push(i));
+        tj.forEach(j => { const ap = j.apply; j.apply = d => { ap(d); if (d.tp) tparts.push(...d.tp); }; });
       }
       let fell = false;
       return this.run(jobs, () => { fell = true; evaluate(pop, fallbackMazes(), gen, runs); }).then(() => {
-        if (!fell) pop.forEach((ge, j) => { ge.fit = sum[j] / M; ge.ok = ok[j]; ge.steps = st[j]; });
-        if (!fell && tparts.length === TEST.length) x.onTest(testCombine(x.test, tparts));
+        if (!fell) pop.forEach((ge, j) => { let s = 0; for (let q = j * M * R, e = q + M * R; q < e; q++) s += sc[q]; ge.fit = s / (M * R); ge.ok = ok[j]; ge.steps = st[j]; });
+        if (!fell && tHit) x.onTest(tHit);
+        else if (!fell && tparts.length === TEST.length) x.onTest(testCombine(x.test, tparts));
         return pop;
       });
     }
@@ -632,8 +675,9 @@ if(d.pre)for(const x of d.pre)E.buildMaze(x.o,x.sd,x.i,x.asp);};`; // pre = dool
     if (ML.onSolversChanged) ML.onSolversChanged();
   }
 
-  ML.Evo = { GENES, PRESETS, TEST, TEST_CATS, HEAVY, Walker, ENGINE_V, context, pack, buildMaze, mazeSpec, specMaze, spName, testScore, testPut, testPart, testCombine, testMazes, heavyScore, heavyReady, bestClassic,
-    initPop, evaluate, evalList: ENG.evalList, nextGen, nextGenIslands, assignIslands, Pool, loadFame, addFame, delFame, syncSolvers, solverFn, MAKERS, GRIDS,
+  ML.Evo = { GENES, PRESETS, TEST, TEST_CATS, HEAVY, Walker: ENG.Walker, ENGINE_V, context, pack, buildMaze, mazeSpec, specMaze, spName, testScore, testPut, testPart, testCombine, testMazes, heavyScore, heavyReady, bestClassic,
+    testScoreAsync: genes => Pool.scoreAsync('test', genes), heavyScoreAsync: genes => Pool.scoreAsync('heavy', genes), heavyPart, heavyCombine,
+    initPop, evaluate, evalList: ENG.evalList, evalRaw: ENG.evalRaw, nextGen, nextGenIslands, assignIslands, Pool, loadFame, addFame, delFame, syncSolvers, solverFn, MAKERS, GRIDS,
     evalOne: ENG.evalOne, genome, nameOf, colorOf, describe, dominant, norm, dnaDist, clamp, clampHard, upGenes, okGenes, randomGenes,
     loadAlgos, saveAlgos, newAlgo, stampHist, toCode, toShort, fromCode, newId, today };
   // eigen algoritmes meteen als oplosser (niet in de Web Worker: daar is geen ML.SOLVERS)
